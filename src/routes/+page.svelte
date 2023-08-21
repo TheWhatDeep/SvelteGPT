@@ -1,2 +1,17 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
+<script>
+    import './style.css';
+    import Messages from './messages.svelte'
+</script>
+<main>
+    <aside></aside>
+    <div id="app">
+        <nav class="navbar">
+
+        </nav>
+        <Messages>
+        </Messages>
+        <div class="chatbox">
+
+        </div>
+    </div>
+</main>

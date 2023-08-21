@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap');
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+:root {
+    --main-primary: rgb(200, 200, 200);
+    --main-secondary: rgb(50,50,50);
+}
+* {
+    font-family: 'Roboto', sans-serif;
+    box-sizing: border-box;
+    font-size: 1.3rem;
+}
+main {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 400px 1fr;
+}
+aside {
+    border-right: 1px solid var(--main-primary);
+    padding: 10px;
+}
+#app {
+    display: grid;
+    grid-template-rows: 70px 1fr 70px;
+}
+.navbar {
+    padding: 10px;
+    border-bottom: 1px solid var(--main-primary);
+}
+.messages {
+    padding: 10px;
+}
+.chatbox {
+    padding: 10px;
+    border-top: 1px solid var(--main-primary);
+}
+@media screen and (max-width: 80rem) {
+    main {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    aside {
+        z-index: 999;
+        position: fixed;
+        right: 100%;
+    }
+}
