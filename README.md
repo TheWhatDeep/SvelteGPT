@@ -1,18 +1,18 @@
-# create-svelte
+# SvelteGPT
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+AI powered svelte project. Using SvelteKit and langchain to develop a chat-bot.
 
-## Creating a project
+## Notes and to-do
 
-If you're seeing this, you've probably already done this step. Congrats!
-
+Couple of thins we need to do here. This includes:
 ```bash
-# create a new project in the current directory
-npm create svelte@latest
-
-# create a new project in my-app
-npm create svelte@latest my-app
+- UI and design
+- llm functionality
+- user authentication
+- database management
+- hosting the site
 ```
+I'll update this once I'm done with those things.
 
 ## Developing
 

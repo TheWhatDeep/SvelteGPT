@@ -11,10 +11,12 @@
         const result = await chat.predict(message);
         return result;
     }
-</script>
-<style>
 
-</style>
+    function getInput() {
+
+    }
+
+</script>
 
 <section class="messages">
     {#await receiveMessages("Who am I?") }
@@ -25,3 +27,6 @@
         <p style="color: red">{error.message}</p>
     {/await}
 </section>
+<div class="chatbox">
+    <input type="text" name="message" id="message">
+</div>

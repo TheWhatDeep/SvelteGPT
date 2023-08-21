@@ -33,6 +33,8 @@ aside {
 .navbar {
     padding: 10px;
     border-bottom: 1px solid var(--main-primary);
+    display: flex;
+    flex-flow: row nowrap;
 }
 .messages {
     padding: 10px;
@@ -41,14 +43,45 @@ aside {
     padding: 10px;
     border-top: 1px solid var(--main-primary);
 }
+.mobile-only {
+    display: none;
+}
+
+.nav-link {
+    aspect-ratio: 1/1;
+    height: 100%;
+    border: none;
+    background-color: transparent;
+    padding: 10px;
+    z-index: 999
+}
+.nav-link > img {
+    aspect-ratio: 1/1;
+    height: 100%;
+}
+
+.chatbox {
+    padding: 10px;
+    display: flex;
+    flex-flow: column nowrap;
+}
+.chatbox > input[type=text] {
+    height: 100%;
+    width: 20rem;
+}
+
 @media screen and (max-width: 80rem) {
     main {
         display: grid;
         grid-template-columns: 1fr;
     }
     aside {
+        background: rgb(50,50,50);
+        height: 100%;
+        width: 100%;
         z-index: 999;
         position: fixed;
         right: 100%;
+        border: none;
     }
 }
