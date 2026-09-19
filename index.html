@@ -447,9 +447,16 @@ body{
           override the auto-target. Useful for picking off a Spitter behind the horde.</p>
         <p><b>Upgrade</b> — clear a wave and choose one of three permanent upgrades.
           They stack for the whole run.</p>
-        <p><b>Watch for</b> — green <span class="k">Shamblers</span> are slow,
-          pale <span class="k">Runners</span> sprint, grey <span class="k">Brutes</span>
-          soak damage, and ochre <span class="k">Spitters</span> hit you from range.</p>
+        <p><b>The dead, in order of appearance</b></p>
+        <p><span class="k">Shambler</span> — green, slow, arrives in numbers.<br>
+          <span class="k">Runner</span> — pale and fast, closes before you notice.<br>
+          <span class="k">Crawler</span> — tan, scuttles on all fours, low and easy to lose.<br>
+          <span class="k">Brute</span> — grey and huge, soaks a magazine.<br>
+          <span class="k">Spitter</span> — ochre, hangs back and lobs acid.<br>
+          <span class="k">Bloater</span> — swollen and yellow-green; it detonates when
+          it dies, so do not kill it at arm's length.<br>
+          <span class="k">Howler</span> — red-brown; its shriek sends every walker
+          nearby into a sprint. Shoot it first.</p>
         <p>Desktop: <span class="k">WASD</span> to move, mouse to aim, hold to fire.</p>
       </div>
       <div class="stack">
@@ -593,17 +600,49 @@ function main(hotData) {
   };
   var QORDER = ['battery', 'balanced', 'high'];
 
+  // legSwing is the half-amplitude of the leg swing in radians. Stride length
+  // is DERIVED from it below rather than guessed, so gait speed always matches
+  // ground speed.
+  var LEG_LEN = 0.66;
+
   var ZTYPE = {
     shambler: { hp: 24,  speed: 2.60, dmg: 9,  radius: 0.46, scale: 1.00,
-                score: 10, color: 0x7FA04E, headColor: 0xA3C068, swing: 1.0 },
+                score: 10, color: 0x7FA04E, headColor: 0xA3C068,
+                legSwing: 0.58, reach: 1.15 },
     runner:   { hp: 15,  speed: 5.05, dmg: 7,  radius: 0.38, scale: 0.90,
-                score: 16, color: 0xC2BCA0, headColor: 0xDCD6BA, swing: 2.1 },
+                score: 16, color: 0xC2BCA0, headColor: 0xDCD6BA,
+                legSwing: 0.92, reach: 0.90 },
     brute:    { hp: 110, speed: 1.80, dmg: 24, radius: 0.86, scale: 1.62,
-                score: 45, color: 0x66737F, headColor: 0x808E9B, swing: 0.7 },
+                score: 45, color: 0x66737F, headColor: 0x808E9B,
+                legSwing: 0.48, reach: 1.02 },
     spitter:  { hp: 30,  speed: 2.45, dmg: 9,  radius: 0.44, scale: 0.98,
-                score: 28, color: 0xB98A30, headColor: 0xD8A945, swing: 1.2,
-                ranged: true, range: 12, cooldown: 2.5 }
+                score: 28, color: 0xB98A30, headColor: 0xD8A945,
+                legSwing: 0.56, reach: 1.20,
+                ranged: true, range: 12, cooldown: 2.5 },
+
+    // Scuttles on all fours — low, quick, easy to lose in a crowd.
+    crawler:  { hp: 13,  speed: 4.30, dmg: 6,  radius: 0.40, scale: 0.94,
+                score: 18, color: 0xA89A62, headColor: 0xC4B577,
+                legSwing: 0.74, reach: 1.15, crawl: true },
+
+    // Detonates on death. Kills its neighbours, and you if you were greedy.
+    bloater:  { hp: 58,  speed: 1.65, dmg: 14, radius: 0.72, scale: 1.30,
+                score: 36, color: 0x9AAB63, headColor: 0xB4C47A,
+                legSwing: 0.44, reach: 1.05,
+                explodes: true, blastRadius: 3.8, blastDamage: 34 },
+
+    // Support unit. Shrieks and the horde around it surges — kill it first.
+    howler:   { hp: 44,  speed: 1.95, dmg: 8,  radius: 0.46, scale: 1.06,
+                score: 42, color: 0xB2645A, headColor: 0xCC7E6E,
+                legSwing: 0.54, reach: 1.30,
+                howls: true, howlRadius: 9.5, cooldown: 6.5 }
   };
+
+  // stride = ground covered per full gait cycle, from the leg's own geometry
+  Object.keys(ZTYPE).forEach(function (k) {
+    var t = ZTYPE[k];
+    t.stride = 4 * LEG_LEN * t.scale * Math.sin(t.legSwing);
+  });
 
   /* ------------------------------------------------------------- utilities */
   function $(id) { return document.getElementById(id); }
@@ -705,6 +744,38 @@ function main(hotData) {
       o.connect(f);
       this.env(f, t, 0.13, 0.6, 0.07);
       o.start(t); o.stop(t + 0.8);
+    },
+    howl: function () {
+      if (!this.on || !this.ready) return;
+      var t = this.ctx.currentTime;
+      var o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(680, t + 0.22);
+      o.frequency.exponentialRampToValueAtTime(240, t + 0.85);
+      var f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 2.2;
+      o.connect(f);
+      this.env(f, t, 0.05, 0.8, 0.26);
+      o.start(t); o.stop(t + 0.95);
+    },
+    boom: function () {
+      if (!this.on || !this.ready) return;
+      var t = this.ctx.currentTime;
+      var src = this.noise(0.55);
+      var f = this.ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(1400, t);
+      f.frequency.exponentialRampToValueAtTime(90, t + 0.45);
+      src.connect(f);
+      this.env(f, t, 0.006, 0.5, 0.75);
+      var sub = this.ctx.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(110, t);
+      sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+      this.env(sub, t, 0.008, 0.4, 0.5);
+      src.start(t); src.stop(t + 0.58);
+      sub.start(t); sub.stop(t + 0.45);
     },
     hurt: function () {
       if (!this.on || !this.ready) return;
@@ -1021,12 +1092,15 @@ function main(hotData) {
 
   /* ------------------------------------------------------------- the player
      Few enough of these to be a normal Group rather than instanced.          */
+  var PLAYER_SWING = 0.95;                                    // radians
+  var PLAYER_STRIDE = 4 * LEG_LEN * Math.sin(PLAYER_SWING);   // ~2.15 units/cycle
+
   var player = {
     x: 0, z: 0, angle: 0, vx: 0, vz: 0,
     hp: 100, maxHp: 100, speed: 7.0, radius: 0.46,
     fireRate: 5.4, damage: 12, bulletSpeed: 34, pierce: 0, shots: 1,
     spread: 0.055, crit: 0.05, critMult: 2, regen: 0, armor: 0,
-    magnet: 3.2, range: 17, cooldown: 0, hurtCd: 0, muzzle: 0, bob: 0
+    magnet: 3.2, range: 17, cooldown: 0, hurtCd: 0, muzzle: 0, gait: 0
   };
 
   var playerGroup = new T.Group();
@@ -1208,7 +1282,8 @@ function main(hotData) {
       speed: t.speed * spScale * rand(0.9, 1.1),
       radius: t.radius, scale: t.scale * rand(0.94, 1.07),
       phase: rand(0, TAU), flash: 0, atkCd: rand(0, 1),
-      groanCd: rand(1, 9), lunge: 0
+      groanCd: rand(1, 9), lunge: 0,
+      rage: 0, pulse: 0, clawCd: 0, gaitAmp: 1
     });
   }
 
@@ -1602,7 +1677,35 @@ function main(hotData) {
     if (player.hp <= 0) gameOver();
   }
 
+  // A bloater's blast only SETS hp on its neighbours — it never kills them
+  // directly, so one detonation can't recurse into another mid-iteration.
+  // The deferred hp<=0 sweep at the top of the zombie loop collects them.
+  function detonate(z) {
+    var t = ZTYPE[z.type];
+    var R = t.blastRadius;
+    burst(z.x, 0.9, z.z, 26, 'gore', 7.5);
+    burst(z.x, 1.1, z.z, 14, 'spark', 6);
+    addDecal(z.x, z.z, R * 0.85);
+    Audio_.boom();
+    G.shake = Math.min(0.7, G.shake + 0.4);
+
+    var pd = Math.hypot(player.x - z.x, player.z - z.z);
+    if (pd < R) {
+      damagePlayer(Math.round(t.blastDamage * (1 - pd / R) + 4));
+    }
+    for (var k = 0; k < zombies.length; k++) {
+      var o = zombies[k];
+      if (o === z) continue;
+      var od = Math.hypot(o.x - z.x, o.z - z.z);
+      if (od < R) {
+        o.hp -= t.blastDamage * (1 - od / R);
+        o.flash = 1;
+      }
+    }
+  }
+
   function killZombie(z, i) {
+    if (ZTYPE[z.type].explodes) detonate(z);
     G.kills++;
     G.score += Math.round(ZTYPE[z.type].score * (1 + Math.floor(G.wave / 5) * 0.25));
     burst(z.x, 0.85 * z.scale, z.z, 9, 'gore', 3.4);
@@ -1644,15 +1747,20 @@ function main(hotData) {
     announce('Wave', String(n));
   }
 
+  // Each type enters a few waves apart so you meet one new threat at a time.
   function waveMix(n) {
     var bag = ['shambler', 'shambler', 'shambler'];
     if (n >= 2) bag.push('runner');
-    if (n >= 3) bag.push('runner');
+    if (n >= 3) bag.push('crawler', 'runner');
     if (n >= 4) bag.push('brute');
-    if (n >= 5) bag.push('runner', 'shambler');
+    if (n >= 5) bag.push('crawler', 'shambler');
     if (n >= 6) bag.push('spitter');
+    if (n >= 7) bag.push('bloater');
     if (n >= 8) bag.push('brute', 'spitter');
-    if (n >= 12) bag.push('runner', 'brute');
+    if (n >= 9) bag.push('howler');
+    if (n >= 11) bag.push('bloater', 'crawler');
+    if (n >= 13) bag.push('runner', 'brute', 'howler');
+    if (n >= 16) bag.push('spitter', 'bloater', 'crawler');
     return pick(bag);
   }
 
@@ -1738,8 +1846,13 @@ function main(hotData) {
     player.z = clamp(player.z, -ARENA + 1.4, ARENA - 1.4);
     resolveProps(player);
 
+    // Gait advances by distance travelled / stride length, so the feet plant
+    // at the speed the body actually moves instead of a fixed tempo.
     var moving = Math.hypot(player.vx, player.vz);
-    player.bob += moving * dt * 2.1;
+    player.gait += (moving / PLAYER_STRIDE) * TAU * dt;
+    if (player.gait > TAU) player.gait -= TAU;
+    player.gaitAmp = lerp(player.gaitAmp || 0,
+      clamp(moving / player.speed, 0, 1) * PLAYER_SWING, 1 - Math.pow(0.001, dt));
     if (player.hurtCd > 0) player.hurtCd -= dt;
     if (player.regen > 0 && player.hp > 0) {
       player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
@@ -1773,17 +1886,43 @@ function main(hotData) {
     for (var i = zombies.length - 1; i >= 0; i--) {
       var z = zombies[i];
       var t = ZTYPE[z.type];
+
+      if (z.hp <= 0) { killZombie(z, i); continue; }   // deferred/AoE deaths
+
       var dx = player.x - z.x, dz = player.z - z.z;
       var dist = Math.hypot(dx, dz) || 0.0001;
       z.angle = Math.atan2(dx, dz);
+
+      if (z.rage > 0) z.rage -= dt;
+      var rageMul = z.rage > 0 ? 1.5 : 1;
+      var moveSp = 0;                                  // speed actually used
+
+      if (t.howls) {
+        z.atkCd -= dt;
+        if (z.atkCd <= 0 && dist < 30) {
+          z.atkCd = t.cooldown * rand(0.85, 1.2);
+          var buffed = 0;
+          for (var hz = 0; hz < zombies.length; hz++) {
+            var o2 = zombies[hz];
+            if (o2 === z) continue;
+            if (Math.hypot(o2.x - z.x, o2.z - z.z) < t.howlRadius) {
+              o2.rage = 4.5; buffed++;
+            }
+          }
+          if (buffed) { Audio_.howl(); burst(z.x, 1.5, z.z, 12, 'spark', 3.2); }
+          z.pulse = 0.45;
+        }
+        if (z.pulse > 0) z.pulse -= dt;
+      }
 
       if (t.ranged) {
         // spitters hold at range and lob acid
         z.atkCd -= dt;
         var want = t.range * 0.8;
         var dir = dist > want + 1.5 ? 1 : (dist < want - 2 ? -0.6 : 0);
-        z.x += (dx / dist) * z.speed * dir * dt;
-        z.z += (dz / dist) * z.speed * dir * dt;
+        moveSp = z.speed * rageMul * Math.abs(dir);
+        z.x += (dx / dist) * z.speed * rageMul * dir * dt;
+        z.z += (dz / dist) * z.speed * rageMul * dir * dt;
         if (dist < t.range && z.atkCd <= 0) {
           z.atkCd = t.cooldown * rand(0.8, 1.25);
           if (eBullets.length < MAXE) {
@@ -1797,17 +1936,25 @@ function main(hotData) {
         }
       } else {
         var chase = dist > (z.radius + player.radius + 0.1) ? 1 : 0;
-        var sp2 = z.speed * (z.lunge > 0 ? 1.8 : 1);
+        var sp2 = z.speed * rageMul * (z.lunge > 0 ? 1.8 : 1);
+        moveSp = sp2 * chase;
         z.x += (dx / dist) * sp2 * chase * dt;
         z.z += (dz / dist) * sp2 * chase * dt;
         if (z.lunge > 0) z.lunge -= dt;
 
-        z.atkCd -= dt;
-        if (dist < z.radius + player.radius + 0.35 && z.atkCd <= 0) {
-          z.atkCd = 0.95;
+        if (!t.howls) {
+          z.atkCd -= dt;
+          if (dist < z.radius + player.radius + 0.35 && z.atkCd <= 0) {
+            z.atkCd = 0.95;
+            damagePlayer(t.dmg);
+            z.lunge = 0.18;
+          }
+        } else if (dist < z.radius + player.radius + 0.35 && z.clawCd <= 0) {
+          z.clawCd = 1.2;
           damagePlayer(t.dmg);
           z.lunge = 0.18;
         }
+        if (z.clawCd > 0) z.clawCd -= dt;
       }
 
       // separation so the horde spreads rather than stacking
@@ -1827,7 +1974,12 @@ function main(hotData) {
       z.x = clamp(z.x, -ARENA + 1.2, ARENA - 1.2);
       z.z = clamp(z.z, -ARENA + 1.2, ARENA - 1.2);
 
-      z.phase += dt * t.swing * (2.6 + z.speed * 0.5);
+      // Gait from distance covered, not a fixed tempo — a brute at 1.8 u/s and
+      // a runner at 5 u/s now plant their feet at rates that match the ground.
+      // The floor keeps stalled or attacking bodies shuffling instead of frozen.
+      z.phase += ((Math.max(moveSp, 0.45) / t.stride) * TAU) * dt;
+      if (z.phase > TAU) z.phase -= TAU;
+      z.gaitAmp = clamp(0.35 + (moveSp / Math.max(z.speed, 0.01)) * 0.65, 0, 1);
       if (z.flash > 0) z.flash -= dt * 5;
 
       z.groanCd -= dt;
@@ -1952,54 +2104,103 @@ function main(hotData) {
       var s = z.scale * (1 + Math.max(0, z.flash) * 0.16);
       var walk = Math.sin(z.phase);
       var walk2 = Math.sin(z.phase + PI);
-      var lean = z.type === 'brute' ? 0.06 : 0.16;
+      var amp = z.gaitAmp === undefined ? 1 : z.gaitAmp;
+      var swing = t.legSwing * amp;
+      var lunge = z.lunge > 0 ? 0.55 : 0;
 
       _body.position.set(z.x, 0, z.z);
       _body.rotation.set(0, z.angle, 0);
       _body.scale.set(s, s, s);
       _body.updateMatrix();
 
-      // torso — hunched, bobbing with the gait
-      _limb.position.set(0, 1.03 + Math.abs(walk) * 0.035, 0);
-      _limb.rotation.set(lean, 0, walk * 0.05);
-      _limb.scale.set(1, 1, 1);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.torso.setMatrixAt(i, _m);
+      if (t.crawl) {
+        /* ---- on all fours: body low and near-horizontal, limbs scrabbling ---- */
+        _limb.position.set(0, 0.46 + Math.abs(walk) * 0.03, 0);
+        _limb.rotation.set(1.30, 0, walk * 0.12);
+        _limb.scale.set(1, 1, 1);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.torso.setMatrixAt(i, _m);
 
-      // head
-      _limb.position.set(0, 1.55 + Math.abs(walk) * 0.03, 0.06);
-      _limb.rotation.set(lean * 1.3, walk * 0.12, walk * 0.07);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.head.setMatrixAt(i, _m);
+        _limb.position.set(0, 0.60, 0.42);
+        _limb.rotation.set(-0.35, walk * 0.18, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.head.setMatrixAt(i, _m);
 
-      // arms reach forward — the classic silhouette
-      var reach = z.type === 'runner' ? 0.9 : 1.15;
-      _limb.position.set(-0.34, 1.32, 0);
-      _limb.rotation.set(-reach + walk * 0.22, 0, 0.14);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.armL.setMatrixAt(i, _m);
+        // front limbs paw at the ground, alternating
+        _limb.position.set(-0.26, 0.56, 0.24);
+        _limb.rotation.set(-2.05 + walk * 0.55, 0, 0.30);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armL.setMatrixAt(i, _m);
 
-      _limb.position.set(0.34, 1.32, 0);
-      _limb.rotation.set(-reach + walk2 * 0.22, 0, -0.14);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.armR.setMatrixAt(i, _m);
+        _limb.position.set(0.26, 0.56, 0.24);
+        _limb.rotation.set(-2.05 + walk2 * 0.55, 0, -0.30);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armR.setMatrixAt(i, _m);
 
-      // legs
-      _limb.position.set(-0.15, 0.68, 0);
-      _limb.rotation.set(walk * 0.62, 0, 0);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.legL.setMatrixAt(i, _m);
+        // hind legs kick out behind
+        _limb.position.set(-0.17, 0.44, -0.30);
+        _limb.rotation.set(-1.15 + walk2 * swing, 0, 0.18);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legL.setMatrixAt(i, _m);
 
-      _limb.position.set(0.15, 0.68, 0);
-      _limb.rotation.set(walk2 * 0.62, 0, 0);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.legR.setMatrixAt(i, _m);
+        _limb.position.set(0.17, 0.44, -0.30);
+        _limb.rotation.set(-1.15 + walk * swing, 0, -0.18);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legR.setMatrixAt(i, _m);
+      } else {
+        /* ---- upright ---- */
+        var lean = t.explodes ? 0.04 : (z.type === 'brute' ? 0.06 : 0.16);
+        // a howler mid-shriek rears back; a bloater sways with its own weight
+        var rear = (t.howls && z.pulse > 0) ? -0.42 : 0;
+        var sway = t.explodes ? Math.sin(z.phase * 0.5) * 0.09 : 0;
+
+        _limb.position.set(0, 1.03 + Math.abs(walk) * 0.035 * amp, 0);
+        _limb.rotation.set(lean + rear, 0, walk * 0.05 + sway);
+        // a bloater is distended — read it at a glance before it reaches you
+        if (t.explodes) _limb.scale.set(1.42, 1.12, 1.52);
+        else _limb.scale.set(1, 1, 1);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.torso.setMatrixAt(i, _m);
+
+        _limb.position.set(0, 1.55 + Math.abs(walk) * 0.03 * amp, 0.06);
+        _limb.rotation.set(lean * 1.3 + rear * 1.6, walk * 0.12, walk * 0.07);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.head.setMatrixAt(i, _m);
+
+        // arms reach forward — the classic silhouette
+        var reach = t.reach + lunge;
+        _limb.position.set(-0.34, 1.32, 0);
+        _limb.rotation.set(-reach + walk * 0.22 * amp, 0, 0.14);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armL.setMatrixAt(i, _m);
+
+        _limb.position.set(0.34, 1.32, 0);
+        _limb.rotation.set(-reach + walk2 * 0.22 * amp, 0, -0.14);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armR.setMatrixAt(i, _m);
+
+        _limb.position.set(-0.15, 0.68, 0);
+        _limb.rotation.set(walk * swing, 0, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legL.setMatrixAt(i, _m);
+
+        _limb.position.set(0.15, 0.68, 0);
+        _limb.rotation.set(walk2 * swing, 0, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legR.setMatrixAt(i, _m);
+      }
     }
 
     for (gi = 0; gi < ZNAMES.length; gi++) {
@@ -2009,6 +2210,7 @@ function main(hotData) {
       for (var ki = 0; ki < ZKEYS.length; ki++) {
         var part = group[ZKEYS[ki]];
         part.count = c;
+        part.visible = c > 0;          // skip types absent from this wave
         part.instanceMatrix.needsUpdate = true;
       }
     }
@@ -2098,12 +2300,14 @@ function main(hotData) {
   }
 
   function syncPlayer(now) {
-    playerGroup.position.set(player.x, 0, player.z);
+    playerGroup.position.set(player.x, playerGroup.position.y, player.z);
     playerGroup.rotation.y = player.angle;
     var legs = playerGroup.userData.legs;
-    var sw = Math.sin(player.bob * 3.2) * 0.5;
+    var sw = Math.sin(player.gait) * (player.gaitAmp || 0);
     legs[0].rotation.x = sw;
     legs[1].rotation.x = -sw;
+    // a little vertical bounce on each footfall, for weight
+    playerGroup.position.y = Math.abs(Math.sin(player.gait)) * (player.gaitAmp || 0) * 0.09;
     playerGroup.userData.flash.visible = player.muzzle > 0;
     if (player.muzzle > 0) {
       var f = playerGroup.userData.flash;
@@ -2220,7 +2424,7 @@ function main(hotData) {
         z.x += Math.sin(z.angle) * 0.4 * dt;
         z.z += Math.cos(z.angle) * 0.4 * dt;
       }
-      z.phase += dt * ZTYPE[z.type].swing * 3;
+      z.phase += ((z.speed * 0.45) / ZTYPE[z.type].stride) * TAU * dt;
       for (var j = i - 1; j >= 0; j--) {
         var o = zombies[j];
         var sx = z.x - o.x, sz = z.z - o.z, sd = Math.hypot(sx, sz);

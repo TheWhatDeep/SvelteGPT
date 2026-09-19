@@ -11,8 +11,21 @@ You hold a lamp-lit parking lot against escalating waves of the dead. Clear a
 wave, take one of three permanent upgrades, repeat until you're overrun. Score
 and best wave persist locally.
 
-- **Endless waves** with four enemy types — Shamblers, Runners, Brutes, and
-  ranged Spitters — that enter the mix as waves progress.
+- **Endless waves** with seven enemy types, each entering a few waves apart so
+  you meet one new threat at a time:
+
+  | Type | From wave | Behaviour |
+  |---|---|---|
+  | Shambler | 1 | Slow, weak, arrives in numbers |
+  | Runner | 2 | Fast, fragile, closes before you notice |
+  | Crawler | 3 | Scuttles on all fours — low silhouette, easy to lose in a crowd |
+  | Brute | 4 | Huge and slow, soaks a magazine |
+  | Spitter | 6 | Holds at range and lobs acid |
+  | Bloater | 7 | Detonates on death, damaging you *and* its neighbours |
+  | Howler | 9 | Shrieks and every walker nearby surges to 1.5× speed |
+
+  Bloaters and Howlers exist to break the "hold the trigger" reflex: one
+  punishes killing at arm's length, the other makes target priority matter.
 - **Twelve stacking upgrades**: damage, fire rate, pierce, multishot, crit,
   armour, regen, pickup magnet, and more.
 - **One-thumb play.** The left half of the screen is a floating movement stick;
@@ -40,7 +53,9 @@ with a fallback source. Everything else is in `index.html`.
 There are no model or texture files. Every asset is authored in code at runtime:
 
 - **Zombies** are six-part articulated figures — torso, head, two arms, two legs
-  — with per-limb walk animation driven by a phase offset per body.
+  — with per-limb walk animation driven by a phase offset per body. Crawlers
+  reuse the same six parts in a different pose: torso near-horizontal, front
+  limbs pawing at the ground, hind legs kicking out behind.
 - **The ground** is a 2D canvas painted at startup: asphalt grain, cracks, faded
   parking bays, and the warm pools beneath each streetlight, baked in at the
   lamps' own coordinates.
@@ -49,6 +64,22 @@ There are no model or texture files. Every asset is authored in code at runtime:
 This was originally a constraint — the page is published as a sandboxed artifact
 that cannot fetch external media — but it keeps the whole game in one file with
 zero network requests after the engine loads.
+
+### Gait is derived, not tuned
+
+Walk cycles are driven by **distance travelled**, never by a fixed tempo. A leg
+of length `L` swinging `±θ` advances the body `4·L·sin(θ)` per cycle, so each
+body type's stride is computed from its own leg geometry at startup:
+
+```js
+t.stride = 4 * LEG_LEN * t.scale * Math.sin(t.legSwing);
+```
+
+The phase then advances by `(speed / stride) × 2π` per second. Feet cannot
+slide, because the animation rate is a function of the movement rate rather
+than a constant someone guessed. A Brute at 1.8 u/s and a Runner at 5.05 u/s
+plant their feet at visibly different rates without either being hand-tuned,
+and changing a type's speed needs no animation change at all.
 
 ### Performance notes
 
