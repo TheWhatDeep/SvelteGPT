@@ -26,6 +26,17 @@ and best wave persist locally.
 
   Bloaters and Howlers exist to break the "hold the trigger" reflex: one
   punishes killing at arm's length, the other makes target priority matter.
+- **Five weapons**, found in crates that drop in the lot each wave rather than
+  chosen from a menu — walking out to get one mid-fight is the decision:
+
+  | Weapon | Shape of it |
+  |---|---|
+  | Field Rifle | Balanced starter. Nothing it does badly. |
+  | Scattergun | Seven pellets, short reach. Deletes a crowd at contact range. |
+  | Stutter SMG | 13 rounds/sec, sprays wide, runs out of reach early. |
+  | Marksman | Slow and heavy, pierces 3 bodies, drops Brutes. |
+  | Thumper | Lobs a grenade. Huge against a pack, wasteful on one body. |
+
 - **Twelve stacking upgrades**: damage, fire rate, pierce, multishot, crit,
   armour, regen, pickup magnet, and more.
 - **One-thumb play.** The left half of the screen is a floating movement stick;
@@ -64,6 +75,18 @@ There are no model or texture files. Every asset is authored in code at runtime:
 This was originally a constraint — the page is published as a sandboxed artifact
 that cannot fetch external media — but it keeps the whole game in one file with
 zero network requests after the engine loads.
+
+### Weapons are base stats; upgrades are multipliers
+
+Upgrades used to mutate `player.damage` directly. That works until weapons can
+swap, at which point "+25% damage" earned on a rifle silently becomes a flat
+number on a shotgun and your build evaporates.
+
+So weapons hold base stats, upgrades write only to `player.mul` (damage, fire
+rate, bullet speed, range) and `player.add` (pierce, shots, crit, spread), and
+a single `recalc()` derives the effective stats into a reused `eff` object
+whenever either side changes. The hot loop never re-derives or allocates, and a
+build carries across every weapon swap.
 
 ### Gait is derived, not tuned
 
