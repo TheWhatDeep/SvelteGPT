@@ -39,9 +39,14 @@ and best wave persist locally.
 
 - **Twelve stacking upgrades**: damage, fire rate, pierce, multishot, crit,
   armour, regen, pickup magnet, and more.
-- **One-thumb play.** The left half of the screen is a floating movement stick;
-  the weapon auto-targets the nearest threat. The right half overrides aim when
-  you need to pick something specific out of the horde.
+- **Twin-stick by default.** The left half of the screen is a floating movement
+  stick, the right half aims and fires. **Auto-aim is off by default** and can be
+  switched on from the menu or pause screen — with it on, the weapon tracks the
+  nearest walker and one thumb is enough. Manual aim always overrides it.
+
+  The default is deliberate: auto-aim plus auto-fire leaves the player with only
+  one verb ("don't die"), which rewards standing still in a corner. Giving the
+  right thumb a job keeps both hands in the fight.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
@@ -50,8 +55,9 @@ and best wave persist locally.
 | | Touch | Desktop |
 |---|---|---|
 | Move | Drag on the left half | `WASD` / arrow keys |
-| Aim | Drag on the right half (optional) | Mouse |
-| Fire | Automatic | Automatic |
+| Aim | Drag on the right half | Mouse |
+| Fire | While aiming | Hold mouse button |
+| Fire (auto-aim on) | Automatic | Automatic |
 | Pause | Button, top right | `Esc` |
 
 ## How it's built

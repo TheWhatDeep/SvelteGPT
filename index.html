@@ -300,13 +300,15 @@ body{
 }
 
 .toggles{
-  display:flex;gap:8px;margin-top:20px;justify-content:center;flex-wrap:wrap;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px;
 }
+/* the gameplay setting gets its own row; preferences share the next one */
+.tog.wide{grid-column:1 / -1;}
 .tog{
   pointer-events:auto;
-  font-family:var(--f-ui);font-size:var(--fs-label);font-weight:600;
-  letter-spacing:.12em;text-transform:uppercase;
-  padding:12px 16px;min-height:44px;cursor:pointer;
+  font-family:var(--f-ui);font-size:var(--fs-micro);font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;line-height:1.25;
+  padding:11px 12px;min-height:44px;cursor:pointer;
   background:transparent;color:var(--bone-faint);
   border:1px solid var(--fog);
 }
@@ -405,7 +407,7 @@ body{
     <div class="stick" id="stick-move"><div class="knob"></div></div>
     <div class="stick" id="stick-aim"><div class="knob"></div></div>
     <div class="hintzone" id="hint-l">move</div>
-    <div class="hintzone" id="hint-r">aim</div>
+    <div class="hintzone" id="hint-r">aim + fire</div>
   </div>
 
   <div id="threats"></div>
@@ -454,6 +456,7 @@ body{
         <div>Best Score<b id="m-score">&mdash;</b></div>
       </div>
       <div class="toggles">
+        <button class="tog wide" id="tog-aim" aria-pressed="false">Auto-aim: Off</button>
         <button class="tog" id="tog-quality" aria-pressed="false">Quality: Balanced</button>
         <button class="tog" id="tog-sound" aria-pressed="true">Sound: On</button>
       </div>
@@ -470,10 +473,15 @@ body{
       <div class="howto">
         <p><b>Move</b> — drag anywhere on the <span class="k">left half</span> of the
           screen. The stick appears under your thumb.</p>
-        <p><b>Shoot</b> — automatic. Your weapon tracks the nearest walker on its own,
-          so one thumb is enough.</p>
-        <p><b>Aim manually</b> — drag on the <span class="k">right half</span> to
-          override the auto-target. Useful for picking off a Spitter behind the horde.</p>
+        <p><b>Shoot</b> — drag on the <span class="k">right half</span>. You fire in
+          the direction you point, and only while you are pointing. Two thumbs,
+          both busy.</p>
+        <p><b>Auto-aim</b> — off by default. Turn it on from the menu or the pause
+          screen and your weapon tracks the nearest walker on its own, so one thumb
+          is enough. Your own aim always overrides it.</p>
+        <p><b>Pick up a weapon</b> — white crates drop in the lot each wave. A
+          <span class="k">white arrow</span> at the screen edge points to one that
+          is off-screen. Walk over it to swap.</p>
         <p><b>Upgrade</b> — clear a wave and choose one of three permanent upgrades.
           They stack for the whole run.</p>
         <p><b>The dead, in order of appearance</b></p>
@@ -486,7 +494,8 @@ body{
           it dies, so do not kill it at arm's length.<br>
           <span class="k">Howler</span> — red-brown; its shriek sends every walker
           nearby into a sprint. Shoot it first.</p>
-        <p>Desktop: <span class="k">WASD</span> to move, mouse to aim, hold to fire.</p>
+        <p>Desktop: <span class="k">WASD</span> to move, mouse to aim, hold the
+          button to fire.</p>
       </div>
       <div class="stack">
         <button class="btn" id="btn-how-back">Back</button>
@@ -518,6 +527,7 @@ body{
         <button class="btn ghost" id="btn-quit">Quit to Menu</button>
       </div>
       <div class="toggles">
+        <button class="tog wide" id="tog-aim2" aria-pressed="false">Auto-aim: Off</button>
         <button class="tog" id="tog-quality2" aria-pressed="false">Quality: Balanced</button>
         <button class="tog" id="tog-sound2" aria-pressed="true">Sound: On</button>
       </div>
@@ -907,6 +917,7 @@ function main(hotData) {
   /* -------------------------------------------------------------- renderer */
   var canvas = $('scene');
   var app = $('app');
+  var autoAim = store.get('autoAim', false);   // off by default: aim is the player's job
   var quality = store.get('quality', 'balanced');
   if (QORDER.indexOf(quality) === -1) quality = 'balanced';
   var Q = QUALITY[quality];
@@ -1561,6 +1572,17 @@ function main(hotData) {
     $('tog-quality2').setAttribute('aria-pressed', name === 'high');
   }
 
+  function setAutoAim(on) {
+    autoAim = on;
+    store.set('autoAim', on);
+    var label = 'Auto-aim: ' + (on ? 'On' : 'Off');
+    $('tog-aim').textContent = label;
+    $('tog-aim2').textContent = label;
+    $('tog-aim').setAttribute('aria-pressed', on);
+    $('tog-aim2').setAttribute('aria-pressed', on);
+    $('hint-r').textContent = on ? 'aim' : 'aim + fire';
+  }
+
   function setSound(on) {
     Audio_.on = on;
     store.set('sound', on);
@@ -1734,27 +1756,41 @@ function main(hotData) {
   function fire(dt) {
     player.cooldown -= dt;
 
-    var target = nearestZombie(eff.range);
     var aimA = null;
-    var deliberate = false;   // player is pointing the gun themselves
+    var wantFire = false;
 
+    // Player-directed aim always wins over assist.
     if (input.aiming) {
       aimA = Math.atan2(input.ax, input.az);
-      deliberate = true;
+      wantFire = true;
     } else if (IS_TOUCH === false && mouse.active) {
       var g = screenToGround(mouse.x, mouse.y);
-      if (g) { aimA = Math.atan2(g.x - player.x, g.z - player.z); deliberate = true; }
+      if (g) {
+        aimA = Math.atan2(g.x - player.x, g.z - player.z);
+        wantFire = mouse.down;          // hold to fire on desktop
+      }
     }
-    if (aimA === null && target) {
-      aimA = Math.atan2(target.x - player.x, target.z - player.z);
+
+    if (autoAim) {
+      var target = nearestZombie(eff.range);
+      if (target) {
+        if (aimA === null) aimA = Math.atan2(target.x - player.x, target.z - player.z);
+        wantFire = true;
+      }
     }
-    if (aimA === null) return;      // nothing in range, nothing being aimed at
+
+    if (aimA === null) {
+      // Not aiming at anything: face the way you're running rather than
+      // standing locked at whatever angle you last fired.
+      var mv = Math.hypot(player.vx, player.vz);
+      if (mv > 0.5) player.angle = Math.atan2(player.vx, player.vz);
+      return;
+    }
 
     // face the aim direction even while the weapon is cycling
     player.angle = aimA;
 
-    if (player.cooldown > 0) return;
-    if (!target && !deliberate) return;
+    if (!wantFire || player.cooldown > 0) return;
 
     var w = WEAPONS[player.wep];
     player.cooldown = 1 / eff.fireRate;
@@ -2766,11 +2802,14 @@ function main(hotData) {
   }
   $('tog-quality').addEventListener('click', cycleQuality);
   $('tog-quality2').addEventListener('click', cycleQuality);
+  $('tog-aim').addEventListener('click', function () { setAutoAim(!autoAim); });
+  $('tog-aim2').addEventListener('click', function () { setAutoAim(!autoAim); });
   $('tog-sound').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
   $('tog-sound2').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
 
   setQuality(quality);
   setSound(Audio_.on);
+  setAutoAim(autoAim);
   equip('rifle', false);   // derive eff[] before the first frame
 
   /* --------------------------------------- survive a republish mid-session */
