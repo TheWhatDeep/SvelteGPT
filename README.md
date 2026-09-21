@@ -208,6 +208,18 @@ Other deliberate choices:
   hand-authored for display; the sRGB pass would apply a gamma curve a second
   time and wash the palette out.
 
+### Desktop
+
+Keyboard and mouse are first-class, not an afterthought: WASD/arrows move, the
+mouse aims, holding the button fires, `Esc` pauses. The camera has a separate
+landscape branch so a wide window shows a wide view rather than a stretched
+portrait one, and the on-screen hints reword themselves for keyboard and mouse
+when no touch support is detected.
+
+A `blur` handler clears held keys. `visibilitychange` catches tab switches but
+not application switches, so alt-tabbing while holding a movement key used to
+swallow the keyup and leave the player walking on return.
+
 ### Safari specifics
 
 - Auto-pauses on `visibilitychange`, since Safari suspends `requestAnimationFrame`
