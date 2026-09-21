@@ -37,8 +37,8 @@ and best wave persist locally.
   | Marksman | Slow and heavy, pierces 3 bodies, drops Brutes. |
   | Thumper | Lobs a grenade. Huge against a pack, wasteful on one body. |
 
-- **Twelve stacking upgrades**: damage, fire rate, pierce, multishot, crit,
-  armour, regen, pickup magnet, and more.
+- **Eleven stacking upgrades**: damage, fire rate, pierce, crit, armour, regen,
+  pickup magnet, and more.
 - **Twin-stick by default.** The left half of the screen is a floating movement
   stick, the right half aims and fires. **Auto-aim is off by default** and can be
   switched on from the menu or pause screen — with it on, the weapon tracks the
@@ -92,6 +92,61 @@ There are no model or texture files. Every asset is authored in code at runtime:
 This was originally a constraint — the page is published as a sandboxed artifact
 that cannot fetch external media — but it keeps the whole game in one file with
 zero network requests after the engine loads.
+
+### Difficulty scales on three axes, damage included
+
+Enemy health, speed **and damage** all scale with wave number:
+
+```js
+hpScale  = 1 + 0.135 * (wave - 1)
+spScale  = min(1.42, 1 + 0.022 * (wave - 1))
+dmgScale = 1 + 0.12  * (wave - 1)
+```
+
+Damage scaling is load-bearing, not decoration. Without it, flat damage
+reduction eventually zeroes every hit: a −10 flat armour bonus against an
+unscaled 9-damage Shambler floors at 1, the global 0.42s hit cooldown caps
+incoming damage at ~2.4/sec regardless of how many bodies are on you, and 3.5
+HP/sec of regen then exceeds that ceiling. The result was a player who could
+not be killed by anything except Brutes and Bloaters.
+
+The fix is three-part: damage scales, armour is a **percentage** (7%/level to a
+35% cap) so it can never trivialise a hit, and regen only ticks **2.2 seconds
+after you were last hit**, making it a between-fights recovery tool rather than
+a combat one. A fully-maxed defensive build standing still in nine wave-7
+zombies now loses ~19 HP/sec.
+
+### Post-processing: bloom and FXAA
+
+Written by hand rather than with three.js `EffectComposer` + `UnrealBloomPass`,
+which live in the examples bundle and would mean a second CDN fetch this page
+can't guarantee. Four passes: scene into a render target, a bright-pass that
+downsamples, a separable blur in two directions, then a composite.
+
+- The bright-pass keys on **max channel, not luma**. This palette's highlights
+  are saturated amber, which luma weighting under-reads and refuses to bloom.
+- The composite also runs **FXAA**, which is load-bearing: rendering into a
+  render target bypasses the canvas's MSAA entirely, so without it turning
+  effects on would make edges *worse*.
+- Bloom buffers run at 20–40% resolution depending on quality tier. FXAA is the
+  only full-resolution pass, and it is skipped on the battery tier.
+- Render targets tolerate a 6% size drift before reallocating, because the
+  adaptive quality system nudges pixel ratio continuously and would otherwise
+  reallocate every buffer every few frames.
+- If frame time still misses 30fps with pixel ratio already at its floor,
+  effects switch themselves off after ~6 sustained seconds. That is not
+  persisted, so the player's own setting survives a reload.
+
+### Lighting
+
+Two `PointLight`s — muzzle flash and explosion — are added at startup at zero
+intensity and driven by their timers. Adding a light later changes the scene's
+light count and forces every material to recompile, which shows up as a hitch
+at exactly the wrong moment.
+
+The ground plane is subdivided 64×64 for their benefit: `MeshLambertMaterial`
+lights per-vertex, so on the original two triangles a muzzle flash had nowhere
+to land.
 
 ### Weapons are base stats; upgrades are multipliers
 

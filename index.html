@@ -530,7 +530,8 @@ body{
         <button class="tog wide" id="tog-aim" aria-pressed="false">Auto-aim: Off</button>
         <button class="tog wide" id="tog-cheat" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality" aria-pressed="false">Quality: Balanced</button>
-        <button class="tog" id="tog-sound" aria-pressed="true">Sound: On</button>
+        <button class="tog" id="tog-fx" aria-pressed="true">Effects: On</button>
+        <button class="tog wide" id="tog-sound" aria-pressed="true">Sound: On</button>
       </div>
     </div>
   </section>
@@ -602,7 +603,8 @@ body{
         <button class="tog wide" id="tog-aim2" aria-pressed="false">Auto-aim: Off</button>
         <button class="tog wide" id="tog-cheat2" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality2" aria-pressed="false">Quality: Balanced</button>
-        <button class="tog" id="tog-sound2" aria-pressed="true">Sound: On</button>
+        <button class="tog" id="tog-fx2" aria-pressed="true">Effects: On</button>
+        <button class="tog wide" id="tog-sound2" aria-pressed="true">Sound: On</button>
       </div>
     </div>
   </section>
@@ -724,9 +726,9 @@ function main(hotData) {
   var MAX_STEPS = 5;
 
   var QUALITY = {
-    battery:  { dpr: 1.0, alive: 16, parts: 140, aa: false, tex: 512 },
-    balanced: { dpr: 1.5, alive: 26, parts: 240, aa: false, tex: 1024 },
-    high:     { dpr: 2.0, alive: 40, parts: 380, aa: true,  tex: 1024 }
+    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20 },
+    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26 },
+    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40 }
   };
   var QORDER = ['battery', 'balanced', 'high'];
 
@@ -1008,6 +1010,7 @@ function main(hotData) {
   /* -------------------------------------------------------------- renderer */
   var canvas = $('scene');
   var app = $('app');
+  var fxOn = store.get('fx', true);
   var cheatsOn = store.get('cheats', false);
   var autoAim = store.get('autoAim', false);   // off by default: aim is the player's job
   var quality = store.get('quality', 'balanced');
@@ -1018,7 +1021,7 @@ function main(hotData) {
   try {
     renderer = new T.WebGLRenderer({
       canvas: canvas,
-      antialias: Q.aa,
+      antialias: false,   // FXAA happens in the composite; MSAA can't reach a render target
       alpha: false,
       powerPreference: 'high-performance',
       stencil: false,
@@ -1129,8 +1132,10 @@ function main(hotData) {
   }
 
   var groundTex = makeGroundTexture(Q.tex);
+  // Subdivided because MeshLambertMaterial lights per-vertex: on two triangles
+  // a muzzle flash would have nowhere to land.
   var ground = new T.Mesh(
-    new T.PlaneGeometry(ARENA * 2, ARENA * 2),
+    new T.PlaneGeometry(ARENA * 2, ARENA * 2, 64, 64),
     new T.MeshLambertMaterial({ map: groundTex })
   );
   ground.rotation.x = -PI / 2;
@@ -1155,6 +1160,16 @@ function main(hotData) {
   var warm = new T.DirectionalLight(0xFFAE42, 0.46);
   warm.position.set(10, 14, 12);
   scene.add(warm);
+
+  // Present from frame one at zero intensity: adding a light later changes the
+  // light count and forces every material in the scene to recompile, which
+  // shows up as a hitch exactly when you fire.
+  var muzzleLight = new T.PointLight(0xFFC468, 0, 10, 2);
+  muzzleLight.position.set(0, 1.2, 0);
+  scene.add(muzzleLight);
+  var blastLight = new T.PointLight(0xFF8A3C, 0, 16, 2);
+  blastLight.position.set(0, 1.2, 0);
+  scene.add(blastLight);
 
   /* ------------------------------------------------------------------ props
      Static geometry, instanced per prop type. These double as cover: bullets
@@ -1486,10 +1501,13 @@ function main(hotData) {
 
     var hpScale = 1 + 0.135 * (wave - 1);
     var spScale = Math.min(1.42, 1 + 0.022 * (wave - 1));
+    // damage scales too — without this, flat armour eventually zeroes every hit
+    var dmgScale = 1 + 0.12 * (wave - 1);
 
     zombies.push({
       type: typeName, x: x, z: z, angle: 0,
       hp: t.hp * hpScale, maxHp: t.hp * hpScale,
+      dmg: t.dmg * dmgScale, blast: (t.blastDamage || 0) * dmgScale,
       speed: t.speed * spScale * rand(0.9, 1.1),
       radius: t.radius, scale: t.scale * rand(0.94, 1.07),
       phase: rand(0, TAU), flash: 0, atkCd: rand(0, 1),
@@ -1523,7 +1541,7 @@ function main(hotData) {
   /* ------------------------------------------------------------------ state */
   var G = {
     screen: 'menu',        // menu | how | playing | upgrade | pause | over
-    wave: 1, score: 0, kills: 0, time: 0, cheated: false,
+    wave: 1, score: 0, kills: 0, time: 0, cheated: false, blastT: 0,
     toSpawn: 0, spawnCd: 0, waveActive: false, betweenCd: 0,
     shake: 0, running: true
   };
@@ -1546,18 +1564,15 @@ function main(hotData) {
     { id: 'pierce', name: 'Steel Core', max: 4, glyph: 'pierce',
       desc: function () { return 'Rounds pass through +1 body'; },
       apply: function () { player.add.pierce += 1; } },
-    { id: 'shots', name: 'Split Barrel', max: 4, glyph: 'fan',
-      desc: function () { return '+1 round per shot, wider spread'; },
-      apply: function () { player.add.shots += 1; player.add.spread += 0.05; } },
     { id: 'crit', name: 'Marked Rounds', max: 6, glyph: 'crit',
       desc: function () { return '+8% critical chance'; },
       apply: function () { player.add.crit += 0.08; } },
     { id: 'regen', name: 'Combat Stims', max: 5, glyph: 'cross',
-      desc: function () { return 'Regenerate +0.7 health per second'; },
-      apply: function () { player.regen += 0.7; } },
+      desc: function () { return '+0.55 health/sec once you go 2s unhit'; },
+      apply: function () { player.regen += 0.55; } },
     { id: 'armor', name: 'Plate Carrier', max: 5, glyph: 'shield',
-      desc: function () { return 'Take 2 less damage per hit'; },
-      apply: function () { player.armor += 2; } },
+      desc: function () { return 'Take 7% less damage, up to 35%'; },
+      apply: function () { player.armor = Math.min(0.35, player.armor + 0.07); } },
     { id: 'magnet', name: 'Scav Instinct', max: 4, glyph: 'magnet',
       desc: function () { return '+70% pickup radius'; },
       apply: function () { player.magnet *= 1.7; } },
@@ -1656,8 +1671,11 @@ function main(hotData) {
     quality = name;
     Q = QUALITY[name];
     store.set('quality', name);
+    Post.scale = Q.bloom;
+    Post.mComp.uniforms.fxaaOn.value = (name === 'battery') ? 0 : 1;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
     resize();
+    syncPostSize(true);
     var label = 'Quality: ' + name.charAt(0).toUpperCase() + name.slice(1);
     $('tog-quality').textContent = label;
     $('tog-quality2').textContent = label;
@@ -1677,6 +1695,17 @@ function main(hotData) {
   }
 
   /* ------------------------------------------------------------ cheat panel */
+  function setEffects(on, persist) {
+    fxOn = on;
+    if (persist !== false) store.set('fx', on);
+    Post.on = on;
+    var label = 'Effects: ' + (on ? 'On' : 'Off');
+    $('tog-fx').textContent = label;
+    $('tog-fx2').textContent = label;
+    $('tog-fx').setAttribute('aria-pressed', on);
+    $('tog-fx2').setAttribute('aria-pressed', on);
+  }
+
   function setCheats(on) {
     cheatsOn = on;
     store.set('cheats', on);
@@ -1983,8 +2012,9 @@ function main(hotData) {
 
   function damagePlayer(amount) {
     if (player.hurtCd > 0) return;
-    var dealt = Math.max(1, amount - player.armor);
+    var dealt = amount * (1 - player.armor);
     player.hp -= dealt;
+    player.lastHurt = G.time;
     player.hurtCd = 0.42;
     G.shake = Math.min(0.55, G.shake + 0.28);
     Audio_.hurt();
@@ -1998,6 +2028,8 @@ function main(hotData) {
   // sweep at the top of the zombie loop collects the bodies.
   // hurtsPlayer is false for your own ordnance: no self-damage on a phone.
   function blastAt(bx, bz, R, dmg, hurtsPlayer, skip) {
+    blastLight.position.set(bx, 1.3, bz);
+    G.blastT = 0.38;
     burst(bx, 0.9, bz, 22, 'gore', 7);
     burst(bx, 1.1, bz, 14, 'spark', 6);
     addDecal(bx, bz, R * 0.52);
@@ -2018,7 +2050,7 @@ function main(hotData) {
 
   function detonate(z) {
     var t = ZTYPE[z.type];
-    blastAt(z.x, z.z, t.blastRadius, t.blastDamage, true, z);
+    blastAt(z.x, z.z, t.blastRadius, z.blast || t.blastDamage, true, z);
   }
 
   /* ---------------------------------------------------------- weapon handling */
@@ -2138,6 +2170,7 @@ function main(hotData) {
     player.x = 0; player.z = 0; player.vx = 0; player.vz = 0; player.angle = 0;
     player.maxHp = 100; player.hp = 100; player.speed = 7.0;
     player.regen = 0; player.armor = 0; player.magnet = 3.2; player.knock = 0;
+    player.lastHurt = -99;
     player.cooldown = 0; player.hurtCd = 0; player.gait = 0; player.gaitAmp = 0;
     player.mul.damage = player.mul.fireRate = 1;
     player.mul.bulletSpeed = player.mul.range = 1;
@@ -2223,7 +2256,8 @@ function main(hotData) {
     player.gaitAmp = lerp(player.gaitAmp || 0,
       clamp(moving / player.speed, 0, 1) * PLAYER_SWING, 1 - Math.pow(0.001, dt));
     if (player.hurtCd > 0) player.hurtCd -= dt;
-    if (player.regen > 0 && player.hp > 0) {
+    // out-of-combat only: unconditional regen out-healed the i-frame ceiling
+    if (player.regen > 0 && player.hp > 0 && (G.time - player.lastHurt) > 2.2) {
       player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
     }
     if (player.muzzle > 0) player.muzzle -= dt;
@@ -2299,7 +2333,7 @@ function main(hotData) {
             eBullets.push({
               x: z.x, z: z.z, y: 1.0,
               vx: (dx / dist) * sp, vz: (dz / dist) * sp,
-              dmg: t.dmg, life: 2.4
+              dmg: z.dmg, life: 2.4
             });
           }
         }
@@ -2315,12 +2349,12 @@ function main(hotData) {
           z.atkCd -= dt;
           if (dist < z.radius + player.radius + 0.35 && z.atkCd <= 0) {
             z.atkCd = 0.95;
-            damagePlayer(t.dmg);
+            damagePlayer(z.dmg);
             z.lunge = 0.18;
           }
         } else if (dist < z.radius + player.radius + 0.35 && z.clawCd <= 0) {
           z.clawCd = 1.2;
-          damagePlayer(t.dmg);
+          damagePlayer(z.dmg);
           z.lunge = 0.18;
         }
         if (z.clawCd > 0) z.clawCd -= dt;
@@ -2697,6 +2731,11 @@ function main(hotData) {
     // a little vertical bounce on each footfall, for weight
     playerGroup.position.y = Math.abs(Math.sin(player.gait)) * (player.gaitAmp || 0) * 0.09;
     playerGroup.userData.flash.visible = player.muzzle > 0;
+    muzzleLight.intensity = player.muzzle > 0 ? 3.4 * (player.muzzle / 0.055) : 0;
+    if (player.muzzle > 0) {
+      muzzleLight.position.set(player.x + Math.sin(player.angle) * 1.1, 1.2,
+                               player.z + Math.cos(player.angle) * 1.1);
+    }
     if (player.muzzle > 0) {
       var f = playerGroup.userData.flash;
       var s = 0.7 + Math.random() * 0.7;
@@ -2847,6 +2886,160 @@ function main(hotData) {
     playerGroup.visible = false;
   }
 
+  /* ======================================================= post-processing
+     Hand-rolled rather than three.js EffectComposer + UnrealBloomPass: those
+     live in the examples bundle, which is a separate CDN fetch this page can't
+     guarantee. Four small passes, all under our own control:
+       scene -> RT, bright-pass + downsample, separable blur x2, composite.
+     The composite also does FXAA, which matters because rendering into a
+     render target bypasses the canvas's MSAA entirely.                       */
+  var Post = (function () {
+    var VERT = `
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+    // Max-channel rather than luma: this palette's brights are saturated amber,
+    // which luma weighting would under-read and refuse to bloom.
+    var FRAG_BRIGHT = `
+      uniform sampler2D tDiffuse; uniform float threshold; uniform float knee;
+      varying vec2 vUv;
+      void main(){
+        vec3 c = texture2D(tDiffuse, vUv).rgb;
+        float l = max(max(c.r, c.g), c.b);
+        gl_FragColor = vec4(c * smoothstep(threshold, threshold + knee, l), 1.0);
+      }`;
+
+    // 5 taps, linear-sampled — equivalent reach to a 9-tap gaussian
+    var FRAG_BLUR = `
+      uniform sampler2D tDiffuse; uniform vec2 dir;
+      varying vec2 vUv;
+      void main(){
+        vec3 s  = texture2D(tDiffuse, vUv).rgb * 0.2270270270;
+        s += texture2D(tDiffuse, vUv + dir * 1.3846153846).rgb * 0.3162162162;
+        s += texture2D(tDiffuse, vUv - dir * 1.3846153846).rgb * 0.3162162162;
+        s += texture2D(tDiffuse, vUv + dir * 3.2307692308).rgb * 0.0702702703;
+        s += texture2D(tDiffuse, vUv - dir * 3.2307692308).rgb * 0.0702702703;
+        gl_FragColor = vec4(s, 1.0);
+      }`;
+
+    var FRAG_COMP = `
+      uniform sampler2D tScene; uniform sampler2D tBloom;
+      uniform vec2 rcp; uniform float strength; uniform float fxaaOn;
+      varying vec2 vUv;
+      vec3 fxaa(sampler2D tex, vec2 uv){
+        vec3 luma = vec3(0.299, 0.587, 0.114);
+        vec3 nw = texture2D(tex, uv + vec2(-1.0,-1.0) * rcp).rgb;
+        vec3 ne = texture2D(tex, uv + vec2( 1.0,-1.0) * rcp).rgb;
+        vec3 sw = texture2D(tex, uv + vec2(-1.0, 1.0) * rcp).rgb;
+        vec3 se = texture2D(tex, uv + vec2( 1.0, 1.0) * rcp).rgb;
+        vec3 m  = texture2D(tex, uv).rgb;
+        float lnw = dot(nw,luma), lne = dot(ne,luma);
+        float lsw = dot(sw,luma), lse = dot(se,luma), lm = dot(m,luma);
+        float lmin = min(lm, min(min(lnw,lne), min(lsw,lse)));
+        float lmax = max(lm, max(max(lnw,lne), max(lsw,lse)));
+        vec2 d = vec2(-((lnw + lne) - (lsw + lse)), ((lnw + lsw) - (lne + lse)));
+        float red = max((lnw + lne + lsw + lse) * 0.03125, 0.0078125);
+        float rcpMin = 1.0 / (min(abs(d.x), abs(d.y)) + red);
+        d = clamp(d * rcpMin, -8.0, 8.0) * rcp;
+        vec3 a = 0.5 * (texture2D(tex, uv + d * (1.0/3.0 - 0.5)).rgb +
+                        texture2D(tex, uv + d * (2.0/3.0 - 0.5)).rgb);
+        vec3 b = a * 0.5 + 0.25 * (texture2D(tex, uv + d * -0.5).rgb +
+                                   texture2D(tex, uv + d *  0.5).rgb);
+        float lb = dot(b, luma);
+        return (lb < lmin || lb > lmax) ? a : b;
+      }
+      void main(){
+        vec3 base = fxaaOn > 0.5 ? fxaa(tScene, vUv) : texture2D(tScene, vUv).rgb;
+        vec3 glow = texture2D(tBloom, vUv).rgb;
+        gl_FragColor = vec4(base + glow * strength, 1.0);
+      }`;
+
+    function mat(frag, uniforms) {
+      return new T.ShaderMaterial({
+        uniforms: uniforms, vertexShader: VERT, fragmentShader: frag,
+        depthTest: false, depthWrite: false
+      });
+    }
+    function target(w, h, depth) {
+      return new T.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), {
+        minFilter: T.LinearFilter, magFilter: T.LinearFilter,
+        depthBuffer: !!depth, stencilBuffer: false
+      });
+    }
+
+    var api = {
+      on: false, bufW: 0, bufH: 0, scale: 0.25,
+      rtScene: null, rtA: null, rtB: null,
+      qScene: new T.Scene(), qCam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+      quad: null, mBright: null, mBlur: null, mComp: null
+    };
+
+    api.init = function () {
+      api.mBright = mat(FRAG_BRIGHT, {
+        tDiffuse: { value: null }, threshold: { value: 0.76 }, knee: { value: 0.22 }
+      });
+      api.mBlur = mat(FRAG_BLUR, {
+        tDiffuse: { value: null }, dir: { value: new T.Vector2() }
+      });
+      api.mComp = mat(FRAG_COMP, {
+        tScene: { value: null }, tBloom: { value: null },
+        rcp: { value: new T.Vector2() }, strength: { value: 0.68 },
+        fxaaOn: { value: 1 }
+      });
+      api.quad = new T.Mesh(new T.PlaneGeometry(2, 2), api.mComp);
+      api.quad.frustumCulled = false;
+      api.qScene.add(api.quad);
+    };
+
+    api.resize = function (w, h, force) {
+      // the adaptive quality system nudges pixel ratio constantly; without a
+      // tolerance this would reallocate every render target every few frames
+      if (api.rtScene && !force &&
+          Math.abs(w - api.bufW) <= api.bufW * 0.06 &&
+          Math.abs(h - api.bufH) <= api.bufH * 0.06) return;
+      if (w === api.bufW && h === api.bufH) return;
+      api.bufW = w; api.bufH = h;
+      var bw = Math.round(w * api.scale), bh = Math.round(h * api.scale);
+      if (api.rtScene) { api.rtScene.dispose(); api.rtA.dispose(); api.rtB.dispose(); }
+      api.rtScene = target(w, h, true);
+      api.rtA = target(bw, bh, false);
+      api.rtB = target(bw, bh, false);
+      api.mComp.uniforms.rcp.value.set(1 / w, 1 / h);
+    };
+
+    api.render = function (scene, camera) {
+      if (!api.on) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+
+      renderer.setRenderTarget(api.rtScene);
+      renderer.render(scene, camera);
+
+      api.quad.material = api.mBright;
+      api.mBright.uniforms.tDiffuse.value = api.rtScene.texture;
+      renderer.setRenderTarget(api.rtA);
+      renderer.render(api.qScene, api.qCam);
+
+      api.quad.material = api.mBlur;
+      api.mBlur.uniforms.tDiffuse.value = api.rtA.texture;
+      api.mBlur.uniforms.dir.value.set(1 / api.rtA.width, 0);
+      renderer.setRenderTarget(api.rtB);
+      renderer.render(api.qScene, api.qCam);
+
+      api.mBlur.uniforms.tDiffuse.value = api.rtB.texture;
+      api.mBlur.uniforms.dir.value.set(0, 1 / api.rtA.height);
+      renderer.setRenderTarget(api.rtA);
+      renderer.render(api.qScene, api.qCam);
+
+      api.quad.material = api.mComp;
+      api.mComp.uniforms.tScene.value = api.rtScene.texture;
+      api.mComp.uniforms.tBloom.value = api.rtA.texture;
+      renderer.setRenderTarget(null);
+      renderer.render(api.qScene, api.qCam);
+    };
+
+    return api;
+  })();
+  Post.init();
+
   /* ------------------------------------------------------------------ resize */
   function resize() {
     var w = app.clientWidth || window.innerWidth;
@@ -2854,6 +3047,12 @@ function main(hotData) {
     renderer.setSize(w, h, false);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
+    syncPostSize(true);
+  }
+
+  function syncPostSize(force) {
+    var gl = renderer.getContext();
+    Post.resize(gl.drawingBufferWidth, gl.drawingBufferHeight, force);
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
   resize();
@@ -2863,7 +3062,7 @@ function main(hotData) {
   });
 
   /* ------------------------------------------ adaptive quality + pause guards */
-  var frameAvg = 16.7, dprScale = 1;
+  var frameAvg = 16.7, dprScale = 1, fxStress = 0;
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && G.screen === 'playing') togglePause();
   });
@@ -2889,6 +3088,17 @@ function main(hotData) {
     var dt = Math.min(raw, 0.1);
 
     frameAvg = frameAvg * 0.94 + (raw * 1000) * 0.06;
+
+    // Resolution is shed first (below). If the frame is still missing 30fps
+    // with pixel ratio already at the floor, the effects go rather than let
+    // the game crawl — six seconds of sustained struggle, and not persisted,
+    // so the player's own setting survives a reload.
+    if (Post.on && frameAvg > 34 && dprScale <= 0.64) {
+      fxStress++;
+      if (fxStress > 180) { fxStress = 0; setEffects(false, false); }
+    } else if (fxStress > 0) {
+      fxStress = Math.max(0, fxStress - 2);
+    }
     if (frameAvg > 27 && dprScale > 0.62) {
       dprScale -= 0.02;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr) * dprScale);
@@ -2926,7 +3136,15 @@ function main(hotData) {
     syncPickups(now / 1000);
     syncDecals();
 
-    renderer.render(scene, camera);
+    if (G.blastT > 0) {
+      G.blastT -= dt;
+      blastLight.intensity = Math.max(0, G.blastT / 0.38) * 6.5;
+    } else if (blastLight.intensity !== 0) {
+      blastLight.intensity = 0;
+    }
+
+    syncPostSize(false);
+    Post.render(scene, camera);
   }
 
   /* ------------------------------------------------------------------ events */
@@ -2967,6 +3185,8 @@ function main(hotData) {
   $('tog-quality2').addEventListener('click', cycleQuality);
   $('btn-cheats').addEventListener('click', openCheats);
   $('btn-cheat-close').addEventListener('click', function () { show('playing'); });
+  $('tog-fx').addEventListener('click', function () { setEffects(!fxOn); });
+  $('tog-fx2').addEventListener('click', function () { setEffects(!fxOn); });
   $('tog-cheat').addEventListener('click', function () { setCheats(!cheatsOn); });
   $('tog-cheat2').addEventListener('click', function () { setCheats(!cheatsOn); });
   $('tog-aim').addEventListener('click', function () { setAutoAim(!autoAim); });
@@ -2978,6 +3198,7 @@ function main(hotData) {
   setSound(Audio_.on);
   setAutoAim(autoAim);
   setCheats(cheatsOn);
+  setEffects(fxOn);
   equip('rifle', false);   // derive eff[] before the first frame
 
   /* --------------------------------------- survive a republish mid-session */
