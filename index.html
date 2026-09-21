@@ -354,6 +354,8 @@ body{
 }
 .card .glyph svg{width:23px;height:23px;display:block;}
 .card .body{flex:1;min-width:0;}
+/* both are spans inside a flex item, so they need to be blocks to stack */
+.card .nm,.card .ds{display:block;}
 .card .nm{
   font-weight:700;font-size:clamp(17px,4.7vw,21px);letter-spacing:.02em;line-height:1.16;
 }
@@ -1195,11 +1197,13 @@ function main(hotData) {
 
   // The flashlight is a real spotlight, not a mask: it lights the ground, the
   // props and the bodies it falls on, and leaves everything outside it dark.
-  // Mounted high and angled down, not held at chest height. A near-horizontal
-  // beam hits the floor at grazing incidence (N.L ~ 0.1) and lights almost
-  // nothing; from above, the cone lands as a readable pool on the ground.
-  var torchLight = new T.SpotLight(0xE4EEFF, 0, 34, 0.50, 0.62, 1.1);
-  torchLight.position.set(0, 5.2, 0);
+  // Height is a balance, not a preference. Too low and the beam meets the floor
+  // at grazing incidence (N.L ~ 0.1) and lights nothing; too high and the cone
+  // touches down several units ahead, so the light reads as a projector rather
+  // than something the player is holding. Just above head height, aimed a short
+  // way ahead, puts the near edge about two units from the feet.
+  var torchLight = new T.SpotLight(0xE4EEFF, 0, 30, 0.58, 0.55, 1.1);
+  torchLight.position.set(0, 2.6, 0);
   scene.add(torchLight);
   scene.add(torchLight.target);
 
@@ -3299,11 +3303,16 @@ function main(hotData) {
     // ---- real lights: nearest lamps, and the torch beam following the aim
     updateLampLights();
     if (player.torch && G.screen !== 'menu' && G.screen !== 'how') {
-      torchLight.intensity = 4.2;
-      torchLight.position.set(player.x, 5.2, player.z);
+      // Emitted from the weapon, not from the player's centre: forward and a
+      // little to the gun side, so the cone looks carried rather than cast.
+      var tfx = Math.sin(player.angle), tfz = Math.cos(player.angle);
+      var trx = Math.cos(player.angle), trz = -Math.sin(player.angle);
+      torchLight.intensity = 3.3;
+      torchLight.position.set(player.x + tfx * 0.5 + trx * 0.25, 2.6,
+                              player.z + tfz * 0.5 + trz * 0.25);
       torchLight.target.position.set(
-        player.x + Math.sin(player.angle) * 11, 0,
-        player.z + Math.cos(player.angle) * 11);
+        player.x + tfx * 6.5, 0,
+        player.z + tfz * 6.5);
       torchLight.target.updateMatrixWorld();
     } else {
       torchLight.intensity = 0;

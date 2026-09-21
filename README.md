@@ -71,10 +71,13 @@ Everything else comes from real lights, on a fixed budget:
   of point lights is reassigned to the closest posts each frame rather than
   lighting all seven at once. The pool size is a quality tier: 1 light on
   battery, 2 on balanced, 3 on high.
-- **The flashlight** is a `SpotLight` mounted high and angled down, not held at
-  chest height. A near-horizontal beam meets the floor at grazing incidence
-  (`N·L ≈ 0.1`) and lights almost nothing; from above, the cone lands as a
-  readable pool.
+- **The flashlight** is a `SpotLight` whose height is a balance rather than a
+  preference. Too low and the beam meets the floor at grazing incidence
+  (`N·L ≈ 0.1`) and lights nothing; too high and the cone touches down several
+  units ahead, so it reads as a projector rather than something the player is
+  carrying. Just above head height, aimed a short way ahead, puts the near edge
+  of the cone about two units from the feet. It is emitted from the weapon —
+  forward and slightly to the gun side — rather than from the player's centre.
 - **Muzzle flash and explosions** are point lights created at startup at zero
   intensity, because adding a light later changes the scene's light count and
   forces every material to recompile.
@@ -134,9 +137,8 @@ There are no model or texture files. Every asset is authored in code at runtime:
   — with per-limb walk animation driven by a phase offset per body. Crawlers
   reuse the same six parts in a different pose: torso near-horizontal, front
   limbs pawing at the ground, hind legs kicking out behind.
-- **The ground** is a 2D canvas painted at startup: asphalt grain, cracks, faded
-  parking bays, and the warm pools beneath each streetlight, baked in at the
-  lamps' own coordinates.
+- **The ground** is a 2D canvas painted at startup: asphalt grain, cracks and
+  faded parking bays. Surface only — the light on it is real, not painted.
 - **Audio** is synthesised from oscillators and noise buffers.
 
 This was originally a constraint — the page is published as a sandboxed artifact
