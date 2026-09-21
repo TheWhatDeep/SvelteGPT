@@ -50,6 +50,17 @@ and best wave persist locally.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
+## Cheats
+
+Turn **Cheats: On** in the menu or pause screen and a slider button appears in the
+HUD beside pause. It opens a panel with every weapon (tap to equip) and every
+upgrade (tap to add a level, up to its normal cap). The world freezes while the
+panel is open, so you can build a loadout without being eaten.
+
+Touching anything in the panel marks the run: it will not write a best wave or
+best score, and the game-over screen says so. Testing a wave-12 Howler pack
+shouldn't quietly overwrite a real record.
+
 ## Controls
 
 | | Touch | Desktop |

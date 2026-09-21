@@ -382,6 +382,68 @@ body{
   color:var(--sodium);font-weight:600;
 }
 
+/* ---------------- Cheat panel ----------------
+   Deliberately reads as a tool, not part of the game: denser, flatter, no
+   display face, so it never gets mistaken for real UI in a screenshot. */
+.sheet{
+  justify-content:flex-end;
+  padding:0;
+  background:rgba(5,7,9,.42);
+}
+.cheat-panel{
+  /* the page reset is content-box, so width:100% + padding would overflow */
+  box-sizing:border-box;
+  width:100%;max-width:440px;margin:0 auto;
+  background:var(--slate);
+  border-top:2px solid var(--sodium);
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  max-height:72%;overflow-y:auto;
+  display:flex;flex-direction:column;gap:10px;
+}
+.cheat-head{display:flex;align-items:center;gap:10px;}
+.cheat-title{
+  flex:1;font-size:var(--fs-label);font-weight:700;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--sodium);
+}
+.cheat-close{
+  pointer-events:auto;font-family:var(--f-ui);
+  font-size:var(--fs-micro);font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;padding:9px 14px;min-height:40px;cursor:pointer;
+  background:transparent;color:var(--bone);border:1px solid var(--fog);
+}
+.cheat-close:active{background:var(--slate-2);}
+.cheat-sec{
+  font-size:var(--fs-micro);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--bone-faint);border-bottom:1px solid var(--fog);
+  padding-bottom:5px;margin-top:2px;
+}
+.cheat-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px;
+}
+.cheat-btn{
+  pointer-events:auto;cursor:pointer;text-align:left;
+  font-family:var(--f-ui);font-size:var(--fs-micro);font-weight:600;
+  line-height:1.2;padding:8px 9px;min-height:42px;
+  background:var(--slate-2);color:var(--bone);
+  border:1px solid var(--fog);
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+}
+.cheat-btn:active{background:var(--fog);}
+.cheat-btn .lvl{
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--sodium);font-variant-numeric:tabular-nums;
+}
+.cheat-btn[data-on="1"]{
+  background:var(--sodium);color:var(--pit);border-color:var(--sodium);
+}
+.cheat-btn[data-on="1"] .lvl{color:var(--pit);opacity:.72;}
+.cheat-btn[disabled]{opacity:.42;cursor:default;}
+.cheat-btn[disabled] .lvl{color:var(--bone-faint);}
+.cheat-note{
+  font-size:var(--fs-micro);line-height:1.45;color:var(--bone-faint);
+}
+.cheat-note b{color:var(--ember);}
+
 #fatal{
   position:absolute;inset:0;z-index:40;display:none;
   align-items:center;justify-content:center;padding:26px 20px;
@@ -420,6 +482,15 @@ body{
           <div class="hpfill" id="hp-fill"></div>
           <div class="hptext" id="hp-text">100 / 100</div>
         </div>
+        <button class="pausebtn" id="btn-cheats" aria-label="Cheats" hidden>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1 4h5M10 4h5M1 8h9M14 8h1M1 12h3M8 12h7"
+                  stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <circle cx="8" cy="4" r="2" fill="currentColor"/>
+            <circle cx="12" cy="8" r="2" fill="currentColor"/>
+            <circle cx="6" cy="12" r="2" fill="currentColor"/>
+          </svg>
+        </button>
         <button class="pausebtn" id="btn-pause" aria-label="Pause">
           <svg viewBox="0 0 12 14" aria-hidden="true">
             <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
@@ -457,6 +528,7 @@ body{
       </div>
       <div class="toggles">
         <button class="tog wide" id="tog-aim" aria-pressed="false">Auto-aim: Off</button>
+        <button class="tog wide" id="tog-cheat" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality" aria-pressed="false">Quality: Balanced</button>
         <button class="tog" id="tog-sound" aria-pressed="true">Sound: On</button>
       </div>
@@ -528,8 +600,27 @@ body{
       </div>
       <div class="toggles">
         <button class="tog wide" id="tog-aim2" aria-pressed="false">Auto-aim: Off</button>
+        <button class="tog wide" id="tog-cheat2" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality2" aria-pressed="false">Quality: Balanced</button>
         <button class="tog" id="tog-sound2" aria-pressed="true">Sound: On</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHEATS -->
+  <section class="screen sheet" id="sc-cheats" hidden>
+    <div class="cheat-panel">
+      <div class="cheat-head">
+        <span class="cheat-title">Cheats</span>
+        <button class="cheat-close" id="btn-cheat-close">Close</button>
+      </div>
+      <div class="cheat-sec">Weapon &mdash; tap to equip</div>
+      <div class="cheat-grid" id="cheat-weps"></div>
+      <div class="cheat-sec">Upgrades &mdash; tap to add a level</div>
+      <div class="cheat-grid" id="cheat-ups"></div>
+      <div class="cheat-note">
+        The world is frozen while this is open. Using anything here marks the run:
+        it <b>will not set a best wave or score</b>.
       </div>
     </div>
   </section>
@@ -917,6 +1008,7 @@ function main(hotData) {
   /* -------------------------------------------------------------- renderer */
   var canvas = $('scene');
   var app = $('app');
+  var cheatsOn = store.get('cheats', false);
   var autoAim = store.get('autoAim', false);   // off by default: aim is the player's job
   var quality = store.get('quality', 'balanced');
   if (QORDER.indexOf(quality) === -1) quality = 'balanced';
@@ -1431,7 +1523,7 @@ function main(hotData) {
   /* ------------------------------------------------------------------ state */
   var G = {
     screen: 'menu',        // menu | how | playing | upgrade | pause | over
-    wave: 1, score: 0, kills: 0, time: 0,
+    wave: 1, score: 0, kills: 0, time: 0, cheated: false,
     toSpawn: 0, spawnCd: 0, waveActive: false, betweenCd: 0,
     shake: 0, running: true
   };
@@ -1507,7 +1599,7 @@ function main(hotData) {
   /* ---------------------------------------------------------------- UI wiring */
   var ui = {
     hud: $('hud'), menu: $('sc-menu'), how: $('sc-how'), upgrade: $('sc-upgrade'),
-    pause: $('sc-pause'), over: $('sc-over'),
+    pause: $('sc-pause'), over: $('sc-over'), cheats: $('sc-cheats'),
     hpFill: $('hp-fill'), hpGhost: $('hp-ghost'), hpText: $('hp-text'),
     roWep: $('ro-wep'), roWave: $('ro-wave'), roScore: $('ro-score'), roLeft: $('ro-left'),
     announce: $('announce'), aMain: $('a-main'), aSub: $('a-sub'), hurt: $('hurt')
@@ -1519,8 +1611,9 @@ function main(hotData) {
     ui.how.hidden = name !== 'how';
     ui.upgrade.hidden = name !== 'upgrade';
     ui.pause.hidden = name !== 'pause';
+    ui.cheats.hidden = name !== 'cheats';
     ui.over.hidden = name !== 'over';
-    ui.hud.hidden = !(name === 'playing' || name === 'pause');
+    ui.hud.hidden = !(name === 'playing' || name === 'pause' || name === 'cheats');
     $('hint-l').classList.toggle('gone', name !== 'playing');
     $('hint-r').classList.toggle('gone', name !== 'playing');
   }
@@ -1581,6 +1674,72 @@ function main(hotData) {
     $('tog-aim').setAttribute('aria-pressed', on);
     $('tog-aim2').setAttribute('aria-pressed', on);
     $('hint-r').textContent = on ? 'aim' : 'aim + fire';
+  }
+
+  /* ------------------------------------------------------------ cheat panel */
+  function setCheats(on) {
+    cheatsOn = on;
+    store.set('cheats', on);
+    var label = 'Cheats: ' + (on ? 'On' : 'Off');
+    $('tog-cheat').textContent = label;
+    $('tog-cheat2').textContent = label;
+    $('tog-cheat').setAttribute('aria-pressed', on);
+    $('tog-cheat2').setAttribute('aria-pressed', on);
+    $('btn-cheats').hidden = !on;
+    if (!on && G.screen === 'cheats') show('playing');
+  }
+
+  function buildCheatPanel() {
+    var wepHost = $('cheat-weps');
+    wepHost.innerHTML = '';
+    WEP_IDS.forEach(function (id) {
+      var w = WEAPONS[id];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cheat-btn';
+      btn.dataset.on = id === player.wep ? '1' : '0';
+      btn.innerHTML = '<span></span><span class="lvl"></span>';
+      btn.firstChild.textContent = w.name;
+      btn.lastChild.textContent = id === player.wep ? 'Equipped' : w.short;
+      btn.addEventListener('click', function () {
+        G.cheated = true;
+        equip(id, false);
+        buildCheatPanel();
+        updateHud();
+      });
+      wepHost.appendChild(btn);
+    });
+
+    var upHost = $('cheat-ups');
+    upHost.innerHTML = '';
+    UPGRADES.forEach(function (u) {
+      var lvl = upgradeLevels[u.id] || 0;
+      var maxed = lvl >= u.max;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cheat-btn';
+      btn.disabled = maxed;
+      btn.innerHTML = '<span></span><span class="lvl"></span>';
+      btn.firstChild.textContent = u.name;
+      btn.lastChild.textContent = maxed ? 'MAX ' + lvl : 'LV ' + lvl + ' / ' + u.max;
+      btn.addEventListener('click', function () {
+        if ((upgradeLevels[u.id] || 0) >= u.max) return;
+        G.cheated = true;
+        u.apply();
+        recalc();
+        upgradeLevels[u.id] = (upgradeLevels[u.id] || 0) + 1;
+        Audio_.pickup();
+        buildCheatPanel();
+        updateHud();
+      });
+      upHost.appendChild(btn);
+    });
+  }
+
+  function openCheats() {
+    if (!cheatsOn) return;
+    buildCheatPanel();
+    show('cheats');
   }
 
   function setSound(on) {
@@ -1679,8 +1838,10 @@ function main(hotData) {
   // desktop
   window.addEventListener('keydown', function (e) {
     keys[e.key.toLowerCase()] = true;
-    if (e.key === 'Escape' && G.screen === 'playing') togglePause();
-    else if (e.key === 'Escape' && G.screen === 'pause') togglePause();
+    if (e.key === 'Escape') {
+      if (G.screen === 'cheats') show('playing');
+      else if (G.screen === 'playing' || G.screen === 'pause') togglePause();
+    }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) >= 0) {
       e.preventDefault();
     }
@@ -1928,16 +2089,18 @@ function main(hotData) {
     player.hp = 0;
     G.shake = 0.9;
     Audio_.dead();
-    if (G.wave > best.wave) { best.wave = G.wave; store.set('bestWave', best.wave); }
-    if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
-    refreshBest();
+    if (!G.cheated) {
+      if (G.wave > best.wave) { best.wave = G.wave; store.set('bestWave', best.wave); }
+      if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
+      refreshBest();
+    }
     $('o-wave').textContent = G.wave;
     $('o-score').textContent = G.score.toLocaleString();
     $('o-kills').textContent = G.kills;
     var mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
     $('o-time').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
-    $('o-eyebrow').textContent =
-      (G.wave >= best.wave && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended';
+    $('o-eyebrow').textContent = G.cheated ? 'Cheated Run \u2014 Not Recorded'
+      : ((G.wave >= best.wave && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended');
     setTimeout(function () { show('over'); }, 900);
   }
 
@@ -1981,7 +2144,7 @@ function main(hotData) {
     player.add.pierce = player.add.shots = player.add.crit = player.add.spread = 0;
     equip('rifle', false);
     G.wave = 1; G.score = 0; G.kills = 0; G.time = 0;
-    G.betweenCd = 0; G.shake = 0;
+    G.betweenCd = 0; G.shake = 0; G.cheated = false;
     input.mx = input.mz = 0; input.aiming = false;
     startWave(1);
     updateHud();
@@ -2802,6 +2965,10 @@ function main(hotData) {
   }
   $('tog-quality').addEventListener('click', cycleQuality);
   $('tog-quality2').addEventListener('click', cycleQuality);
+  $('btn-cheats').addEventListener('click', openCheats);
+  $('btn-cheat-close').addEventListener('click', function () { show('playing'); });
+  $('tog-cheat').addEventListener('click', function () { setCheats(!cheatsOn); });
+  $('tog-cheat2').addEventListener('click', function () { setCheats(!cheatsOn); });
   $('tog-aim').addEventListener('click', function () { setAutoAim(!autoAim); });
   $('tog-aim2').addEventListener('click', function () { setAutoAim(!autoAim); });
   $('tog-sound').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
@@ -2810,6 +2977,7 @@ function main(hotData) {
   setQuality(quality);
   setSound(Audio_.on);
   setAutoAim(autoAim);
+  setCheats(cheatsOn);
   equip('rifle', false);   // derive eff[] before the first frame
 
   /* --------------------------------------- survive a republish mid-session */
