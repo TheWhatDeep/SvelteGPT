@@ -52,21 +52,43 @@ and best wave persist locally.
 
 ## Darkness and the flashlight
 
-The lot is dark. Without a light you see a small bubble around yourself and
-whatever the streetlamps reach — everything else is a silhouette at best. The
-**flashlight** is a found item, guaranteed to drop from wave 2, and it opens a
-wide cone wherever you aim. It is not a toggle; lose the run and you start blind
-again.
+The lot is dark, and light comes from actual light sources. Streetlamps
+illuminate the ground and everything standing near them; the **flashlight** is a
+found item, guaranteed to drop from wave 2, and it is a real spotlight that
+lights the ground, the props and the bodies it falls on. It is not a toggle —
+lose the run and you start blind again.
 
-Darkness is screen-space, computed in the composite pass. The camera is locked
-overhead, so distance from screen centre *is* distance from the player, which
-makes the mask a couple of `smoothstep`s rather than a second lighting pass.
-Bloom is only partly dimmed by it, so distant streetlamps still glow through the
-dark and work as landmarks you can navigate by.
+An earlier version faked this in screen space, darkening by distance from the
+player. It looked like a filter because it was one: a lamp twenty units away sat
+in shadow under that model, which is backwards. The lamp *is* the light.
 
-Because it is a gameplay mechanic rather than an effect, the composite pass now
-always runs — the **Effects** toggle governs bloom and FXAA only. Turning
-effects off would otherwise have handed you night vision.
+## Lighting
+
+Ambient is deliberately near-useless — enough to read a silhouette and no more.
+Everything else comes from real lights, on a fixed budget:
+
+- **Streetlamps.** Only the nearest few can ever be on screen, so a small pool
+  of point lights is reassigned to the closest posts each frame rather than
+  lighting all seven at once. The pool size is a quality tier: 1 light on
+  battery, 2 on balanced, 3 on high.
+- **The flashlight** is a `SpotLight` mounted high and angled down, not held at
+  chest height. A near-horizontal beam meets the floor at grazing incidence
+  (`N·L ≈ 0.1`) and lights almost nothing; from above, the cone lands as a
+  readable pool.
+- **Muzzle flash and explosions** are point lights created at startup at zero
+  intensity, because adding a light later changes the scene's light count and
+  forces every material to recompile.
+
+Two costs are worth knowing. The ground uses `MeshPhongMaterial` for
+**per-fragment** lighting — it is one object covering most of the screen, so
+paying per-fragment there buys smooth pools and spot cones for a single
+material's worth of cost, while everything else stays on cheap vertex-lit
+Lambert. And changing the lamp-pool size adds or removes lights from the scene
+rather than zeroing their intensity, since the shader loops over every light
+present regardless; that costs one recompile on a settings change, which is
+acceptable there and would not be per frame.
+
+The ground texture carries no baked light any more. It is pure surface.
 
 ## Minimap
 

@@ -738,9 +738,9 @@ function main(hotData) {
   var MAX_STEPS = 5;
 
   var QUALITY = {
-    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20 },
-    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26 },
-    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40 }
+    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20, lamps: 1 },
+    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26, lamps: 2 },
+    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40, lamps: 3 }
   };
   var QORDER = ['battery', 'balanced', 'high'];
 
@@ -1114,28 +1114,10 @@ function main(hotData) {
       }
     }
 
-    // baked sodium light pools, positioned to match the lamp props
-    g.globalCompositeOperation = 'lighter';
-    LAMPS.forEach(function (l) {
-      var cx = ((l.x + ARENA) / W) * size;
-      var cy = ((l.z + ARENA) / W) * size;
-      var r = size * 0.21;
-      var grd = g.createRadialGradient(cx, cy, 0, cx, cy, r);
-      grd.addColorStop(0, 'rgba(255,170,52,.46)');
-      grd.addColorStop(0.28, 'rgba(232,146,38,.26)');
-      grd.addColorStop(0.62, 'rgba(184,106,28,.10)');
-      grd.addColorStop(1, 'rgba(120,70,20,0)');
-      g.fillStyle = grd;
-      g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
-    });
-
-    // cold moon wash from one corner so the lot is not uniformly lit
-    var mg = g.createLinearGradient(0, 0, size, size);
-    mg.addColorStop(0, 'rgba(84,110,140,.10)');
-    mg.addColorStop(0.6, 'rgba(84,110,140,0)');
-    g.fillStyle = mg;
-    g.fillRect(0, 0, size, size);
-    g.globalCompositeOperation = 'source-over';
+    // No baked light here any more. Light pools used to be painted into this
+    // texture, which looked like light but did not behave like it — a lamp
+    // could not brighten a zombie standing under it. Real lights do that now,
+    // so the texture is pure surface: albedo only.
 
     var tex = new T.CanvasTexture(c);
     tex.wrapS = tex.wrapT = T.ClampToEdgeWrapping;
@@ -1147,8 +1129,8 @@ function main(hotData) {
   // Subdivided because MeshLambertMaterial lights per-vertex: on two triangles
   // a muzzle flash would have nowhere to land.
   var ground = new T.Mesh(
-    new T.PlaneGeometry(ARENA * 2, ARENA * 2, 64, 64),
-    new T.MeshLambertMaterial({ map: groundTex })
+    new T.PlaneGeometry(ARENA * 2, ARENA * 2, 8, 8),
+    new T.MeshPhongMaterial({ map: groundTex, shininess: 6, specular: 0x171C21 })
   );
   ground.rotation.x = -PI / 2;
   scene.add(ground);
@@ -1163,15 +1145,63 @@ function main(hotData) {
   scene.add(skirt);
 
   /* ----------------------------------------------------------------- lights */
-  scene.add(new T.AmbientLight(0x3B4856, 0.95));
-  var hemi = new T.HemisphereLight(0x6E88AC, 0x2C2012, 0.62);
+  // Night baseline: just enough to read a silhouette. Everything else has to
+  // come from an actual light in the world.
+  scene.add(new T.AmbientLight(0x1A2430, 0.5));
+  var hemi = new T.HemisphereLight(0x2A3A4E, 0x0E0A06, 0.3);
   scene.add(hemi);
-  var moon = new T.DirectionalLight(0xB4C6DE, 0.58);
+  var moon = new T.DirectionalLight(0x8FA6C4, 0.22);
   moon.position.set(-14, 26, -10);
   scene.add(moon);
-  var warm = new T.DirectionalLight(0xFFAE42, 0.46);
-  warm.position.set(10, 14, 12);
-  scene.add(warm);
+
+  // Only the closest lamps can ever be on screen, so three real point lights
+  // get reassigned to the nearest posts instead of lighting all seven at once.
+  // Fixed light count, so no shader recompiles while you walk around.
+  var LAMP_LIGHTS = 3;
+  var lampLights = [];
+  for (var li = 0; li < LAMP_LIGHTS; li++) {
+    var pl = new T.PointLight(0xFFB042, 0, 19, 1.7);
+    pl.position.set(0, 6.4, 0);
+    scene.add(pl);
+    lampLights.push(pl);
+  }
+  var lampOrder = LAMPS.map(function (l, i) { return i; });
+
+  var lampsActive = LAMP_LIGHTS;
+  function setLampCount(n) {
+    n = clamp(n, 1, LAMP_LIGHTS);
+    if (n === lampsActive) return;
+    lampsActive = n;
+    // A zero-intensity light still costs: the shader loops over every light in
+    // the scene. Only removing it actually saves anything, at the price of one
+    // recompile — fine on a settings change, not fine per frame.
+    for (var i = 0; i < LAMP_LIGHTS; i++) {
+      if (i < n && !lampLights[i].parent) scene.add(lampLights[i]);
+      else if (i >= n && lampLights[i].parent) scene.remove(lampLights[i]);
+    }
+  }
+
+  function updateLampLights() {
+    lampOrder.sort(function (a, b) {
+      return (Math.hypot(LAMPS[a].x - player.x, LAMPS[a].z - player.z)) -
+             (Math.hypot(LAMPS[b].x - player.x, LAMPS[b].z - player.z));
+    });
+    for (var i = 0; i < lampsActive; i++) {
+      var L = LAMPS[lampOrder[i]];
+      lampLights[i].position.set(L.x, 6.4, L.z);
+      lampLights[i].intensity = 2.5;
+    }
+  }
+
+  // The flashlight is a real spotlight, not a mask: it lights the ground, the
+  // props and the bodies it falls on, and leaves everything outside it dark.
+  // Mounted high and angled down, not held at chest height. A near-horizontal
+  // beam hits the floor at grazing incidence (N.L ~ 0.1) and lights almost
+  // nothing; from above, the cone lands as a readable pool on the ground.
+  var torchLight = new T.SpotLight(0xE4EEFF, 0, 34, 0.50, 0.62, 1.1);
+  torchLight.position.set(0, 5.2, 0);
+  scene.add(torchLight);
+  scene.add(torchLight.target);
 
   // Present from frame one at zero intensity: adding a light later changes the
   // light count and forces every material in the scene to recompile, which
@@ -1685,6 +1715,7 @@ function main(hotData) {
     Q = QUALITY[name];
     store.set('quality', name);
     Post.scale = Q.bloom;
+    setLampCount(Q.lamps);
     Post.mComp.uniforms.fxaaOn.value = (fxOn && name !== 'battery') ? 1 : 0;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
     resize();
@@ -3046,8 +3077,6 @@ function main(hotData) {
     var FRAG_COMP = `
       uniform sampler2D tScene; uniform sampler2D tBloom;
       uniform vec2 rcp; uniform float strength; uniform float fxaaOn;
-      uniform vec2 uAim; uniform vec2 uAspect;
-      uniform float uDark, uBase, uTorch, uCone, uFloor;
       varying vec2 vUv;
       vec3 fxaa(sampler2D tex, vec2 uv){
         vec3 luma = vec3(0.299, 0.587, 0.114);
@@ -3074,25 +3103,7 @@ function main(hotData) {
       void main(){
         vec3 base = fxaaOn > 0.5 ? fxaa(tScene, vUv) : texture2D(tScene, vUv).rgb;
         vec3 glow = texture2D(tBloom, vUv).rgb;
-
-        // Darkness is screen-space: the camera is locked overhead, so distance
-        // from screen centre is distance from the player. The player sees a
-        // small ambient bubble; the torch, when carried, opens a cone well
-        // beyond it. Without one you are nearly blind outside the lamp pools.
-        vec2 d = (vUv - vec2(0.5)) * uAspect;
-        float dist = length(d);
-        float vis = 1.0 - smoothstep(uBase * 0.55, uBase, dist);
-        if (uTorch > 0.0) {
-          vec2 nd = dist > 0.0001 ? d / dist : vec2(0.0);
-          float cone  = smoothstep(uCone, uCone + 0.16, dot(nd, uAim));
-          float reach = 1.0 - smoothstep(uTorch * 0.62, uTorch, dist);
-          vis = max(vis, cone * reach);
-        }
-        float lit = mix(1.0, mix(uFloor, 1.0, vis), uDark);
-
-        // Bloom is only partly dimmed, so distant streetlamps still glow
-        // through the dark and work as landmarks you can navigate by.
-        gl_FragColor = vec4(base * lit + glow * strength * (0.35 + 0.65 * lit), 1.0);
+        gl_FragColor = vec4(base + glow * strength, 1.0);
       }`;
 
     function mat(frag, uniforms) {
@@ -3125,10 +3136,7 @@ function main(hotData) {
       api.mComp = mat(FRAG_COMP, {
         tScene: { value: null }, tBloom: { value: null },
         rcp: { value: new T.Vector2() }, strength: { value: 0.68 },
-        fxaaOn: { value: 1 },
-        uAim: { value: new T.Vector2(0, -1) }, uAspect: { value: new T.Vector2(1, 1) },
-        uDark: { value: 1 }, uBase: { value: 0.16 }, uTorch: { value: 0 },
-        uCone: { value: 0.72 }, uFloor: { value: 0.16 }
+        fxaaOn: { value: 1 }
       });
       api.quad = new T.Mesh(new T.PlaneGeometry(2, 2), api.mComp);
       api.quad.frustumCulled = false;
@@ -3288,16 +3296,18 @@ function main(hotData) {
     syncPickups(now / 1000);
     syncDecals();
 
-    // ---- darkness: radii are authored in world units, converted to the
-    // screen-height units the composite shader works in.
-    var uni = Post.mComp.uniforms;
-    var vw = app.clientWidth || 1, vh = app.clientHeight || 1;
-    var spanV = 2 * camDist * Math.tan((camera.fov * PI / 180) / 2);
-    uni.uAspect.value.set(vw / vh, 1);
-    uni.uDark.value = (G.screen === 'menu' || G.screen === 'how') ? 0.35 : 1;
-    uni.uBase.value = 6.5 / spanV;
-    uni.uTorch.value = player.torch ? (20 / spanV) : 0;
-    uni.uAim.value.set(Math.sin(player.angle), -Math.cos(player.angle));
+    // ---- real lights: nearest lamps, and the torch beam following the aim
+    updateLampLights();
+    if (player.torch && G.screen !== 'menu' && G.screen !== 'how') {
+      torchLight.intensity = 4.2;
+      torchLight.position.set(player.x, 5.2, player.z);
+      torchLight.target.position.set(
+        player.x + Math.sin(player.angle) * 11, 0,
+        player.z + Math.cos(player.angle) * 11);
+      torchLight.target.updateMatrixWorld();
+    } else {
+      torchLight.intensity = 0;
+    }
 
     if (G.blastT > 0) {
       G.blastT -= dt;
