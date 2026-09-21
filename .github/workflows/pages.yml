@@ -1,0 +1,70 @@
+# Builds the installable version and publishes it to GitHub Pages.
+#
+# index.html is authored as an artifact fragment: no doctype, html, head or body
+# tags of its own, because the Claude artifact host supplies those. A PWA needs a
+# real document with a manifest link, so rather than keeping a second copy of the
+# game in sync, this wraps the same file at deploy time.
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wrap the game in a standalone document
+        run: |
+          mkdir -p dist
+          cat > dist/index.html <<'HEAD'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+          <meta name="theme-color" content="#050709">
+          <meta name="mobile-web-app-capable" content="yes">
+          <meta name="apple-mobile-web-app-capable" content="yes">
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+          <meta name="apple-mobile-web-app-title" content="Graveyard Shift">
+          <link rel="manifest" href="manifest.webmanifest">
+          <link rel="apple-touch-icon" href="icon-192.png">
+          <style>
+            :root{color-scheme:dark;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+            html,body{margin:0;height:100%;background:#050709;overscroll-behavior:none}
+            img{max-width:100%}[hidden]{display:none!important}
+          </style>
+          </head>
+          <body>
+          HEAD
+          cat index.html >> dist/index.html
+          printf '\n</body>\n</html>\n' >> dist/index.html
+          cp manifest.webmanifest sw.js icon-192.png icon-512.png icon-maskable-512.png dist/
+          echo "built dist/index.html ($(wc -c < dist/index.html) bytes)"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
