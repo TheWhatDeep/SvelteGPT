@@ -224,6 +224,14 @@ body{
 #hint-r{right:0;}
 .hintzone.gone{opacity:0;}
 
+#minimap{
+  position:absolute;right:16px;top:112px;width:75px;height:75px;z-index:3;
+  pointer-events:none;opacity:0;transition:opacity .2s ease;
+  background:rgba(5,7,9,.62);
+  border:1px solid var(--fog);
+}
+#minimap.on{opacity:1;}
+
 /* Off-screen threat markers — portrait is narrow, so enemies closing from the
    sides would otherwise arrive with no warning at all. */
 #threats{position:absolute;inset:0;z-index:3;pointer-events:none;}
@@ -474,6 +482,7 @@ body{
   </div>
 
   <div id="threats"></div>
+  <canvas id="minimap" width="150" height="150" aria-hidden="true"></canvas>
 
   <div id="hud" hidden>
     <div id="hud-top">
@@ -1303,7 +1312,7 @@ function main(hotData) {
     hp: 100, maxHp: 100, speed: 7.0, radius: 0.46,
     critMult: 2, regen: 0, armor: 0, magnet: 3.2, knock: 0,
     cooldown: 0, hurtCd: 0, muzzle: 0, gait: 0,
-    wep: 'rifle',
+    wep: 'rifle', torch: false,
     // upgrades write here, never to the weapon
     mul: { damage: 1, fireRate: 1, bulletSpeed: 1, range: 1 },
     add: { pierce: 0, shots: 0, crit: 0, spread: 0 }
@@ -1463,9 +1472,10 @@ function main(hotData) {
   var pickupMesh = {
     health: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xE23B3B }), MAXPK),
     scrap: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xFFA424 }), MAXPK),
-    weapon: new T.InstancedMesh(crateGeo2, new T.MeshBasicMaterial({ color: 0xEDE7D9 }), MAXPK)
+    weapon: new T.InstancedMesh(crateGeo2, new T.MeshBasicMaterial({ color: 0xEDE7D9 }), MAXPK),
+    torch: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xBFE6FF }), MAXPK)
   };
-  ['health', 'scrap', 'weapon'].forEach(function (k) {
+  ['health', 'scrap', 'weapon', 'torch'].forEach(function (k) {
     pickupMesh[k].frustumCulled = false;
     pickupMesh[k].count = 0;
     scene.add(pickupMesh[k]);
@@ -1675,7 +1685,7 @@ function main(hotData) {
     Q = QUALITY[name];
     store.set('quality', name);
     Post.scale = Q.bloom;
-    Post.mComp.uniforms.fxaaOn.value = (name === 'battery') ? 0 : 1;
+    Post.mComp.uniforms.fxaaOn.value = (fxOn && name !== 'battery') ? 1 : 0;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
     resize();
     syncPostSize(true);
@@ -1704,7 +1714,9 @@ function main(hotData) {
   function setEffects(on, persist) {
     fxOn = on;
     if (persist !== false) store.set('fx', on);
-    Post.on = on;
+    Post.bloom = on;
+    Post.mComp.uniforms.strength.value = on ? 0.68 : 0;
+    Post.mComp.uniforms.fxaaOn.value = (on && quality !== 'battery') ? 1 : 0;
     var label = 'Effects: ' + (on ? 'On' : 'Off');
     $('tog-fx').textContent = label;
     $('tog-fx2').textContent = label;
@@ -2089,6 +2101,22 @@ function main(hotData) {
     }
   }
 
+  function spawnDrop(kind) {
+    for (var tries = 0; tries < 24; tries++) {
+      var ang = rand(0, TAU), d = rand(7, 15);
+      var x = clamp(player.x + Math.cos(ang) * d, -ARENA + 3, ARENA - 3);
+      var z = clamp(player.z + Math.sin(ang) * d, -ARENA + 3, ARENA - 3);
+      if (Math.hypot(x - player.x, z - player.z) < 5) continue;
+      var clear = true;
+      for (var i = 0; i < props.length; i++) {
+        if (Math.hypot(x - props[i].x, z - props[i].z) < props[i].r + 1.3) { clear = false; break; }
+      }
+      if (!clear) continue;
+      pickups.push({ x: x, z: z, kind: kind, spin: rand(0, TAU), life: 9999 });
+      return;
+    }
+  }
+
   function spawnWeaponCrate() {
     // never offer what you are holding, nor a duplicate of a crate already out
     var onGround = pickups.filter(function (p) { return p.kind === 'weapon'; })
@@ -2157,6 +2185,9 @@ function main(hotData) {
     G.waveActive = true;
     announce('Wave', String(n));
     if (n >= 2) spawnWeaponCrate();
+    if (!player.torch && n >= 2 && !pickups.some(function (p) { return p.kind === 'torch'; })) {
+      spawnDrop('torch');
+    }
     if (n >= 8 && Math.random() < 0.5) spawnWeaponCrate();
   }
 
@@ -2190,6 +2221,7 @@ function main(hotData) {
     player.mul.bulletSpeed = player.mul.range = 1;
     player.add.pierce = player.add.shots = player.add.crit = player.add.spread = 0;
     equip('rifle', false);
+    player.torch = false;
     G.wave = 1; G.score = 0; G.kills = 0; G.time = 0;
     G.betweenCd = 0; G.shake = 0; G.cheated = false;
     input.mx = input.mz = 0; input.aiming = false;
@@ -2500,6 +2532,11 @@ function main(hotData) {
       if (pd < (pu.kind === 'weapon' ? 1.0 : 0.7)) {
         if (pu.kind === 'health') { player.hp = Math.min(player.maxHp, player.hp + 22); Audio_.pickup(); }
         else if (pu.kind === 'weapon') { equip(pu.wep, true); }
+        else if (pu.kind === 'torch') {
+          player.torch = true;
+          showToast('Flashlight', 'Lights a cone wherever you aim. Do not lose it.');
+          Audio_.pickup();
+        }
         else { G.score += 25; Audio_.pickup(); }
         pickups.splice(pk, 1);
       } else if (pu.life <= 0) {
@@ -2689,9 +2726,18 @@ function main(hotData) {
   }
 
   function syncPickups(now) {
-    var nh = 0, nsc = 0, nw = 0;
+    var nh = 0, nsc = 0, nw = 0, nt = 0;
     for (var i = 0; i < pickups.length; i++) {
       var p = pickups[i];
+      if (p.kind === 'torch') {
+        var tp = 1 + Math.sin(now * 5.0) * 0.12;
+        _body.position.set(p.x, 0.5 + Math.sin(now * 2.2) * 0.12, p.z);
+        _body.rotation.set(0.4, now * 1.6, 0.3);
+        _body.scale.set(tp, tp, tp);
+        _body.updateMatrix();
+        if (nt < MAXPK) pickupMesh.torch.setMatrixAt(nt++, _body.matrix);
+        continue;
+      }
       if (p.kind === 'weapon') {
         // crates sit flat and turn slowly, with a slow pulse to draw the eye
         var pulse = 1 + Math.sin(now * 3.2) * 0.07;
@@ -2716,6 +2762,8 @@ function main(hotData) {
     pickupMesh.health.count = nh;
     pickupMesh.scrap.count = nsc;
     pickupMesh.weapon.count = nw;
+    pickupMesh.torch.count = nt;
+    pickupMesh.torch.instanceMatrix.needsUpdate = true;
     pickupMesh.health.instanceMatrix.needsUpdate = true;
     pickupMesh.scrap.instanceMatrix.needsUpdate = true;
     pickupMesh.weapon.instanceMatrix.needsUpdate = true;
@@ -2804,6 +2852,65 @@ function main(hotData) {
       threatPool.push(d);
     }
   })();
+
+  var miniCv = $('minimap'), miniCtx = miniCv.getContext('2d');
+  var MINI_RANGE = 34;   // world units from the player, edge to centre
+
+  function syncMinimap() {
+    var live = G.screen === 'playing' || G.screen === 'cheats';
+    miniCv.classList.toggle('on', live);
+    if (!live) return;
+
+    var w = miniCv.width, c = w / 2, k = c / MINI_RANGE;
+    miniCtx.clearRect(0, 0, w, w);
+
+    // arena bounds, so you can read where the walls are
+    miniCtx.strokeStyle = 'rgba(46,57,65,.9)';
+    miniCtx.lineWidth = 2;
+    miniCtx.strokeRect(c + (-ARENA - player.x) * k, c + (-ARENA - player.z) * k,
+                       ARENA * 2 * k, ARENA * 2 * k);
+
+    // torch cone, so the minimap shows what you can actually see
+    if (player.torch) {
+      miniCtx.fillStyle = 'rgba(191,230,255,.10)';
+      miniCtx.beginPath();
+      miniCtx.moveTo(c, c);
+      miniCtx.arc(c, c, 20 * k, player.angle - PI / 2 - 0.62, player.angle - PI / 2 + 0.62);
+      miniCtx.closePath();
+      miniCtx.fill();
+    }
+
+    function dot(x, z, r, fill) {
+      var px = c + (x - player.x) * k, py = c + (z - player.z) * k;
+      if (px < -4 || py < -4 || px > w + 4 || py > w + 4) return;
+      miniCtx.fillStyle = fill;
+      miniCtx.beginPath();
+      miniCtx.arc(px, py, r, 0, TAU);
+      miniCtx.fill();
+    }
+
+    for (var i = 0; i < pickups.length; i++) {
+      var p = pickups[i];
+      if (p.kind === 'weapon') dot(p.x, p.z, 2.6, '#EDE7D9');
+      else if (p.kind === 'torch') dot(p.x, p.z, 2.6, '#BFE6FF');
+      else if (p.kind === 'health') dot(p.x, p.z, 2, '#E23B3B');
+    }
+    for (var z2 = 0; z2 < zombies.length; z2++) {
+      var zz = zombies[z2];
+      var t = ZTYPE[zz.type];
+      dot(zz.x, zz.z, t.scale > 1.2 ? 2.8 : 2, t.howls ? '#CC7E6E' : (t.explodes ? '#B4C47A' : '#8FAE5B'));
+    }
+
+    // player last, always on top, pointing where the gun points
+    miniCtx.save();
+    miniCtx.translate(c, c);
+    miniCtx.rotate(player.angle + PI);
+    miniCtx.fillStyle = '#FFA424';
+    miniCtx.beginPath();
+    miniCtx.moveTo(0, -5); miniCtx.lineTo(3.6, 4); miniCtx.lineTo(-3.6, 4);
+    miniCtx.closePath(); miniCtx.fill();
+    miniCtx.restore();
+  }
 
   function syncThreats() {
     var used = 0;
@@ -2939,6 +3046,8 @@ function main(hotData) {
     var FRAG_COMP = `
       uniform sampler2D tScene; uniform sampler2D tBloom;
       uniform vec2 rcp; uniform float strength; uniform float fxaaOn;
+      uniform vec2 uAim; uniform vec2 uAspect;
+      uniform float uDark, uBase, uTorch, uCone, uFloor;
       varying vec2 vUv;
       vec3 fxaa(sampler2D tex, vec2 uv){
         vec3 luma = vec3(0.299, 0.587, 0.114);
@@ -2965,7 +3074,25 @@ function main(hotData) {
       void main(){
         vec3 base = fxaaOn > 0.5 ? fxaa(tScene, vUv) : texture2D(tScene, vUv).rgb;
         vec3 glow = texture2D(tBloom, vUv).rgb;
-        gl_FragColor = vec4(base + glow * strength, 1.0);
+
+        // Darkness is screen-space: the camera is locked overhead, so distance
+        // from screen centre is distance from the player. The player sees a
+        // small ambient bubble; the torch, when carried, opens a cone well
+        // beyond it. Without one you are nearly blind outside the lamp pools.
+        vec2 d = (vUv - vec2(0.5)) * uAspect;
+        float dist = length(d);
+        float vis = 1.0 - smoothstep(uBase * 0.55, uBase, dist);
+        if (uTorch > 0.0) {
+          vec2 nd = dist > 0.0001 ? d / dist : vec2(0.0);
+          float cone  = smoothstep(uCone, uCone + 0.16, dot(nd, uAim));
+          float reach = 1.0 - smoothstep(uTorch * 0.62, uTorch, dist);
+          vis = max(vis, cone * reach);
+        }
+        float lit = mix(1.0, mix(uFloor, 1.0, vis), uDark);
+
+        // Bloom is only partly dimmed, so distant streetlamps still glow
+        // through the dark and work as landmarks you can navigate by.
+        gl_FragColor = vec4(base * lit + glow * strength * (0.35 + 0.65 * lit), 1.0);
       }`;
 
     function mat(frag, uniforms) {
@@ -2982,7 +3109,7 @@ function main(hotData) {
     }
 
     var api = {
-      on: false, bufW: 0, bufH: 0, scale: 0.25,
+      bloom: true, bufW: 0, bufH: 0, scale: 0.25,
       rtScene: null, rtA: null, rtB: null,
       qScene: new T.Scene(), qCam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1),
       quad: null, mBright: null, mBlur: null, mComp: null
@@ -2998,7 +3125,10 @@ function main(hotData) {
       api.mComp = mat(FRAG_COMP, {
         tScene: { value: null }, tBloom: { value: null },
         rcp: { value: new T.Vector2() }, strength: { value: 0.68 },
-        fxaaOn: { value: 1 }
+        fxaaOn: { value: 1 },
+        uAim: { value: new T.Vector2(0, -1) }, uAspect: { value: new T.Vector2(1, 1) },
+        uDark: { value: 1 }, uBase: { value: 0.16 }, uTorch: { value: 0 },
+        uCone: { value: 0.72 }, uFloor: { value: 0.16 }
       });
       api.quad = new T.Mesh(new T.PlaneGeometry(2, 2), api.mComp);
       api.quad.frustumCulled = false;
@@ -3022,10 +3152,17 @@ function main(hotData) {
     };
 
     api.render = function (scene, camera) {
-      if (!api.on) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
-
       renderer.setRenderTarget(api.rtScene);
       renderer.render(scene, camera);
+
+      if (!api.bloom) {
+        api.quad.material = api.mComp;
+        api.mComp.uniforms.tScene.value = api.rtScene.texture;
+        api.mComp.uniforms.tBloom.value = api.rtA.texture;
+        renderer.setRenderTarget(null);
+        renderer.render(api.qScene, api.qCam);
+        return;
+      }
 
       api.quad.material = api.mBright;
       api.mBright.uniforms.tDiffuse.value = api.rtScene.texture;
@@ -3107,7 +3244,7 @@ function main(hotData) {
     // with pixel ratio already at the floor, the effects go rather than let
     // the game crawl — six seconds of sustained struggle, and not persisted,
     // so the player's own setting survives a reload.
-    if (Post.on && frameAvg > 34 && dprScale <= 0.64) {
+    if (Post.bloom && frameAvg > 34 && dprScale <= 0.64) {
       fxStress++;
       if (fxStress > 180) { fxStress = 0; setEffects(false, false); }
     } else if (fxStress > 0) {
@@ -3144,11 +3281,23 @@ function main(hotData) {
     }
 
     syncThreats();
+    syncMinimap();
     syncZombies();
     syncBullets();
     syncParticles();
     syncPickups(now / 1000);
     syncDecals();
+
+    // ---- darkness: radii are authored in world units, converted to the
+    // screen-height units the composite shader works in.
+    var uni = Post.mComp.uniforms;
+    var vw = app.clientWidth || 1, vh = app.clientHeight || 1;
+    var spanV = 2 * camDist * Math.tan((camera.fov * PI / 180) / 2);
+    uni.uAspect.value.set(vw / vh, 1);
+    uni.uDark.value = (G.screen === 'menu' || G.screen === 'how') ? 0.35 : 1;
+    uni.uBase.value = 6.5 / spanV;
+    uni.uTorch.value = player.torch ? (20 / spanV) : 0;
+    uni.uAim.value.set(Math.sin(player.angle), -Math.cos(player.angle));
 
     if (G.blastT > 0) {
       G.blastT -= dt;

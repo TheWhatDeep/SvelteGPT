@@ -50,6 +50,34 @@ and best wave persist locally.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
+## Darkness and the flashlight
+
+The lot is dark. Without a light you see a small bubble around yourself and
+whatever the streetlamps reach — everything else is a silhouette at best. The
+**flashlight** is a found item, guaranteed to drop from wave 2, and it opens a
+wide cone wherever you aim. It is not a toggle; lose the run and you start blind
+again.
+
+Darkness is screen-space, computed in the composite pass. The camera is locked
+overhead, so distance from screen centre *is* distance from the player, which
+makes the mask a couple of `smoothstep`s rather than a second lighting pass.
+Bloom is only partly dimmed by it, so distant streetlamps still glow through the
+dark and work as landmarks you can navigate by.
+
+Because it is a gameplay mechanic rather than an effect, the composite pass now
+always runs — the **Effects** toggle governs bloom and FXAA only. Turning
+effects off would otherwise have handed you night vision.
+
+## Minimap
+
+A 34-unit-radius radar sits under the HUD buttons: arena bounds, zombies
+coloured by type, weapon crates, health drops, and your own facing. When you
+carry the flashlight it also draws the cone, so the map shows what you can
+actually see rather than what exists.
+
+It is a 2D canvas redrawn each frame — a few dozen `arc` calls, far cheaper than
+DOM nodes, and it became necessary the moment darkness landed.
+
 ## Cheats
 
 Turn **Cheats: On** in the menu or pause screen and a slider button appears in the
