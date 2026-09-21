@@ -11,23 +11,64 @@ You hold a lamp-lit parking lot against escalating waves of the dead. Clear a
 wave, take one of three permanent upgrades, repeat until you're overrun. Score
 and best wave persist locally.
 
-- **Endless waves** with four enemy types — Shamblers, Runners, Brutes, and
-  ranged Spitters — that enter the mix as waves progress.
-- **Twelve stacking upgrades**: damage, fire rate, pierce, multishot, crit,
-  armour, regen, pickup magnet, and more.
-- **One-thumb play.** The left half of the screen is a floating movement stick;
-  the weapon auto-targets the nearest threat. The right half overrides aim when
-  you need to pick something specific out of the horde.
+- **Endless waves** with seven enemy types, each entering a few waves apart so
+  you meet one new threat at a time:
+
+  | Type | From wave | Behaviour |
+  |---|---|---|
+  | Shambler | 1 | Slow, weak, arrives in numbers |
+  | Runner | 2 | Fast, fragile, closes before you notice |
+  | Crawler | 3 | Scuttles on all fours — low silhouette, easy to lose in a crowd |
+  | Brute | 4 | Huge and slow, soaks a magazine |
+  | Spitter | 6 | Holds at range and lobs acid |
+  | Bloater | 7 | Detonates on death, damaging you *and* its neighbours |
+  | Howler | 9 | Shrieks and every walker nearby surges to 1.5× speed |
+
+  Bloaters and Howlers exist to break the "hold the trigger" reflex: one
+  punishes killing at arm's length, the other makes target priority matter.
+- **Five weapons**, found in crates that drop in the lot each wave rather than
+  chosen from a menu — walking out to get one mid-fight is the decision:
+
+  | Weapon | Shape of it |
+  |---|---|
+  | Field Rifle | Balanced starter. Nothing it does badly. |
+  | Scattergun | Seven pellets, short reach. Deletes a crowd at contact range. |
+  | Stutter SMG | 13 rounds/sec, sprays wide, runs out of reach early. |
+  | Marksman | Slow and heavy, pierces 3 bodies, drops Brutes. |
+  | Thumper | Lobs a grenade. Huge against a pack, wasteful on one body. |
+
+- **Eleven stacking upgrades**: damage, fire rate, pierce, crit, armour, regen,
+  pickup magnet, and more.
+- **Twin-stick by default.** The left half of the screen is a floating movement
+  stick, the right half aims and fires. **Auto-aim is off by default** and can be
+  switched on from the menu or pause screen — with it on, the weapon tracks the
+  nearest walker and one thumb is enough. Manual aim always overrides it.
+
+  The default is deliberate: auto-aim plus auto-fire leaves the player with only
+  one verb ("don't die"), which rewards standing still in a corner. Giving the
+  right thumb a job keeps both hands in the fight.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
+
+## Cheats
+
+Turn **Cheats: On** in the menu or pause screen and a slider button appears in the
+HUD beside pause. It opens a panel with every weapon (tap to equip) and every
+upgrade (tap to add a level, up to its normal cap). The world freezes while the
+panel is open, so you can build a loadout without being eaten.
+
+Touching anything in the panel marks the run: it will not write a best wave or
+best score, and the game-over screen says so. Testing a wave-12 Howler pack
+shouldn't quietly overwrite a real record.
 
 ## Controls
 
 | | Touch | Desktop |
 |---|---|---|
 | Move | Drag on the left half | `WASD` / arrow keys |
-| Aim | Drag on the right half (optional) | Mouse |
-| Fire | Automatic | Automatic |
+| Aim | Drag on the right half | Mouse |
+| Fire | While aiming | Hold mouse button |
+| Fire (auto-aim on) | Automatic | Automatic |
 | Pause | Button, top right | `Esc` |
 
 ## How it's built
@@ -40,7 +81,9 @@ with a fallback source. Everything else is in `index.html`.
 There are no model or texture files. Every asset is authored in code at runtime:
 
 - **Zombies** are six-part articulated figures — torso, head, two arms, two legs
-  — with per-limb walk animation driven by a phase offset per body.
+  — with per-limb walk animation driven by a phase offset per body. Crawlers
+  reuse the same six parts in a different pose: torso near-horizontal, front
+  limbs pawing at the ground, hind legs kicking out behind.
 - **The ground** is a 2D canvas painted at startup: asphalt grain, cracks, faded
   parking bays, and the warm pools beneath each streetlight, baked in at the
   lamps' own coordinates.
@@ -49,6 +92,89 @@ There are no model or texture files. Every asset is authored in code at runtime:
 This was originally a constraint — the page is published as a sandboxed artifact
 that cannot fetch external media — but it keeps the whole game in one file with
 zero network requests after the engine loads.
+
+### Difficulty scales on three axes, damage included
+
+Enemy health, speed **and damage** all scale with wave number:
+
+```js
+hpScale  = 1 + 0.135 * (wave - 1)
+spScale  = min(1.42, 1 + 0.022 * (wave - 1))
+dmgScale = 1 + 0.12  * (wave - 1)
+```
+
+Damage scaling is load-bearing, not decoration. Without it, flat damage
+reduction eventually zeroes every hit: a −10 flat armour bonus against an
+unscaled 9-damage Shambler floors at 1, the global 0.42s hit cooldown caps
+incoming damage at ~2.4/sec regardless of how many bodies are on you, and 3.5
+HP/sec of regen then exceeds that ceiling. The result was a player who could
+not be killed by anything except Brutes and Bloaters.
+
+The fix is three-part: damage scales, armour is a **percentage** (7%/level to a
+35% cap) so it can never trivialise a hit, and regen only ticks **2.2 seconds
+after you were last hit**, making it a between-fights recovery tool rather than
+a combat one. A fully-maxed defensive build standing still in nine wave-7
+zombies now loses ~19 HP/sec.
+
+### Post-processing: bloom and FXAA
+
+Written by hand rather than with three.js `EffectComposer` + `UnrealBloomPass`,
+which live in the examples bundle and would mean a second CDN fetch this page
+can't guarantee. Four passes: scene into a render target, a bright-pass that
+downsamples, a separable blur in two directions, then a composite.
+
+- The bright-pass keys on **max channel, not luma**. This palette's highlights
+  are saturated amber, which luma weighting under-reads and refuses to bloom.
+- The composite also runs **FXAA**, which is load-bearing: rendering into a
+  render target bypasses the canvas's MSAA entirely, so without it turning
+  effects on would make edges *worse*.
+- Bloom buffers run at 20–40% resolution depending on quality tier. FXAA is the
+  only full-resolution pass, and it is skipped on the battery tier.
+- Render targets tolerate a 6% size drift before reallocating, because the
+  adaptive quality system nudges pixel ratio continuously and would otherwise
+  reallocate every buffer every few frames.
+- If frame time still misses 30fps with pixel ratio already at its floor,
+  effects switch themselves off after ~6 sustained seconds. That is not
+  persisted, so the player's own setting survives a reload.
+
+### Lighting
+
+Two `PointLight`s — muzzle flash and explosion — are added at startup at zero
+intensity and driven by their timers. Adding a light later changes the scene's
+light count and forces every material to recompile, which shows up as a hitch
+at exactly the wrong moment.
+
+The ground plane is subdivided 64×64 for their benefit: `MeshLambertMaterial`
+lights per-vertex, so on the original two triangles a muzzle flash had nowhere
+to land.
+
+### Weapons are base stats; upgrades are multipliers
+
+Upgrades used to mutate `player.damage` directly. That works until weapons can
+swap, at which point "+25% damage" earned on a rifle silently becomes a flat
+number on a shotgun and your build evaporates.
+
+So weapons hold base stats, upgrades write only to `player.mul` (damage, fire
+rate, bullet speed, range) and `player.add` (pierce, shots, crit, spread), and
+a single `recalc()` derives the effective stats into a reused `eff` object
+whenever either side changes. The hot loop never re-derives or allocates, and a
+build carries across every weapon swap.
+
+### Gait is derived, not tuned
+
+Walk cycles are driven by **distance travelled**, never by a fixed tempo. A leg
+of length `L` swinging `±θ` advances the body `4·L·sin(θ)` per cycle, so each
+body type's stride is computed from its own leg geometry at startup:
+
+```js
+t.stride = 4 * LEG_LEN * t.scale * Math.sin(t.legSwing);
+```
+
+The phase then advances by `(speed / stride) × 2π` per second. Feet cannot
+slide, because the animation rate is a function of the movement rate rather
+than a constant someone guessed. A Brute at 1.8 u/s and a Runner at 5.05 u/s
+plant their feet at visibly different rates without either being hand-tuned,
+and changing a type's speed needs no animation change at all.
 
 ### Performance notes
 

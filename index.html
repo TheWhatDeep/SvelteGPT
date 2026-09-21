@@ -120,7 +120,7 @@ body{
 .pausebtn svg{width:18px;height:18px;display:block;}
 
 .readout{
-  display:flex;align-items:baseline;gap:14px;
+  display:flex;align-items:baseline;gap:8px 13px;flex-wrap:wrap;
   font-size:var(--fs-label);letter-spacing:.1em;text-transform:uppercase;
   color:var(--bone-faint);
 }
@@ -129,6 +129,11 @@ body{
   font-variant-numeric:tabular-nums;letter-spacing:.04em;
 }
 .readout .wv b{color:var(--sodium);}
+.readout .wep{
+  color:var(--pit);background:var(--sodium);
+  font-weight:700;letter-spacing:.1em;
+  padding:2px 8px 1px;
+}
 
 /* Wave announcement */
 #announce{
@@ -152,6 +157,29 @@ body{
   16%{opacity:1;transform:translateY(0) scale(1);}
   72%{opacity:1;}
   100%{opacity:0;transform:translateY(-8px);}
+}
+
+/* Weapon pickup toast */
+#toast{
+  position:absolute;left:0;right:0;bottom:23%;
+  text-align:center;pointer-events:none;z-index:4;opacity:0;
+  padding:0 18px;
+}
+#toast.show{animation:toast 2.4s cubic-bezier(.16,.9,.3,1) forwards;}
+#toast .t-name{
+  font-family:var(--f-display);font-weight:800;
+  font-size:clamp(30px,8vw,42px);line-height:.95;color:var(--sodium);
+  letter-spacing:.02em;text-shadow:0 0 26px rgba(255,164,36,.45);
+}
+#toast .t-sub{
+  font-size:var(--fs-label);color:var(--bone-dim);
+  margin-top:3px;text-wrap:balance;
+}
+@keyframes toast{
+  0%{opacity:0;transform:translateY(12px) scale(.96);}
+  12%{opacity:1;transform:translateY(0) scale(1);}
+  74%{opacity:1;}
+  100%{opacity:0;transform:translateY(-6px);}
 }
 
 /* Damage flash */
@@ -272,13 +300,15 @@ body{
 }
 
 .toggles{
-  display:flex;gap:8px;margin-top:20px;justify-content:center;flex-wrap:wrap;
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px;
 }
+/* the gameplay setting gets its own row; preferences share the next one */
+.tog.wide{grid-column:1 / -1;}
 .tog{
   pointer-events:auto;
-  font-family:var(--f-ui);font-size:var(--fs-label);font-weight:600;
-  letter-spacing:.12em;text-transform:uppercase;
-  padding:12px 16px;min-height:44px;cursor:pointer;
+  font-family:var(--f-ui);font-size:var(--fs-micro);font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;line-height:1.25;
+  padding:11px 12px;min-height:44px;cursor:pointer;
   background:transparent;color:var(--bone-faint);
   border:1px solid var(--fog);
 }
@@ -352,6 +382,68 @@ body{
   color:var(--sodium);font-weight:600;
 }
 
+/* ---------------- Cheat panel ----------------
+   Deliberately reads as a tool, not part of the game: denser, flatter, no
+   display face, so it never gets mistaken for real UI in a screenshot. */
+.sheet{
+  justify-content:flex-end;
+  padding:0;
+  background:rgba(5,7,9,.42);
+}
+.cheat-panel{
+  /* the page reset is content-box, so width:100% + padding would overflow */
+  box-sizing:border-box;
+  width:100%;max-width:440px;margin:0 auto;
+  background:var(--slate);
+  border-top:2px solid var(--sodium);
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  max-height:72%;overflow-y:auto;
+  display:flex;flex-direction:column;gap:10px;
+}
+.cheat-head{display:flex;align-items:center;gap:10px;}
+.cheat-title{
+  flex:1;font-size:var(--fs-label);font-weight:700;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--sodium);
+}
+.cheat-close{
+  pointer-events:auto;font-family:var(--f-ui);
+  font-size:var(--fs-micro);font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;padding:9px 14px;min-height:40px;cursor:pointer;
+  background:transparent;color:var(--bone);border:1px solid var(--fog);
+}
+.cheat-close:active{background:var(--slate-2);}
+.cheat-sec{
+  font-size:var(--fs-micro);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--bone-faint);border-bottom:1px solid var(--fog);
+  padding-bottom:5px;margin-top:2px;
+}
+.cheat-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px;
+}
+.cheat-btn{
+  pointer-events:auto;cursor:pointer;text-align:left;
+  font-family:var(--f-ui);font-size:var(--fs-micro);font-weight:600;
+  line-height:1.2;padding:8px 9px;min-height:42px;
+  background:var(--slate-2);color:var(--bone);
+  border:1px solid var(--fog);
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+}
+.cheat-btn:active{background:var(--fog);}
+.cheat-btn .lvl{
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--sodium);font-variant-numeric:tabular-nums;
+}
+.cheat-btn[data-on="1"]{
+  background:var(--sodium);color:var(--pit);border-color:var(--sodium);
+}
+.cheat-btn[data-on="1"] .lvl{color:var(--pit);opacity:.72;}
+.cheat-btn[disabled]{opacity:.42;cursor:default;}
+.cheat-btn[disabled] .lvl{color:var(--bone-faint);}
+.cheat-note{
+  font-size:var(--fs-micro);line-height:1.45;color:var(--bone-faint);
+}
+.cheat-note b{color:var(--ember);}
+
 #fatal{
   position:absolute;inset:0;z-index:40;display:none;
   align-items:center;justify-content:center;padding:26px 20px;
@@ -377,7 +469,7 @@ body{
     <div class="stick" id="stick-move"><div class="knob"></div></div>
     <div class="stick" id="stick-aim"><div class="knob"></div></div>
     <div class="hintzone" id="hint-l">move</div>
-    <div class="hintzone" id="hint-r">aim</div>
+    <div class="hintzone" id="hint-r">aim + fire</div>
   </div>
 
   <div id="threats"></div>
@@ -390,6 +482,15 @@ body{
           <div class="hpfill" id="hp-fill"></div>
           <div class="hptext" id="hp-text">100 / 100</div>
         </div>
+        <button class="pausebtn" id="btn-cheats" aria-label="Cheats" hidden>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1 4h5M10 4h5M1 8h9M14 8h1M1 12h3M8 12h7"
+                  stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+            <circle cx="8" cy="4" r="2" fill="currentColor"/>
+            <circle cx="12" cy="8" r="2" fill="currentColor"/>
+            <circle cx="6" cy="12" r="2" fill="currentColor"/>
+          </svg>
+        </button>
         <button class="pausebtn" id="btn-pause" aria-label="Pause">
           <svg viewBox="0 0 12 14" aria-hidden="true">
             <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
@@ -398,9 +499,9 @@ body{
         </button>
       </div>
       <div class="readout">
+        <span class="wep" id="ro-wep">Rifle</span>
         <span class="wv">Wave <b id="ro-wave">1</b></span>
         <span>Score <b id="ro-score">0</b></span>
-        <span>Kills <b id="ro-kills">0</b></span>
         <span>Left <b id="ro-left">0</b></span>
       </div>
     </div>
@@ -408,6 +509,7 @@ body{
 
   <div id="announce"><div class="a-sub" id="a-sub">Wave</div><div class="a-main" id="a-main">1</div></div>
   <div id="hurt"></div>
+  <div id="toast"><div class="t-name" id="toast-name"></div><div class="t-sub" id="toast-sub"></div></div>
 
   <!-- MENU -->
   <section class="screen" id="sc-menu">
@@ -425,8 +527,11 @@ body{
         <div>Best Score<b id="m-score">&mdash;</b></div>
       </div>
       <div class="toggles">
+        <button class="tog wide" id="tog-aim" aria-pressed="false">Auto-aim: Off</button>
+        <button class="tog wide" id="tog-cheat" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality" aria-pressed="false">Quality: Balanced</button>
-        <button class="tog" id="tog-sound" aria-pressed="true">Sound: On</button>
+        <button class="tog" id="tog-fx" aria-pressed="true">Effects: On</button>
+        <button class="tog wide" id="tog-sound" aria-pressed="true">Sound: On</button>
       </div>
     </div>
   </section>
@@ -441,16 +546,29 @@ body{
       <div class="howto">
         <p><b>Move</b> — drag anywhere on the <span class="k">left half</span> of the
           screen. The stick appears under your thumb.</p>
-        <p><b>Shoot</b> — automatic. Your weapon tracks the nearest walker on its own,
-          so one thumb is enough.</p>
-        <p><b>Aim manually</b> — drag on the <span class="k">right half</span> to
-          override the auto-target. Useful for picking off a Spitter behind the horde.</p>
+        <p><b>Shoot</b> — drag on the <span class="k">right half</span>. You fire in
+          the direction you point, and only while you are pointing. Two thumbs,
+          both busy.</p>
+        <p><b>Auto-aim</b> — off by default. Turn it on from the menu or the pause
+          screen and your weapon tracks the nearest walker on its own, so one thumb
+          is enough. Your own aim always overrides it.</p>
+        <p><b>Pick up a weapon</b> — white crates drop in the lot each wave. A
+          <span class="k">white arrow</span> at the screen edge points to one that
+          is off-screen. Walk over it to swap.</p>
         <p><b>Upgrade</b> — clear a wave and choose one of three permanent upgrades.
           They stack for the whole run.</p>
-        <p><b>Watch for</b> — green <span class="k">Shamblers</span> are slow,
-          pale <span class="k">Runners</span> sprint, grey <span class="k">Brutes</span>
-          soak damage, and ochre <span class="k">Spitters</span> hit you from range.</p>
-        <p>Desktop: <span class="k">WASD</span> to move, mouse to aim, hold to fire.</p>
+        <p><b>The dead, in order of appearance</b></p>
+        <p><span class="k">Shambler</span> — green, slow, arrives in numbers.<br>
+          <span class="k">Runner</span> — pale and fast, closes before you notice.<br>
+          <span class="k">Crawler</span> — tan, scuttles on all fours, low and easy to lose.<br>
+          <span class="k">Brute</span> — grey and huge, soaks a magazine.<br>
+          <span class="k">Spitter</span> — ochre, hangs back and lobs acid.<br>
+          <span class="k">Bloater</span> — swollen and yellow-green; it detonates when
+          it dies, so do not kill it at arm's length.<br>
+          <span class="k">Howler</span> — red-brown; its shriek sends every walker
+          nearby into a sprint. Shoot it first.</p>
+        <p>Desktop: <span class="k">WASD</span> to move, mouse to aim, hold the
+          button to fire.</p>
       </div>
       <div class="stack">
         <button class="btn" id="btn-how-back">Back</button>
@@ -482,8 +600,29 @@ body{
         <button class="btn ghost" id="btn-quit">Quit to Menu</button>
       </div>
       <div class="toggles">
+        <button class="tog wide" id="tog-aim2" aria-pressed="false">Auto-aim: Off</button>
+        <button class="tog wide" id="tog-cheat2" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality2" aria-pressed="false">Quality: Balanced</button>
-        <button class="tog" id="tog-sound2" aria-pressed="true">Sound: On</button>
+        <button class="tog" id="tog-fx2" aria-pressed="true">Effects: On</button>
+        <button class="tog wide" id="tog-sound2" aria-pressed="true">Sound: On</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHEATS -->
+  <section class="screen sheet" id="sc-cheats" hidden>
+    <div class="cheat-panel">
+      <div class="cheat-head">
+        <span class="cheat-title">Cheats</span>
+        <button class="cheat-close" id="btn-cheat-close">Close</button>
+      </div>
+      <div class="cheat-sec">Weapon &mdash; tap to equip</div>
+      <div class="cheat-grid" id="cheat-weps"></div>
+      <div class="cheat-sec">Upgrades &mdash; tap to add a level</div>
+      <div class="cheat-grid" id="cheat-ups"></div>
+      <div class="cheat-note">
+        The world is frozen while this is open. Using anything here marks the run:
+        it <b>will not set a best wave or score</b>.
       </div>
     </div>
   </section>
@@ -587,23 +726,106 @@ function main(hotData) {
   var MAX_STEPS = 5;
 
   var QUALITY = {
-    battery:  { dpr: 1.0, alive: 16, parts: 140, aa: false, tex: 512 },
-    balanced: { dpr: 1.5, alive: 26, parts: 240, aa: false, tex: 1024 },
-    high:     { dpr: 2.0, alive: 40, parts: 380, aa: true,  tex: 1024 }
+    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20 },
+    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26 },
+    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40 }
   };
   var QORDER = ['battery', 'balanced', 'high'];
 
+  // legSwing is the half-amplitude of the leg swing in radians. Stride length
+  // is DERIVED from it below rather than guessed, so gait speed always matches
+  // ground speed.
+  var LEG_LEN = 0.66;
+
   var ZTYPE = {
     shambler: { hp: 24,  speed: 2.60, dmg: 9,  radius: 0.46, scale: 1.00,
-                score: 10, color: 0x7FA04E, headColor: 0xA3C068, swing: 1.0 },
+                score: 10, color: 0x7FA04E, headColor: 0xA3C068,
+                legSwing: 0.58, reach: 1.15 },
     runner:   { hp: 15,  speed: 5.05, dmg: 7,  radius: 0.38, scale: 0.90,
-                score: 16, color: 0xC2BCA0, headColor: 0xDCD6BA, swing: 2.1 },
+                score: 16, color: 0xC2BCA0, headColor: 0xDCD6BA,
+                legSwing: 0.92, reach: 0.90 },
     brute:    { hp: 110, speed: 1.80, dmg: 24, radius: 0.86, scale: 1.62,
-                score: 45, color: 0x66737F, headColor: 0x808E9B, swing: 0.7 },
+                score: 45, color: 0x66737F, headColor: 0x808E9B,
+                legSwing: 0.48, reach: 1.02 },
     spitter:  { hp: 30,  speed: 2.45, dmg: 9,  radius: 0.44, scale: 0.98,
-                score: 28, color: 0xB98A30, headColor: 0xD8A945, swing: 1.2,
-                ranged: true, range: 12, cooldown: 2.5 }
+                score: 28, color: 0xB98A30, headColor: 0xD8A945,
+                legSwing: 0.56, reach: 1.20,
+                ranged: true, range: 12, cooldown: 2.5 },
+
+    // Scuttles on all fours — low, quick, easy to lose in a crowd.
+    crawler:  { hp: 13,  speed: 4.30, dmg: 6,  radius: 0.40, scale: 0.94,
+                score: 18, color: 0xA89A62, headColor: 0xC4B577,
+                legSwing: 0.74, reach: 1.15, crawl: true },
+
+    // Detonates on death. Kills its neighbours, and you if you were greedy.
+    bloater:  { hp: 58,  speed: 1.65, dmg: 14, radius: 0.72, scale: 1.30,
+                score: 36, color: 0x9AAB63, headColor: 0xB4C47A,
+                legSwing: 0.44, reach: 1.05,
+                explodes: true, blastRadius: 3.8, blastDamage: 34 },
+
+    // Support unit. Shrieks and the horde around it surges — kill it first.
+    howler:   { hp: 44,  speed: 1.95, dmg: 8,  radius: 0.46, scale: 1.06,
+                score: 42, color: 0xB2645A, headColor: 0xCC7E6E,
+                legSwing: 0.54, reach: 1.30,
+                howls: true, howlRadius: 9.5, cooldown: 6.5 }
   };
+
+  // stride = ground covered per full gait cycle, from the leg's own geometry
+  Object.keys(ZTYPE).forEach(function (k) {
+    var t = ZTYPE[k];
+    t.stride = 4 * LEG_LEN * t.scale * Math.sin(t.legSwing);
+  });
+
+  /* ------------------------------------------------------------------ weapons
+     Base stats live here; upgrades are multipliers layered on top (see recalc).
+     Keeping them separate is what lets you swap guns mid-run without your build
+     evaporating or a +25% bonus silently becoming a flat number.
+     gun: [width, height, length] scale of the held model relative to the rifle.
+     snd: [filter start Hz, filter end Hz, duration, gain] for the report.      */
+  var WEAPONS = {
+    rifle: {
+      name: 'Field Rifle', short: 'RIFLE', order: 0,
+      damage: 12, fireRate: 5.4, shots: 1, spread: 0.055,
+      bulletSpeed: 34, range: 17, pierce: 0, crit: 0.05,
+      tracer: 0xFFD98A, bulletScale: [1, 1, 1], gun: [1, 1, 1],
+      snd: [2600, 420, 0.10, 0.50],
+      blurb: 'Balanced. Nothing it does badly.'
+    },
+    scatter: {
+      name: 'Scattergun', short: 'SCATTER', order: 1,
+      damage: 7, fireRate: 1.55, shots: 7, spread: 0.155,
+      bulletSpeed: 26, range: 9.5, pierce: 1, crit: 0.04,
+      tracer: 0xFFC08A, bulletScale: [0.9, 0.9, 0.62], gun: [1.5, 1.2, 0.8],
+      snd: [1800, 240, 0.22, 0.78],
+      blurb: 'Seven pellets, short reach. Deletes a crowd at contact range.'
+    },
+    stutter: {
+      name: 'Stutter SMG', short: 'SMG', order: 2,
+      damage: 5.6, fireRate: 13.5, shots: 1, spread: 0.115,
+      bulletSpeed: 38, range: 13.5, pierce: 0, crit: 0.05,
+      tracer: 0xFFE7A8, bulletScale: [0.8, 0.8, 0.8], gun: [0.85, 0.9, 0.62],
+      snd: [3200, 780, 0.05, 0.24],
+      blurb: 'Hoses everything. Sprays wide and runs out of reach early.'
+    },
+    marksman: {
+      name: 'Marksman', short: 'DMR', order: 3,
+      damage: 48, fireRate: 1.2, shots: 1, spread: 0.006,
+      bulletSpeed: 72, range: 27, pierce: 3, crit: 0.24,
+      tracer: 0xBFE6FF, bulletScale: [1.1, 1.1, 2.2], gun: [0.9, 0.9, 1.55],
+      snd: [5200, 480, 0.16, 0.62],
+      blurb: 'Slow and heavy. Punches through a queue and drops brutes.'
+    },
+    thumper: {
+      name: 'Thumper', short: 'GL', order: 4,
+      damage: 16, fireRate: 1.05, shots: 1, spread: 0.028,
+      bulletSpeed: 19, range: 16, pierce: 0, crit: 0,
+      tracer: 0x9BE06A, bulletScale: [1.9, 1.9, 1.1], gun: [1.35, 1.35, 0.78],
+      snd: [900, 110, 0.20, 0.62],
+      explosive: true, blastRadius: 3.3, blastDamage: 44,
+      blurb: 'Lobs a grenade. Huge against a pack, wasteful on one body.'
+    }
+  };
+  var WEP_IDS = Object.keys(WEAPONS);
 
   /* ------------------------------------------------------------- utilities */
   function $(id) { return document.getElementById(id); }
@@ -660,17 +882,19 @@ function main(hotData) {
       src.buffer = buf;
       return src;
     },
-    shot: function () {
+    // One report generator; each weapon supplies its own [f0, f1, dur, gain].
+    gun: function (cfg) {
       if (!this.on || !this.ready) return;
       var t = this.ctx.currentTime;
-      var src = this.noise(0.14);
+      var dur = cfg[2];
+      var src = this.noise(dur + 0.05);
       var f = this.ctx.createBiquadFilter();
       f.type = 'lowpass';
-      f.frequency.setValueAtTime(2600, t);
-      f.frequency.exponentialRampToValueAtTime(420, t + 0.1);
+      f.frequency.setValueAtTime(cfg[0], t);
+      f.frequency.exponentialRampToValueAtTime(cfg[1], t + dur);
       src.connect(f);
-      this.env(f, t, 0.004, 0.1, 0.5);
-      src.start(t); src.stop(t + 0.15);
+      this.env(f, t, 0.004, dur, cfg[3]);
+      src.start(t); src.stop(t + dur + 0.05);
     },
     hit: function () {
       if (!this.on || !this.ready) return;
@@ -705,6 +929,38 @@ function main(hotData) {
       o.connect(f);
       this.env(f, t, 0.13, 0.6, 0.07);
       o.start(t); o.stop(t + 0.8);
+    },
+    howl: function () {
+      if (!this.on || !this.ready) return;
+      var t = this.ctx.currentTime;
+      var o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(680, t + 0.22);
+      o.frequency.exponentialRampToValueAtTime(240, t + 0.85);
+      var f = this.ctx.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 2.2;
+      o.connect(f);
+      this.env(f, t, 0.05, 0.8, 0.26);
+      o.start(t); o.stop(t + 0.95);
+    },
+    boom: function () {
+      if (!this.on || !this.ready) return;
+      var t = this.ctx.currentTime;
+      var src = this.noise(0.55);
+      var f = this.ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(1400, t);
+      f.frequency.exponentialRampToValueAtTime(90, t + 0.45);
+      src.connect(f);
+      this.env(f, t, 0.006, 0.5, 0.75);
+      var sub = this.ctx.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(110, t);
+      sub.frequency.exponentialRampToValueAtTime(28, t + 0.4);
+      this.env(sub, t, 0.008, 0.4, 0.5);
+      src.start(t); src.stop(t + 0.58);
+      sub.start(t); sub.stop(t + 0.45);
     },
     hurt: function () {
       if (!this.on || !this.ready) return;
@@ -754,6 +1010,9 @@ function main(hotData) {
   /* -------------------------------------------------------------- renderer */
   var canvas = $('scene');
   var app = $('app');
+  var fxOn = store.get('fx', true);
+  var cheatsOn = store.get('cheats', false);
+  var autoAim = store.get('autoAim', false);   // off by default: aim is the player's job
   var quality = store.get('quality', 'balanced');
   if (QORDER.indexOf(quality) === -1) quality = 'balanced';
   var Q = QUALITY[quality];
@@ -762,7 +1021,7 @@ function main(hotData) {
   try {
     renderer = new T.WebGLRenderer({
       canvas: canvas,
-      antialias: Q.aa,
+      antialias: false,   // FXAA happens in the composite; MSAA can't reach a render target
       alpha: false,
       powerPreference: 'high-performance',
       stencil: false,
@@ -873,8 +1132,10 @@ function main(hotData) {
   }
 
   var groundTex = makeGroundTexture(Q.tex);
+  // Subdivided because MeshLambertMaterial lights per-vertex: on two triangles
+  // a muzzle flash would have nowhere to land.
   var ground = new T.Mesh(
-    new T.PlaneGeometry(ARENA * 2, ARENA * 2),
+    new T.PlaneGeometry(ARENA * 2, ARENA * 2, 64, 64),
     new T.MeshLambertMaterial({ map: groundTex })
   );
   ground.rotation.x = -PI / 2;
@@ -899,6 +1160,16 @@ function main(hotData) {
   var warm = new T.DirectionalLight(0xFFAE42, 0.46);
   warm.position.set(10, 14, 12);
   scene.add(warm);
+
+  // Present from frame one at zero intensity: adding a light later changes the
+  // light count and forces every material in the scene to recompile, which
+  // shows up as a hitch exactly when you fire.
+  var muzzleLight = new T.PointLight(0xFFC468, 0, 10, 2);
+  muzzleLight.position.set(0, 1.2, 0);
+  scene.add(muzzleLight);
+  var blastLight = new T.PointLight(0xFF8A3C, 0, 16, 2);
+  blastLight.position.set(0, 1.2, 0);
+  scene.add(blastLight);
 
   /* ------------------------------------------------------------------ props
      Static geometry, instanced per prop type. These double as cover: bullets
@@ -1021,13 +1292,37 @@ function main(hotData) {
 
   /* ------------------------------------------------------------- the player
      Few enough of these to be a normal Group rather than instanced.          */
+  var PLAYER_SWING = 0.95;                                    // radians
+  var PLAYER_STRIDE = 4 * LEG_LEN * Math.sin(PLAYER_SWING);   // ~2.15 units/cycle
+
   var player = {
     x: 0, z: 0, angle: 0, vx: 0, vz: 0,
     hp: 100, maxHp: 100, speed: 7.0, radius: 0.46,
-    fireRate: 5.4, damage: 12, bulletSpeed: 34, pierce: 0, shots: 1,
-    spread: 0.055, crit: 0.05, critMult: 2, regen: 0, armor: 0,
-    magnet: 3.2, range: 17, cooldown: 0, hurtCd: 0, muzzle: 0, bob: 0
+    critMult: 2, regen: 0, armor: 0, magnet: 3.2, knock: 0,
+    cooldown: 0, hurtCd: 0, muzzle: 0, gait: 0,
+    wep: 'rifle',
+    // upgrades write here, never to the weapon
+    mul: { damage: 1, fireRate: 1, bulletSpeed: 1, range: 1 },
+    add: { pierce: 0, shots: 0, crit: 0, spread: 0 }
   };
+
+  // Effective stats, recomputed only when something changes, so the hot loop
+  // never allocates or re-derives them.
+  var eff = {};
+  function recalc() {
+    var w = WEAPONS[player.wep];
+    eff.damage = w.damage * player.mul.damage;
+    eff.fireRate = w.fireRate * player.mul.fireRate;
+    eff.bulletSpeed = w.bulletSpeed * player.mul.bulletSpeed;
+    eff.range = w.range * player.mul.range;
+    eff.pierce = w.pierce + player.add.pierce;
+    eff.shots = w.shots + player.add.shots;
+    eff.spread = w.spread + player.add.spread;
+    eff.crit = Math.min(0.75, w.crit + player.add.crit);
+    eff.explosive = !!w.explosive;
+    eff.blastRadius = w.blastRadius || 0;
+    eff.blastDamage = w.blastDamage || 0;
+  }
 
   var playerGroup = new T.Group();
   (function buildPlayer() {
@@ -1077,6 +1372,7 @@ function main(hotData) {
     flash.visible = false;
     playerGroup.add(flash);
     playerGroup.userData.flash = flash;
+    playerGroup.userData.rifle = rifle;
   })();
   scene.add(playerGroup);
 
@@ -1160,13 +1456,17 @@ function main(hotData) {
   var MAXPK = 24;
   var pickups = [];
   var pickupGeo = new T.BoxGeometry(0.34, 0.34, 0.34);
+  var crateGeo2 = new T.BoxGeometry(0.62, 0.42, 0.62);
   var pickupMesh = {
     health: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xE23B3B }), MAXPK),
-    scrap: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xFFA424 }), MAXPK)
+    scrap: new T.InstancedMesh(pickupGeo, new T.MeshBasicMaterial({ color: 0xFFA424 }), MAXPK),
+    weapon: new T.InstancedMesh(crateGeo2, new T.MeshBasicMaterial({ color: 0xEDE7D9 }), MAXPK)
   };
-  pickupMesh.health.frustumCulled = false; pickupMesh.health.count = 0;
-  pickupMesh.scrap.frustumCulled = false; pickupMesh.scrap.count = 0;
-  scene.add(pickupMesh.health); scene.add(pickupMesh.scrap);
+  ['health', 'scrap', 'weapon'].forEach(function (k) {
+    pickupMesh[k].frustumCulled = false;
+    pickupMesh[k].count = 0;
+    scene.add(pickupMesh[k]);
+  });
 
   // blood decals — flat quads dropped on the asphalt, recycled in a ring
   var MAXD = 34;
@@ -1201,14 +1501,18 @@ function main(hotData) {
 
     var hpScale = 1 + 0.135 * (wave - 1);
     var spScale = Math.min(1.42, 1 + 0.022 * (wave - 1));
+    // damage scales too — without this, flat armour eventually zeroes every hit
+    var dmgScale = 1 + 0.12 * (wave - 1);
 
     zombies.push({
       type: typeName, x: x, z: z, angle: 0,
       hp: t.hp * hpScale, maxHp: t.hp * hpScale,
+      dmg: t.dmg * dmgScale, blast: (t.blastDamage || 0) * dmgScale,
       speed: t.speed * spScale * rand(0.9, 1.1),
       radius: t.radius, scale: t.scale * rand(0.94, 1.07),
       phase: rand(0, TAU), flash: 0, atkCd: rand(0, 1),
-      groanCd: rand(1, 9), lunge: 0
+      groanCd: rand(1, 9), lunge: 0,
+      rage: 0, pulse: 0, clawCd: 0, gaitAmp: 1
     });
   }
 
@@ -1237,7 +1541,7 @@ function main(hotData) {
   /* ------------------------------------------------------------------ state */
   var G = {
     screen: 'menu',        // menu | how | playing | upgrade | pause | over
-    wave: 1, score: 0, kills: 0, time: 0,
+    wave: 1, score: 0, kills: 0, time: 0, cheated: false, blastT: 0,
     toSpawn: 0, spawnCd: 0, waveActive: false, betweenCd: 0,
     shake: 0, running: true
   };
@@ -1247,10 +1551,10 @@ function main(hotData) {
   var UPGRADES = [
     { id: 'dmg', name: 'Hollow Points', max: 8, glyph: 'burst',
       desc: function () { return '+25% weapon damage'; },
-      apply: function () { player.damage *= 1.25; } },
+      apply: function () { player.mul.damage *= 1.25; } },
     { id: 'rof', name: 'Lightened Bolt', max: 8, glyph: 'rate',
       desc: function () { return '+18% fire rate'; },
-      apply: function () { player.fireRate *= 1.18; } },
+      apply: function () { player.mul.fireRate *= 1.18; } },
     { id: 'spd', name: 'Lighter Boots', max: 5, glyph: 'boot',
       desc: function () { return '+12% movement speed'; },
       apply: function () { player.speed *= 1.12; } },
@@ -1259,28 +1563,25 @@ function main(hotData) {
       apply: function () { player.maxHp += 25; player.hp = player.maxHp; } },
     { id: 'pierce', name: 'Steel Core', max: 4, glyph: 'pierce',
       desc: function () { return 'Rounds pass through +1 body'; },
-      apply: function () { player.pierce += 1; } },
-    { id: 'shots', name: 'Split Barrel', max: 4, glyph: 'fan',
-      desc: function () { return '+1 round per shot, wider spread'; },
-      apply: function () { player.shots += 1; player.spread += 0.05; } },
+      apply: function () { player.add.pierce += 1; } },
     { id: 'crit', name: 'Marked Rounds', max: 6, glyph: 'crit',
       desc: function () { return '+8% critical chance'; },
-      apply: function () { player.crit = Math.min(0.6, player.crit + 0.08); } },
+      apply: function () { player.add.crit += 0.08; } },
     { id: 'regen', name: 'Combat Stims', max: 5, glyph: 'cross',
-      desc: function () { return 'Regenerate +0.7 health per second'; },
-      apply: function () { player.regen += 0.7; } },
+      desc: function () { return '+0.55 health/sec once you go 2s unhit'; },
+      apply: function () { player.regen += 0.55; } },
     { id: 'armor', name: 'Plate Carrier', max: 5, glyph: 'shield',
-      desc: function () { return 'Take 2 less damage per hit'; },
-      apply: function () { player.armor += 2; } },
+      desc: function () { return 'Take 7% less damage, up to 35%'; },
+      apply: function () { player.armor = Math.min(0.35, player.armor + 0.07); } },
     { id: 'magnet', name: 'Scav Instinct', max: 4, glyph: 'magnet',
       desc: function () { return '+70% pickup radius'; },
       apply: function () { player.magnet *= 1.7; } },
     { id: 'vel', name: 'Hot Loads', max: 4, glyph: 'vel',
       desc: function () { return '+25% bullet speed and range'; },
-      apply: function () { player.bulletSpeed *= 1.25; player.range *= 1.12; } },
+      apply: function () { player.mul.bulletSpeed *= 1.25; player.mul.range *= 1.12; } },
     { id: 'knock', name: 'Heavy Slugs', max: 3, glyph: 'burst',
       desc: function () { return '+18% damage, rounds knock bodies back'; },
-      apply: function () { player.damage *= 1.18; player.knock = (player.knock || 0) + 1.6; } }
+      apply: function () { player.mul.damage *= 1.18; player.knock += 1.6; } }
   ];
   var upgradeLevels = {};
 
@@ -1313,9 +1614,9 @@ function main(hotData) {
   /* ---------------------------------------------------------------- UI wiring */
   var ui = {
     hud: $('hud'), menu: $('sc-menu'), how: $('sc-how'), upgrade: $('sc-upgrade'),
-    pause: $('sc-pause'), over: $('sc-over'),
+    pause: $('sc-pause'), over: $('sc-over'), cheats: $('sc-cheats'),
     hpFill: $('hp-fill'), hpGhost: $('hp-ghost'), hpText: $('hp-text'),
-    roWave: $('ro-wave'), roScore: $('ro-score'), roKills: $('ro-kills'), roLeft: $('ro-left'),
+    roWep: $('ro-wep'), roWave: $('ro-wave'), roScore: $('ro-score'), roLeft: $('ro-left'),
     announce: $('announce'), aMain: $('a-main'), aSub: $('a-sub'), hurt: $('hurt')
   };
 
@@ -1325,8 +1626,9 @@ function main(hotData) {
     ui.how.hidden = name !== 'how';
     ui.upgrade.hidden = name !== 'upgrade';
     ui.pause.hidden = name !== 'pause';
+    ui.cheats.hidden = name !== 'cheats';
     ui.over.hidden = name !== 'over';
-    ui.hud.hidden = !(name === 'playing' || name === 'pause');
+    ui.hud.hidden = !(name === 'playing' || name === 'pause' || name === 'cheats');
     $('hint-l').classList.toggle('gone', name !== 'playing');
     $('hint-r').classList.toggle('gone', name !== 'playing');
   }
@@ -1336,6 +1638,15 @@ function main(hotData) {
     $('m-score').textContent = best.score ? best.score.toLocaleString() : '—';
   }
   refreshBest();
+
+  function showToast(name, sub) {
+    $('toast-name').textContent = name;
+    $('toast-sub').textContent = sub || '';
+    var el = $('toast');
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
 
   function announce(sub, main) {
     ui.aSub.textContent = sub;
@@ -1350,9 +1661,9 @@ function main(hotData) {
     ui.hpFill.style.transform = 'scaleX(' + frac + ')';
     ui.hpGhost.style.transform = 'scaleX(' + frac + ')';
     ui.hpText.textContent = Math.max(0, Math.ceil(player.hp)) + ' / ' + Math.round(player.maxHp);
+    ui.roWep.textContent = WEAPONS[player.wep].short;
     ui.roWave.textContent = G.wave;
     ui.roScore.textContent = G.score.toLocaleString();
-    ui.roKills.textContent = G.kills;
     ui.roLeft.textContent = zombies.length + G.toSpawn;
   }
 
@@ -1360,13 +1671,104 @@ function main(hotData) {
     quality = name;
     Q = QUALITY[name];
     store.set('quality', name);
+    Post.scale = Q.bloom;
+    Post.mComp.uniforms.fxaaOn.value = (name === 'battery') ? 0 : 1;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
     resize();
+    syncPostSize(true);
     var label = 'Quality: ' + name.charAt(0).toUpperCase() + name.slice(1);
     $('tog-quality').textContent = label;
     $('tog-quality2').textContent = label;
     $('tog-quality').setAttribute('aria-pressed', name === 'high');
     $('tog-quality2').setAttribute('aria-pressed', name === 'high');
+  }
+
+  function setAutoAim(on) {
+    autoAim = on;
+    store.set('autoAim', on);
+    var label = 'Auto-aim: ' + (on ? 'On' : 'Off');
+    $('tog-aim').textContent = label;
+    $('tog-aim2').textContent = label;
+    $('tog-aim').setAttribute('aria-pressed', on);
+    $('tog-aim2').setAttribute('aria-pressed', on);
+    $('hint-r').textContent = on ? 'aim' : 'aim + fire';
+  }
+
+  /* ------------------------------------------------------------ cheat panel */
+  function setEffects(on, persist) {
+    fxOn = on;
+    if (persist !== false) store.set('fx', on);
+    Post.on = on;
+    var label = 'Effects: ' + (on ? 'On' : 'Off');
+    $('tog-fx').textContent = label;
+    $('tog-fx2').textContent = label;
+    $('tog-fx').setAttribute('aria-pressed', on);
+    $('tog-fx2').setAttribute('aria-pressed', on);
+  }
+
+  function setCheats(on) {
+    cheatsOn = on;
+    store.set('cheats', on);
+    var label = 'Cheats: ' + (on ? 'On' : 'Off');
+    $('tog-cheat').textContent = label;
+    $('tog-cheat2').textContent = label;
+    $('tog-cheat').setAttribute('aria-pressed', on);
+    $('tog-cheat2').setAttribute('aria-pressed', on);
+    $('btn-cheats').hidden = !on;
+    if (!on && G.screen === 'cheats') show('playing');
+  }
+
+  function buildCheatPanel() {
+    var wepHost = $('cheat-weps');
+    wepHost.innerHTML = '';
+    WEP_IDS.forEach(function (id) {
+      var w = WEAPONS[id];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cheat-btn';
+      btn.dataset.on = id === player.wep ? '1' : '0';
+      btn.innerHTML = '<span></span><span class="lvl"></span>';
+      btn.firstChild.textContent = w.name;
+      btn.lastChild.textContent = id === player.wep ? 'Equipped' : w.short;
+      btn.addEventListener('click', function () {
+        G.cheated = true;
+        equip(id, false);
+        buildCheatPanel();
+        updateHud();
+      });
+      wepHost.appendChild(btn);
+    });
+
+    var upHost = $('cheat-ups');
+    upHost.innerHTML = '';
+    UPGRADES.forEach(function (u) {
+      var lvl = upgradeLevels[u.id] || 0;
+      var maxed = lvl >= u.max;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cheat-btn';
+      btn.disabled = maxed;
+      btn.innerHTML = '<span></span><span class="lvl"></span>';
+      btn.firstChild.textContent = u.name;
+      btn.lastChild.textContent = maxed ? 'MAX ' + lvl : 'LV ' + lvl + ' / ' + u.max;
+      btn.addEventListener('click', function () {
+        if ((upgradeLevels[u.id] || 0) >= u.max) return;
+        G.cheated = true;
+        u.apply();
+        recalc();
+        upgradeLevels[u.id] = (upgradeLevels[u.id] || 0) + 1;
+        Audio_.pickup();
+        buildCheatPanel();
+        updateHud();
+      });
+      upHost.appendChild(btn);
+    });
+  }
+
+  function openCheats() {
+    if (!cheatsOn) return;
+    buildCheatPanel();
+    show('cheats');
   }
 
   function setSound(on) {
@@ -1465,8 +1867,10 @@ function main(hotData) {
   // desktop
   window.addEventListener('keydown', function (e) {
     keys[e.key.toLowerCase()] = true;
-    if (e.key === 'Escape' && G.screen === 'playing') togglePause();
-    else if (e.key === 'Escape' && G.screen === 'pause') togglePause();
+    if (e.key === 'Escape') {
+      if (G.screen === 'cheats') show('playing');
+      else if (G.screen === 'playing' || G.screen === 'pause') togglePause();
+    }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) >= 0) {
       e.preventDefault();
     }
@@ -1542,48 +1946,64 @@ function main(hotData) {
   function fire(dt) {
     player.cooldown -= dt;
 
-    var target = nearestZombie(player.range);
     var aimA = null;
-    var deliberate = false;   // player is pointing the gun themselves
+    var wantFire = false;
 
+    // Player-directed aim always wins over assist.
     if (input.aiming) {
       aimA = Math.atan2(input.ax, input.az);
-      deliberate = true;
+      wantFire = true;
     } else if (IS_TOUCH === false && mouse.active) {
       var g = screenToGround(mouse.x, mouse.y);
-      if (g) { aimA = Math.atan2(g.x - player.x, g.z - player.z); deliberate = true; }
+      if (g) {
+        aimA = Math.atan2(g.x - player.x, g.z - player.z);
+        wantFire = mouse.down;          // hold to fire on desktop
+      }
     }
-    if (aimA === null && target) {
-      aimA = Math.atan2(target.x - player.x, target.z - player.z);
+
+    if (autoAim) {
+      var target = nearestZombie(eff.range);
+      if (target) {
+        if (aimA === null) aimA = Math.atan2(target.x - player.x, target.z - player.z);
+        wantFire = true;
+      }
     }
-    if (aimA === null) return;      // nothing in range, nothing being aimed at
+
+    if (aimA === null) {
+      // Not aiming at anything: face the way you're running rather than
+      // standing locked at whatever angle you last fired.
+      var mv = Math.hypot(player.vx, player.vz);
+      if (mv > 0.5) player.angle = Math.atan2(player.vx, player.vz);
+      return;
+    }
 
     // face the aim direction even while the weapon is cycling
     player.angle = aimA;
 
-    if (player.cooldown > 0) return;
-    if (!target && !deliberate) return;
+    if (!wantFire || player.cooldown > 0) return;
 
-    player.cooldown = 1 / player.fireRate;
+    var w = WEAPONS[player.wep];
+    player.cooldown = 1 / eff.fireRate;
     player.muzzle = 0.055;
-    Audio_.shot();
+    Audio_.gun(w.snd);
 
-    var n = player.shots;
+    var n = eff.shots;
     for (var s = 0; s < n; s++) {
       if (bullets.length >= MAXB) bullets.shift();
-      var off = n === 1 ? 0 : (s - (n - 1) / 2) * player.spread * 2;
-      var a = aimA + off + rand(-player.spread * 0.4, player.spread * 0.4);
-      var isCrit = Math.random() < player.crit;
+      var off = n === 1 ? 0 : (s - (n - 1) / 2) * eff.spread;
+      var a = aimA + off + rand(-eff.spread * 0.45, eff.spread * 0.45);
+      var isCrit = Math.random() < eff.crit;
       bullets.push({
         x: player.x + Math.sin(aimA) * 0.7,
         z: player.z + Math.cos(aimA) * 0.7,
-        vx: Math.sin(a) * player.bulletSpeed,
-        vz: Math.cos(a) * player.bulletSpeed,
+        vx: Math.sin(a) * eff.bulletSpeed,
+        vz: Math.cos(a) * eff.bulletSpeed,
         angle: a,
-        dmg: player.damage * (isCrit ? player.critMult : 1),
+        dmg: eff.damage * (isCrit ? player.critMult : 1),
         crit: isCrit,
-        pierce: player.pierce,
-        life: player.range / player.bulletSpeed
+        pierce: eff.pierce,
+        boom: eff.explosive,
+        life: eff.range / eff.bulletSpeed
       });
     }
     burst(player.x + Math.sin(aimA) * 1.0, 1.14, player.z + Math.cos(aimA) * 1.0,
@@ -1592,8 +2012,9 @@ function main(hotData) {
 
   function damagePlayer(amount) {
     if (player.hurtCd > 0) return;
-    var dealt = Math.max(1, amount - player.armor);
+    var dealt = amount * (1 - player.armor);
     player.hp -= dealt;
+    player.lastHurt = G.time;
     player.hurtCd = 0.42;
     G.shake = Math.min(0.55, G.shake + 0.28);
     Audio_.hurt();
@@ -1602,7 +2023,84 @@ function main(hotData) {
     if (player.hp <= 0) gameOver();
   }
 
+  // Blasts only SET hp on what they catch — they never kill directly, so one
+  // detonation can't recurse into another mid-iteration. The deferred hp<=0
+  // sweep at the top of the zombie loop collects the bodies.
+  // hurtsPlayer is false for your own ordnance: no self-damage on a phone.
+  function blastAt(bx, bz, R, dmg, hurtsPlayer, skip) {
+    blastLight.position.set(bx, 1.3, bz);
+    G.blastT = 0.38;
+    burst(bx, 0.9, bz, 22, 'gore', 7);
+    burst(bx, 1.1, bz, 14, 'spark', 6);
+    addDecal(bx, bz, R * 0.52);
+    Audio_.boom();
+    G.shake = Math.min(0.7, G.shake + 0.36);
+
+    if (hurtsPlayer) {
+      var pd = Math.hypot(player.x - bx, player.z - bz);
+      if (pd < R) damagePlayer(Math.round(dmg * (1 - pd / R) + 4));
+    }
+    for (var k = 0; k < zombies.length; k++) {
+      var o = zombies[k];
+      if (o === skip) continue;
+      var od = Math.hypot(o.x - bx, o.z - bz);
+      if (od < R) { o.hp -= dmg * (1 - od / R); o.flash = 1; }
+    }
+  }
+
+  function detonate(z) {
+    var t = ZTYPE[z.type];
+    blastAt(z.x, z.z, t.blastRadius, z.blast || t.blastDamage, true, z);
+  }
+
+  /* ---------------------------------------------------------- weapon handling */
+  function equip(id, announceIt) {
+    if (!WEAPONS[id]) return;
+    player.wep = id;
+    recalc();
+
+    var w = WEAPONS[id];
+    bulletMesh.material.color.setHex(w.tracer);
+
+    // reshape the held model so each gun reads differently from above
+    var rifle = playerGroup.userData.rifle;
+    var flash = playerGroup.userData.flash;
+    rifle.scale.set(w.gun[0], w.gun[1], w.gun[2]);
+    rifle.position.z = 0.5 * w.gun[2];
+    flash.position.z = 1.08 * w.gun[2];
+
+    if (announceIt) {
+      showToast(w.name, w.blurb);
+      Audio_.pickup();
+    }
+  }
+
+  function spawnWeaponCrate() {
+    // never offer what you are holding, nor a duplicate of a crate already out
+    var onGround = pickups.filter(function (p) { return p.kind === 'weapon'; })
+                          .map(function (p) { return p.wep; });
+    var pool = WEP_IDS.filter(function (k) {
+      return k !== player.wep && onGround.indexOf(k) === -1;
+    });
+    if (!pool.length || pickups.length >= MAXPK) return;
+    var id = pick(pool);
+    for (var tries = 0; tries < 24; tries++) {
+      var ang = rand(0, TAU), d = rand(8, 17);
+      var x = clamp(player.x + Math.cos(ang) * d, -ARENA + 3, ARENA - 3);
+      var z = clamp(player.z + Math.sin(ang) * d, -ARENA + 3, ARENA - 3);
+      if (Math.hypot(x - player.x, z - player.z) < 6) continue;
+      var clear = true;
+      for (var i = 0; i < props.length; i++) {
+        if (Math.hypot(x - props[i].x, z - props[i].z) < props[i].r + 1.4) { clear = false; break; }
+      }
+      if (!clear) continue;
+      pickups.push({ x: x, z: z, kind: 'weapon', wep: id, spin: rand(0, TAU), life: 9999 });
+      return;
+    }
+  }
+
   function killZombie(z, i) {
+    if (ZTYPE[z.type].explodes) detonate(z);
     G.kills++;
     G.score += Math.round(ZTYPE[z.type].score * (1 + Math.floor(G.wave / 5) * 0.25));
     burst(z.x, 0.85 * z.scale, z.z, 9, 'gore', 3.4);
@@ -1623,16 +2121,18 @@ function main(hotData) {
     player.hp = 0;
     G.shake = 0.9;
     Audio_.dead();
-    if (G.wave > best.wave) { best.wave = G.wave; store.set('bestWave', best.wave); }
-    if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
-    refreshBest();
+    if (!G.cheated) {
+      if (G.wave > best.wave) { best.wave = G.wave; store.set('bestWave', best.wave); }
+      if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
+      refreshBest();
+    }
     $('o-wave').textContent = G.wave;
     $('o-score').textContent = G.score.toLocaleString();
     $('o-kills').textContent = G.kills;
     var mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
     $('o-time').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
-    $('o-eyebrow').textContent =
-      (G.wave >= best.wave && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended';
+    $('o-eyebrow').textContent = G.cheated ? 'Cheated Run \u2014 Not Recorded'
+      : ((G.wave >= best.wave && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended');
     setTimeout(function () { show('over'); }, 900);
   }
 
@@ -1642,17 +2142,24 @@ function main(hotData) {
     G.spawnCd = 0.4;
     G.waveActive = true;
     announce('Wave', String(n));
+    if (n >= 2) spawnWeaponCrate();
+    if (n >= 8 && Math.random() < 0.5) spawnWeaponCrate();
   }
 
+  // Each type enters a few waves apart so you meet one new threat at a time.
   function waveMix(n) {
     var bag = ['shambler', 'shambler', 'shambler'];
     if (n >= 2) bag.push('runner');
-    if (n >= 3) bag.push('runner');
+    if (n >= 3) bag.push('crawler', 'runner');
     if (n >= 4) bag.push('brute');
-    if (n >= 5) bag.push('runner', 'shambler');
+    if (n >= 5) bag.push('crawler', 'shambler');
     if (n >= 6) bag.push('spitter');
+    if (n >= 7) bag.push('bloater');
     if (n >= 8) bag.push('brute', 'spitter');
-    if (n >= 12) bag.push('runner', 'brute');
+    if (n >= 9) bag.push('howler');
+    if (n >= 11) bag.push('bloater', 'crawler');
+    if (n >= 13) bag.push('runner', 'brute', 'howler');
+    if (n >= 16) bag.push('spitter', 'bloater', 'crawler');
     return pick(bag);
   }
 
@@ -1662,13 +2169,15 @@ function main(hotData) {
     upgradeLevels = {};
     player.x = 0; player.z = 0; player.vx = 0; player.vz = 0; player.angle = 0;
     player.maxHp = 100; player.hp = 100; player.speed = 7.0;
-    player.fireRate = 5.4; player.damage = 12; player.bulletSpeed = 34;
-    player.pierce = 0; player.shots = 1; player.spread = 0.055;
-    player.crit = 0.05; player.regen = 0; player.armor = 0;
-    player.magnet = 3.2; player.range = 17; player.knock = 0;
-    player.cooldown = 0; player.hurtCd = 0;
+    player.regen = 0; player.armor = 0; player.magnet = 3.2; player.knock = 0;
+    player.lastHurt = -99;
+    player.cooldown = 0; player.hurtCd = 0; player.gait = 0; player.gaitAmp = 0;
+    player.mul.damage = player.mul.fireRate = 1;
+    player.mul.bulletSpeed = player.mul.range = 1;
+    player.add.pierce = player.add.shots = player.add.crit = player.add.spread = 0;
+    equip('rifle', false);
     G.wave = 1; G.score = 0; G.kills = 0; G.time = 0;
-    G.betweenCd = 0; G.shake = 0;
+    G.betweenCd = 0; G.shake = 0; G.cheated = false;
     input.mx = input.mz = 0; input.aiming = false;
     startWave(1);
     updateHud();
@@ -1695,6 +2204,7 @@ function main(hotData) {
       btn.querySelector('.lv').textContent = lvl ? 'LV ' + (lvl + 1) : 'NEW';
       btn.addEventListener('click', function () {
         u.apply();
+        recalc();
         upgradeLevels[u.id] = lvl + 1;
         Audio_.pickup();
         nextWave();
@@ -1738,10 +2248,16 @@ function main(hotData) {
     player.z = clamp(player.z, -ARENA + 1.4, ARENA - 1.4);
     resolveProps(player);
 
+    // Gait advances by distance travelled / stride length, so the feet plant
+    // at the speed the body actually moves instead of a fixed tempo.
     var moving = Math.hypot(player.vx, player.vz);
-    player.bob += moving * dt * 2.1;
+    player.gait += (moving / PLAYER_STRIDE) * TAU * dt;
+    if (player.gait > TAU) player.gait -= TAU;
+    player.gaitAmp = lerp(player.gaitAmp || 0,
+      clamp(moving / player.speed, 0, 1) * PLAYER_SWING, 1 - Math.pow(0.001, dt));
     if (player.hurtCd > 0) player.hurtCd -= dt;
-    if (player.regen > 0 && player.hp > 0) {
+    // out-of-combat only: unconditional regen out-healed the i-frame ceiling
+    if (player.regen > 0 && player.hp > 0 && (G.time - player.lastHurt) > 2.2) {
       player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
     }
     if (player.muzzle > 0) player.muzzle -= dt;
@@ -1773,17 +2289,43 @@ function main(hotData) {
     for (var i = zombies.length - 1; i >= 0; i--) {
       var z = zombies[i];
       var t = ZTYPE[z.type];
+
+      if (z.hp <= 0) { killZombie(z, i); continue; }   // deferred/AoE deaths
+
       var dx = player.x - z.x, dz = player.z - z.z;
       var dist = Math.hypot(dx, dz) || 0.0001;
       z.angle = Math.atan2(dx, dz);
+
+      if (z.rage > 0) z.rage -= dt;
+      var rageMul = z.rage > 0 ? 1.5 : 1;
+      var moveSp = 0;                                  // speed actually used
+
+      if (t.howls) {
+        z.atkCd -= dt;
+        if (z.atkCd <= 0 && dist < 30) {
+          z.atkCd = t.cooldown * rand(0.85, 1.2);
+          var buffed = 0;
+          for (var hz = 0; hz < zombies.length; hz++) {
+            var o2 = zombies[hz];
+            if (o2 === z) continue;
+            if (Math.hypot(o2.x - z.x, o2.z - z.z) < t.howlRadius) {
+              o2.rage = 4.5; buffed++;
+            }
+          }
+          if (buffed) { Audio_.howl(); burst(z.x, 1.5, z.z, 12, 'spark', 3.2); }
+          z.pulse = 0.45;
+        }
+        if (z.pulse > 0) z.pulse -= dt;
+      }
 
       if (t.ranged) {
         // spitters hold at range and lob acid
         z.atkCd -= dt;
         var want = t.range * 0.8;
         var dir = dist > want + 1.5 ? 1 : (dist < want - 2 ? -0.6 : 0);
-        z.x += (dx / dist) * z.speed * dir * dt;
-        z.z += (dz / dist) * z.speed * dir * dt;
+        moveSp = z.speed * rageMul * Math.abs(dir);
+        z.x += (dx / dist) * z.speed * rageMul * dir * dt;
+        z.z += (dz / dist) * z.speed * rageMul * dir * dt;
         if (dist < t.range && z.atkCd <= 0) {
           z.atkCd = t.cooldown * rand(0.8, 1.25);
           if (eBullets.length < MAXE) {
@@ -1791,23 +2333,31 @@ function main(hotData) {
             eBullets.push({
               x: z.x, z: z.z, y: 1.0,
               vx: (dx / dist) * sp, vz: (dz / dist) * sp,
-              dmg: t.dmg, life: 2.4
+              dmg: z.dmg, life: 2.4
             });
           }
         }
       } else {
         var chase = dist > (z.radius + player.radius + 0.1) ? 1 : 0;
-        var sp2 = z.speed * (z.lunge > 0 ? 1.8 : 1);
+        var sp2 = z.speed * rageMul * (z.lunge > 0 ? 1.8 : 1);
+        moveSp = sp2 * chase;
         z.x += (dx / dist) * sp2 * chase * dt;
         z.z += (dz / dist) * sp2 * chase * dt;
         if (z.lunge > 0) z.lunge -= dt;
 
-        z.atkCd -= dt;
-        if (dist < z.radius + player.radius + 0.35 && z.atkCd <= 0) {
-          z.atkCd = 0.95;
-          damagePlayer(t.dmg);
+        if (!t.howls) {
+          z.atkCd -= dt;
+          if (dist < z.radius + player.radius + 0.35 && z.atkCd <= 0) {
+            z.atkCd = 0.95;
+            damagePlayer(z.dmg);
+            z.lunge = 0.18;
+          }
+        } else if (dist < z.radius + player.radius + 0.35 && z.clawCd <= 0) {
+          z.clawCd = 1.2;
+          damagePlayer(z.dmg);
           z.lunge = 0.18;
         }
+        if (z.clawCd > 0) z.clawCd -= dt;
       }
 
       // separation so the horde spreads rather than stacking
@@ -1827,7 +2377,12 @@ function main(hotData) {
       z.x = clamp(z.x, -ARENA + 1.2, ARENA - 1.2);
       z.z = clamp(z.z, -ARENA + 1.2, ARENA - 1.2);
 
-      z.phase += dt * t.swing * (2.6 + z.speed * 0.5);
+      // Gait from distance covered, not a fixed tempo — a brute at 1.8 u/s and
+      // a runner at 5 u/s now plant their feet at rates that match the ground.
+      // The floor keeps stalled or attacking bodies shuffling instead of frozen.
+      z.phase += ((Math.max(moveSp, 0.45) / t.stride) * TAU) * dt;
+      if (z.phase > TAU) z.phase -= TAU;
+      z.gaitAmp = clamp(0.35 + (moveSp / Math.max(z.speed, 0.01)) * 0.65, 0, 1);
       if (z.flash > 0) z.flash -= dt * 5;
 
       z.groanCd -= dt;
@@ -1851,7 +2406,8 @@ function main(hotData) {
         for (var pi = 0; pi < props.length; pi++) {
           var pr = props[pi];
           if (Math.hypot(bu.x - pr.x, bu.z - pr.z) < pr.r) {
-            burst(bu.x, 0.9, bu.z, 3, 'spark', 1.4);
+            if (bu.boom) blastAt(bu.x, bu.z, eff.blastRadius, eff.blastDamage, false, null);
+            else burst(bu.x, 0.9, bu.z, 3, 'spark', 1.4);
             gone = true; break;
           }
         }
@@ -1869,6 +2425,12 @@ function main(hotData) {
               var kl = Math.hypot(bu.vx, bu.vz) || 1;
               zz.x += (bu.vx / kl) * player.knock * 0.12;
               zz.z += (bu.vz / kl) * player.knock * 0.12;
+            }
+            if (bu.boom) {
+              blastAt(bu.x, bu.z, eff.blastRadius, eff.blastDamage, false, null);
+              gone = true;
+              if (zz.hp <= 0) killZombie(zz, zi);
+              break;
             }
             if (zz.hp <= 0) { killZombie(zz, zi); }
             if (bu.pierce > 0) { bu.pierce--; }
@@ -1921,10 +2483,10 @@ function main(hotData) {
         pu.x += (pdx / pd) * pull * dt;
         pu.z += (pdz / pd) * pull * dt;
       }
-      if (pd < 0.7) {
-        if (pu.kind === 'health') player.hp = Math.min(player.maxHp, player.hp + 22);
-        else G.score += 25;
-        Audio_.pickup();
+      if (pd < (pu.kind === 'weapon' ? 1.0 : 0.7)) {
+        if (pu.kind === 'health') { player.hp = Math.min(player.maxHp, player.hp + 22); Audio_.pickup(); }
+        else if (pu.kind === 'weapon') { equip(pu.wep, true); }
+        else { G.score += 25; Audio_.pickup(); }
         pickups.splice(pk, 1);
       } else if (pu.life <= 0) {
         pickups.splice(pk, 1);
@@ -1952,54 +2514,103 @@ function main(hotData) {
       var s = z.scale * (1 + Math.max(0, z.flash) * 0.16);
       var walk = Math.sin(z.phase);
       var walk2 = Math.sin(z.phase + PI);
-      var lean = z.type === 'brute' ? 0.06 : 0.16;
+      var amp = z.gaitAmp === undefined ? 1 : z.gaitAmp;
+      var swing = t.legSwing * amp;
+      var lunge = z.lunge > 0 ? 0.55 : 0;
 
       _body.position.set(z.x, 0, z.z);
       _body.rotation.set(0, z.angle, 0);
       _body.scale.set(s, s, s);
       _body.updateMatrix();
 
-      // torso — hunched, bobbing with the gait
-      _limb.position.set(0, 1.03 + Math.abs(walk) * 0.035, 0);
-      _limb.rotation.set(lean, 0, walk * 0.05);
-      _limb.scale.set(1, 1, 1);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.torso.setMatrixAt(i, _m);
+      if (t.crawl) {
+        /* ---- on all fours: body low and near-horizontal, limbs scrabbling ---- */
+        _limb.position.set(0, 0.46 + Math.abs(walk) * 0.03, 0);
+        _limb.rotation.set(1.30, 0, walk * 0.12);
+        _limb.scale.set(1, 1, 1);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.torso.setMatrixAt(i, _m);
 
-      // head
-      _limb.position.set(0, 1.55 + Math.abs(walk) * 0.03, 0.06);
-      _limb.rotation.set(lean * 1.3, walk * 0.12, walk * 0.07);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.head.setMatrixAt(i, _m);
+        _limb.position.set(0, 0.60, 0.42);
+        _limb.rotation.set(-0.35, walk * 0.18, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.head.setMatrixAt(i, _m);
 
-      // arms reach forward — the classic silhouette
-      var reach = z.type === 'runner' ? 0.9 : 1.15;
-      _limb.position.set(-0.34, 1.32, 0);
-      _limb.rotation.set(-reach + walk * 0.22, 0, 0.14);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.armL.setMatrixAt(i, _m);
+        // front limbs paw at the ground, alternating
+        _limb.position.set(-0.26, 0.56, 0.24);
+        _limb.rotation.set(-2.05 + walk * 0.55, 0, 0.30);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armL.setMatrixAt(i, _m);
 
-      _limb.position.set(0.34, 1.32, 0);
-      _limb.rotation.set(-reach + walk2 * 0.22, 0, -0.14);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.armR.setMatrixAt(i, _m);
+        _limb.position.set(0.26, 0.56, 0.24);
+        _limb.rotation.set(-2.05 + walk2 * 0.55, 0, -0.30);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armR.setMatrixAt(i, _m);
 
-      // legs
-      _limb.position.set(-0.15, 0.68, 0);
-      _limb.rotation.set(walk * 0.62, 0, 0);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.legL.setMatrixAt(i, _m);
+        // hind legs kick out behind
+        _limb.position.set(-0.17, 0.44, -0.30);
+        _limb.rotation.set(-1.15 + walk2 * swing, 0, 0.18);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legL.setMatrixAt(i, _m);
 
-      _limb.position.set(0.15, 0.68, 0);
-      _limb.rotation.set(walk2 * 0.62, 0, 0);
-      _limb.updateMatrix();
-      _m.multiplyMatrices(_body.matrix, _limb.matrix);
-      grp.legR.setMatrixAt(i, _m);
+        _limb.position.set(0.17, 0.44, -0.30);
+        _limb.rotation.set(-1.15 + walk * swing, 0, -0.18);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legR.setMatrixAt(i, _m);
+      } else {
+        /* ---- upright ---- */
+        var lean = t.explodes ? 0.04 : (z.type === 'brute' ? 0.06 : 0.16);
+        // a howler mid-shriek rears back; a bloater sways with its own weight
+        var rear = (t.howls && z.pulse > 0) ? -0.42 : 0;
+        var sway = t.explodes ? Math.sin(z.phase * 0.5) * 0.09 : 0;
+
+        _limb.position.set(0, 1.03 + Math.abs(walk) * 0.035 * amp, 0);
+        _limb.rotation.set(lean + rear, 0, walk * 0.05 + sway);
+        // a bloater is distended — read it at a glance before it reaches you
+        if (t.explodes) _limb.scale.set(1.42, 1.12, 1.52);
+        else _limb.scale.set(1, 1, 1);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.torso.setMatrixAt(i, _m);
+
+        _limb.position.set(0, 1.55 + Math.abs(walk) * 0.03 * amp, 0.06);
+        _limb.rotation.set(lean * 1.3 + rear * 1.6, walk * 0.12, walk * 0.07);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.head.setMatrixAt(i, _m);
+
+        // arms reach forward — the classic silhouette
+        var reach = t.reach + lunge;
+        _limb.position.set(-0.34, 1.32, 0);
+        _limb.rotation.set(-reach + walk * 0.22 * amp, 0, 0.14);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armL.setMatrixAt(i, _m);
+
+        _limb.position.set(0.34, 1.32, 0);
+        _limb.rotation.set(-reach + walk2 * 0.22 * amp, 0, -0.14);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.armR.setMatrixAt(i, _m);
+
+        _limb.position.set(-0.15, 0.68, 0);
+        _limb.rotation.set(walk * swing, 0, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legL.setMatrixAt(i, _m);
+
+        _limb.position.set(0.15, 0.68, 0);
+        _limb.rotation.set(walk2 * swing, 0, 0);
+        _limb.updateMatrix();
+        _m.multiplyMatrices(_body.matrix, _limb.matrix);
+        grp.legR.setMatrixAt(i, _m);
+      }
     }
 
     for (gi = 0; gi < ZNAMES.length; gi++) {
@@ -2009,6 +2620,7 @@ function main(hotData) {
       for (var ki = 0; ki < ZKEYS.length; ki++) {
         var part = group[ZKEYS[ki]];
         part.count = c;
+        part.visible = c > 0;          // skip types absent from this wave
         part.instanceMatrix.needsUpdate = true;
       }
     }
@@ -2063,9 +2675,19 @@ function main(hotData) {
   }
 
   function syncPickups(now) {
-    var nh = 0, nsc = 0;
+    var nh = 0, nsc = 0, nw = 0;
     for (var i = 0; i < pickups.length; i++) {
       var p = pickups[i];
+      if (p.kind === 'weapon') {
+        // crates sit flat and turn slowly, with a slow pulse to draw the eye
+        var pulse = 1 + Math.sin(now * 3.2) * 0.07;
+        _body.position.set(p.x, 0.30 + Math.sin(now * 1.8) * 0.06, p.z);
+        _body.rotation.set(0, p.spin * 0.5, 0);
+        _body.scale.set(pulse, pulse, pulse);
+        _body.updateMatrix();
+        if (nw < MAXPK) pickupMesh.weapon.setMatrixAt(nw++, _body.matrix);
+        continue;
+      }
       var blink = p.life < 4 ? (Math.sin(now * 14) > -0.2 ? 1 : 0.18) : 1;
       _body.position.set(p.x, 0.42 + Math.sin(p.spin * 1.6) * 0.1, p.z);
       _body.rotation.set(0.5, p.spin, 0.4);
@@ -2079,8 +2701,10 @@ function main(hotData) {
     }
     pickupMesh.health.count = nh;
     pickupMesh.scrap.count = nsc;
+    pickupMesh.weapon.count = nw;
     pickupMesh.health.instanceMatrix.needsUpdate = true;
     pickupMesh.scrap.instanceMatrix.needsUpdate = true;
+    pickupMesh.weapon.instanceMatrix.needsUpdate = true;
   }
 
   function syncDecals() {
@@ -2098,13 +2722,20 @@ function main(hotData) {
   }
 
   function syncPlayer(now) {
-    playerGroup.position.set(player.x, 0, player.z);
+    playerGroup.position.set(player.x, playerGroup.position.y, player.z);
     playerGroup.rotation.y = player.angle;
     var legs = playerGroup.userData.legs;
-    var sw = Math.sin(player.bob * 3.2) * 0.5;
+    var sw = Math.sin(player.gait) * (player.gaitAmp || 0);
     legs[0].rotation.x = sw;
     legs[1].rotation.x = -sw;
+    // a little vertical bounce on each footfall, for weight
+    playerGroup.position.y = Math.abs(Math.sin(player.gait)) * (player.gaitAmp || 0) * 0.09;
     playerGroup.userData.flash.visible = player.muzzle > 0;
+    muzzleLight.intensity = player.muzzle > 0 ? 3.4 * (player.muzzle / 0.055) : 0;
+    if (player.muzzle > 0) {
+      muzzleLight.position.set(player.x + Math.sin(player.angle) * 1.1, 1.2,
+                               player.z + Math.cos(player.angle) * 1.1);
+    }
     if (player.muzzle > 0) {
       var f = playerGroup.userData.flash;
       var s = 0.7 + Math.random() * 0.7;
@@ -2149,7 +2780,7 @@ function main(hotData) {
   var threatHost = $('threats');
   var threatPool = [];
   (function buildThreats() {
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 13; i++) {
       var d = document.createElement('div');
       d.className = 'threat';
       d.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true">' +
@@ -2171,6 +2802,27 @@ function main(hotData) {
       var halfD = (spanV / 2) / Math.sin(CAM_TILT);      // stretched by the tilt
       var cx = w / 2, cy = h / 2;
       var edgeX = cx - 26, edgeY = cy - 26;
+
+      var mark = function (mx, mz, colour, maxD) {
+        var dx = mx - player.x, dz = mz - player.z;
+        var dist = Math.hypot(dx, dz);
+        if (dist > maxD) return;
+        if (Math.abs(dx) < halfW * 0.86 && Math.abs(dz) < halfD * 0.80) return;
+        var a = Math.atan2(dz, dx);
+        var ax = Math.cos(a), ay = Math.sin(a);
+        var t = Math.min(edgeX / Math.max(Math.abs(ax), 1e-4),
+                         edgeY / Math.max(Math.abs(ay), 1e-4));
+        var el = threatPool[used++];
+        el.style.transform =
+          'translate(' + (cx + ax * t) + 'px,' + (cy + ay * t) + 'px) ' +
+          'rotate(' + (a * 180 / PI + 90) + 'deg)';
+        el.style.color = colour;
+        el.classList.add('on');
+      };
+
+      for (var pi2 = 0; pi2 < pickups.length && used < threatPool.length; pi2++) {
+        if (pickups[pi2].kind === 'weapon') mark(pickups[pi2].x, pickups[pi2].z, '#EDE7D9', 40);
+      }
 
       for (var i = 0; i < zombies.length && used < threatPool.length; i++) {
         var z = zombies[i];
@@ -2220,7 +2872,7 @@ function main(hotData) {
         z.x += Math.sin(z.angle) * 0.4 * dt;
         z.z += Math.cos(z.angle) * 0.4 * dt;
       }
-      z.phase += dt * ZTYPE[z.type].swing * 3;
+      z.phase += ((z.speed * 0.45) / ZTYPE[z.type].stride) * TAU * dt;
       for (var j = i - 1; j >= 0; j--) {
         var o = zombies[j];
         var sx = z.x - o.x, sz = z.z - o.z, sd = Math.hypot(sx, sz);
@@ -2234,6 +2886,160 @@ function main(hotData) {
     playerGroup.visible = false;
   }
 
+  /* ======================================================= post-processing
+     Hand-rolled rather than three.js EffectComposer + UnrealBloomPass: those
+     live in the examples bundle, which is a separate CDN fetch this page can't
+     guarantee. Four small passes, all under our own control:
+       scene -> RT, bright-pass + downsample, separable blur x2, composite.
+     The composite also does FXAA, which matters because rendering into a
+     render target bypasses the canvas's MSAA entirely.                       */
+  var Post = (function () {
+    var VERT = `
+      varying vec2 vUv;
+      void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+    // Max-channel rather than luma: this palette's brights are saturated amber,
+    // which luma weighting would under-read and refuse to bloom.
+    var FRAG_BRIGHT = `
+      uniform sampler2D tDiffuse; uniform float threshold; uniform float knee;
+      varying vec2 vUv;
+      void main(){
+        vec3 c = texture2D(tDiffuse, vUv).rgb;
+        float l = max(max(c.r, c.g), c.b);
+        gl_FragColor = vec4(c * smoothstep(threshold, threshold + knee, l), 1.0);
+      }`;
+
+    // 5 taps, linear-sampled — equivalent reach to a 9-tap gaussian
+    var FRAG_BLUR = `
+      uniform sampler2D tDiffuse; uniform vec2 dir;
+      varying vec2 vUv;
+      void main(){
+        vec3 s  = texture2D(tDiffuse, vUv).rgb * 0.2270270270;
+        s += texture2D(tDiffuse, vUv + dir * 1.3846153846).rgb * 0.3162162162;
+        s += texture2D(tDiffuse, vUv - dir * 1.3846153846).rgb * 0.3162162162;
+        s += texture2D(tDiffuse, vUv + dir * 3.2307692308).rgb * 0.0702702703;
+        s += texture2D(tDiffuse, vUv - dir * 3.2307692308).rgb * 0.0702702703;
+        gl_FragColor = vec4(s, 1.0);
+      }`;
+
+    var FRAG_COMP = `
+      uniform sampler2D tScene; uniform sampler2D tBloom;
+      uniform vec2 rcp; uniform float strength; uniform float fxaaOn;
+      varying vec2 vUv;
+      vec3 fxaa(sampler2D tex, vec2 uv){
+        vec3 luma = vec3(0.299, 0.587, 0.114);
+        vec3 nw = texture2D(tex, uv + vec2(-1.0,-1.0) * rcp).rgb;
+        vec3 ne = texture2D(tex, uv + vec2( 1.0,-1.0) * rcp).rgb;
+        vec3 sw = texture2D(tex, uv + vec2(-1.0, 1.0) * rcp).rgb;
+        vec3 se = texture2D(tex, uv + vec2( 1.0, 1.0) * rcp).rgb;
+        vec3 m  = texture2D(tex, uv).rgb;
+        float lnw = dot(nw,luma), lne = dot(ne,luma);
+        float lsw = dot(sw,luma), lse = dot(se,luma), lm = dot(m,luma);
+        float lmin = min(lm, min(min(lnw,lne), min(lsw,lse)));
+        float lmax = max(lm, max(max(lnw,lne), max(lsw,lse)));
+        vec2 d = vec2(-((lnw + lne) - (lsw + lse)), ((lnw + lsw) - (lne + lse)));
+        float red = max((lnw + lne + lsw + lse) * 0.03125, 0.0078125);
+        float rcpMin = 1.0 / (min(abs(d.x), abs(d.y)) + red);
+        d = clamp(d * rcpMin, -8.0, 8.0) * rcp;
+        vec3 a = 0.5 * (texture2D(tex, uv + d * (1.0/3.0 - 0.5)).rgb +
+                        texture2D(tex, uv + d * (2.0/3.0 - 0.5)).rgb);
+        vec3 b = a * 0.5 + 0.25 * (texture2D(tex, uv + d * -0.5).rgb +
+                                   texture2D(tex, uv + d *  0.5).rgb);
+        float lb = dot(b, luma);
+        return (lb < lmin || lb > lmax) ? a : b;
+      }
+      void main(){
+        vec3 base = fxaaOn > 0.5 ? fxaa(tScene, vUv) : texture2D(tScene, vUv).rgb;
+        vec3 glow = texture2D(tBloom, vUv).rgb;
+        gl_FragColor = vec4(base + glow * strength, 1.0);
+      }`;
+
+    function mat(frag, uniforms) {
+      return new T.ShaderMaterial({
+        uniforms: uniforms, vertexShader: VERT, fragmentShader: frag,
+        depthTest: false, depthWrite: false
+      });
+    }
+    function target(w, h, depth) {
+      return new T.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), {
+        minFilter: T.LinearFilter, magFilter: T.LinearFilter,
+        depthBuffer: !!depth, stencilBuffer: false
+      });
+    }
+
+    var api = {
+      on: false, bufW: 0, bufH: 0, scale: 0.25,
+      rtScene: null, rtA: null, rtB: null,
+      qScene: new T.Scene(), qCam: new T.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+      quad: null, mBright: null, mBlur: null, mComp: null
+    };
+
+    api.init = function () {
+      api.mBright = mat(FRAG_BRIGHT, {
+        tDiffuse: { value: null }, threshold: { value: 0.76 }, knee: { value: 0.22 }
+      });
+      api.mBlur = mat(FRAG_BLUR, {
+        tDiffuse: { value: null }, dir: { value: new T.Vector2() }
+      });
+      api.mComp = mat(FRAG_COMP, {
+        tScene: { value: null }, tBloom: { value: null },
+        rcp: { value: new T.Vector2() }, strength: { value: 0.68 },
+        fxaaOn: { value: 1 }
+      });
+      api.quad = new T.Mesh(new T.PlaneGeometry(2, 2), api.mComp);
+      api.quad.frustumCulled = false;
+      api.qScene.add(api.quad);
+    };
+
+    api.resize = function (w, h, force) {
+      // the adaptive quality system nudges pixel ratio constantly; without a
+      // tolerance this would reallocate every render target every few frames
+      if (api.rtScene && !force &&
+          Math.abs(w - api.bufW) <= api.bufW * 0.06 &&
+          Math.abs(h - api.bufH) <= api.bufH * 0.06) return;
+      if (w === api.bufW && h === api.bufH) return;
+      api.bufW = w; api.bufH = h;
+      var bw = Math.round(w * api.scale), bh = Math.round(h * api.scale);
+      if (api.rtScene) { api.rtScene.dispose(); api.rtA.dispose(); api.rtB.dispose(); }
+      api.rtScene = target(w, h, true);
+      api.rtA = target(bw, bh, false);
+      api.rtB = target(bw, bh, false);
+      api.mComp.uniforms.rcp.value.set(1 / w, 1 / h);
+    };
+
+    api.render = function (scene, camera) {
+      if (!api.on) { renderer.setRenderTarget(null); renderer.render(scene, camera); return; }
+
+      renderer.setRenderTarget(api.rtScene);
+      renderer.render(scene, camera);
+
+      api.quad.material = api.mBright;
+      api.mBright.uniforms.tDiffuse.value = api.rtScene.texture;
+      renderer.setRenderTarget(api.rtA);
+      renderer.render(api.qScene, api.qCam);
+
+      api.quad.material = api.mBlur;
+      api.mBlur.uniforms.tDiffuse.value = api.rtA.texture;
+      api.mBlur.uniforms.dir.value.set(1 / api.rtA.width, 0);
+      renderer.setRenderTarget(api.rtB);
+      renderer.render(api.qScene, api.qCam);
+
+      api.mBlur.uniforms.tDiffuse.value = api.rtB.texture;
+      api.mBlur.uniforms.dir.value.set(0, 1 / api.rtA.height);
+      renderer.setRenderTarget(api.rtA);
+      renderer.render(api.qScene, api.qCam);
+
+      api.quad.material = api.mComp;
+      api.mComp.uniforms.tScene.value = api.rtScene.texture;
+      api.mComp.uniforms.tBloom.value = api.rtA.texture;
+      renderer.setRenderTarget(null);
+      renderer.render(api.qScene, api.qCam);
+    };
+
+    return api;
+  })();
+  Post.init();
+
   /* ------------------------------------------------------------------ resize */
   function resize() {
     var w = app.clientWidth || window.innerWidth;
@@ -2241,6 +3047,12 @@ function main(hotData) {
     renderer.setSize(w, h, false);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
+    syncPostSize(true);
+  }
+
+  function syncPostSize(force) {
+    var gl = renderer.getContext();
+    Post.resize(gl.drawingBufferWidth, gl.drawingBufferHeight, force);
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
   resize();
@@ -2250,7 +3062,7 @@ function main(hotData) {
   });
 
   /* ------------------------------------------ adaptive quality + pause guards */
-  var frameAvg = 16.7, dprScale = 1;
+  var frameAvg = 16.7, dprScale = 1, fxStress = 0;
   document.addEventListener('visibilitychange', function () {
     if (document.hidden && G.screen === 'playing') togglePause();
   });
@@ -2276,6 +3088,17 @@ function main(hotData) {
     var dt = Math.min(raw, 0.1);
 
     frameAvg = frameAvg * 0.94 + (raw * 1000) * 0.06;
+
+    // Resolution is shed first (below). If the frame is still missing 30fps
+    // with pixel ratio already at the floor, the effects go rather than let
+    // the game crawl — six seconds of sustained struggle, and not persisted,
+    // so the player's own setting survives a reload.
+    if (Post.on && frameAvg > 34 && dprScale <= 0.64) {
+      fxStress++;
+      if (fxStress > 180) { fxStress = 0; setEffects(false, false); }
+    } else if (fxStress > 0) {
+      fxStress = Math.max(0, fxStress - 2);
+    }
     if (frameAvg > 27 && dprScale > 0.62) {
       dprScale -= 0.02;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr) * dprScale);
@@ -2313,7 +3136,15 @@ function main(hotData) {
     syncPickups(now / 1000);
     syncDecals();
 
-    renderer.render(scene, camera);
+    if (G.blastT > 0) {
+      G.blastT -= dt;
+      blastLight.intensity = Math.max(0, G.blastT / 0.38) * 6.5;
+    } else if (blastLight.intensity !== 0) {
+      blastLight.intensity = 0;
+    }
+
+    syncPostSize(false);
+    Post.render(scene, camera);
   }
 
   /* ------------------------------------------------------------------ events */
@@ -2352,11 +3183,23 @@ function main(hotData) {
   }
   $('tog-quality').addEventListener('click', cycleQuality);
   $('tog-quality2').addEventListener('click', cycleQuality);
+  $('btn-cheats').addEventListener('click', openCheats);
+  $('btn-cheat-close').addEventListener('click', function () { show('playing'); });
+  $('tog-fx').addEventListener('click', function () { setEffects(!fxOn); });
+  $('tog-fx2').addEventListener('click', function () { setEffects(!fxOn); });
+  $('tog-cheat').addEventListener('click', function () { setCheats(!cheatsOn); });
+  $('tog-cheat2').addEventListener('click', function () { setCheats(!cheatsOn); });
+  $('tog-aim').addEventListener('click', function () { setAutoAim(!autoAim); });
+  $('tog-aim2').addEventListener('click', function () { setAutoAim(!autoAim); });
   $('tog-sound').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
   $('tog-sound2').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
 
   setQuality(quality);
   setSound(Audio_.on);
+  setAutoAim(autoAim);
+  setCheats(cheatsOn);
+  setEffects(fxOn);
+  equip('rifle', false);   // derive eff[] before the first frame
 
   /* --------------------------------------- survive a republish mid-session */
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
