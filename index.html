@@ -455,6 +455,46 @@ body{
 }
 .cheat-note b{color:var(--ember);}
 
+#rotate{
+  position:absolute;inset:0;z-index:30;display:none;
+  align-items:center;justify-content:center;padding:26px 24px;
+  background:var(--pit);text-align:center;
+}
+#rotate.on{display:flex;}
+#rotate .rot-inner{max-width:320px;color:var(--bone-dim);}
+#rotate svg{width:74px;height:52px;color:var(--sodium);display:block;margin:0 auto 16px;}
+#rotate .rot-title{
+  font-family:var(--f-display);font-weight:800;font-size:34px;
+  color:var(--bone);line-height:1;margin-bottom:8px;
+}
+#rotate .rot-sub{font-size:var(--fs-body);line-height:1.5;}
+
+/* A sideways phone is only ~400px tall. Compact the menus so they fit without
+   scrolling rather than letting a scrollbar hide the Start button. */
+@media (max-height: 540px){
+  .screen{padding:14px 20px;}
+  .wordmark{font-size:clamp(30px,7.2vh,52px);}
+  .tagline{display:none;}
+  .stack{gap:7px;margin-top:14px;}
+  .btn{font-size:clamp(20px,4.4vh,27px);padding:9px 18px 7px;}
+  .btn.ghost{font-size:clamp(15px,3.4vh,20px);padding:8px 18px 6px;}
+  .metarow{margin-top:12px;}
+  .toggles{margin-top:10px;gap:5px;}
+  /* full-width rows cost four rows of height here; pair them all up instead */
+  .tog.wide{grid-column:auto;}
+  .tog{min-height:36px;padding:7px 8px;}
+  .metarow{gap:18px;}
+  .metarow b{font-size:clamp(17px,3.6vh,22px);}
+  .up-head{margin-bottom:10px;}
+  .up-title{font-size:clamp(24px,5.6vh,36px);}
+  .cards{gap:6px;}
+  .card{padding:10px 12px;}
+  .card .glyph{width:34px;height:34px;}
+  .stats{margin-top:12px;}
+  .stat{padding:9px 8px;}
+  .howto{margin-top:10px;line-height:1.45;}
+}
+
 #fatal{
   position:absolute;inset:0;z-index:40;display:none;
   align-items:center;justify-content:center;padding:26px 20px;
@@ -658,6 +698,22 @@ body{
       </div>
     </div>
   </section>
+
+  <div id="rotate">
+    <div class="rot-inner">
+      <svg viewBox="0 0 64 44" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="41" height="41" rx="4" stroke="currentColor"
+              stroke-width="3" fill="none"/>
+        <path d="M50 12a14 14 0 0 1 0 20" stroke="currentColor" stroke-width="3"
+              fill="none" stroke-linecap="round"/>
+        <path d="M46 30l4 3 3-5" stroke="currentColor" stroke-width="3" fill="none"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="rot-title">Turn your phone</div>
+      <div class="rot-sub">Graveyard Shift is played sideways. You need the width
+        to see what is coming.</div>
+    </div>
+  </div>
 
   <div id="fatal">
     <div class="msg">
@@ -2843,12 +2899,14 @@ function main(hotData) {
 
   function updateCamera(dt) {
     var aspect = app.clientWidth / Math.max(1, app.clientHeight);
-    // Frame by the LONG screen axis: ~30 world units tall in portrait, ~34
-    // wide in landscape. Framing by the short axis (the obvious move) pushes
-    // the camera so far back in portrait that the player becomes a speck.
+    // Landscape is the design target. Framing by WIDTH there keeps the play
+    // area the same shape on a desktop window and a sideways phone: ~36 units
+    // across either way, which is what sightlines and chokepoints need.
+    // Portrait still frames by height so the player isn't a speck, but it is a
+    // fallback now, not the target.
     var tanV = Math.tan((camera.fov * PI / 180) / 2);
-    var d = aspect < 1 ? 30 / (2 * tanV) : 34 / (2 * tanV * aspect);
-    camDist = clamp(d, 18, 32);
+    var d = aspect < 1 ? 30 / (2 * tanV) : 36 / (2 * tanV * aspect);
+    camDist = clamp(d, 13, 32);
 
     var tx = player.x, tz = player.z;
     var shakeX = 0, shakeZ = 0;
@@ -3204,6 +3262,17 @@ function main(hotData) {
   Post.init();
 
   /* ------------------------------------------------------------------ resize */
+  // Only nag a phone. A narrow desktop window is a legitimate way to play and
+  // shouldn't be blocked; a phone held upright genuinely cannot see enough.
+  var rotateEl = $('rotate');
+  function checkOrientation() {
+    var w = app.clientWidth || window.innerWidth;
+    var h = app.clientHeight || window.innerHeight;
+    var nag = IS_TOUCH && h > w * 1.08;
+    rotateEl.classList.toggle('on', nag);
+    if (nag && G.screen === 'playing') togglePause();
+  }
+
   function resize() {
     var w = app.clientWidth || window.innerWidth;
     var h = app.clientHeight || window.innerHeight;
@@ -3211,6 +3280,7 @@ function main(hotData) {
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
     syncPostSize(true);
+    checkOrientation();
   }
 
   function syncPostSize(force) {
@@ -3381,6 +3451,7 @@ function main(hotData) {
   setAutoAim(autoAim);
   setCheats(cheatsOn);
   setEffects(fxOn);
+  checkOrientation();
   equip('rifle', false);   // derive eff[] before the first frame
 
   /* --------------------------------------- survive a republish mid-session */
@@ -3393,6 +3464,12 @@ function main(hotData) {
     best.wave = hotData.bestWave;
     best.score = Math.max(best.score, hotData.bestScore || 0);
     refreshBest();
+  }
+
+  // Installable build only: on the artifact host there is no sw.js to fetch and
+  // registration simply fails, which is harmless and deliberately silent.
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
   }
 
   show('menu');

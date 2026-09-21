@@ -1,9 +1,26 @@
 # Graveyard Shift
 
-An endless top-down 3D zombie survival shooter, built for portrait-mode mobile
-Safari. One HTML file, no build step, no dependencies to install.
+A top-down 3D zombie survival shooter, played **in landscape** on desktop or a
+sideways phone. The game itself is one HTML file with no build step and no
+dependencies to install.
 
 Open `index.html` in a browser, or serve the directory with any static host.
+
+## Installing it
+
+Pushes to `main` build an installable version to GitHub Pages via
+`.github/workflows/pages.yml`. On a phone, open the Pages URL and use **Add to
+Home Screen** — it launches fullscreen in landscape with no browser chrome, and
+works offline once cached.
+
+`index.html` is authored as a Claude artifact fragment, with no doctype, `html`,
+`head` or `body` tags of its own, because the artifact host supplies those. A
+PWA needs a real document with a manifest link, so rather than keep a second
+copy of the game in sync the workflow wraps the same file at deploy time. One
+source of truth, still no build step for development.
+
+**Pages must be enabled once by hand:** repository Settings → Pages → Source →
+*GitHub Actions*. The workflow cannot enable it itself.
 
 ## What it is
 
@@ -49,6 +66,21 @@ and best wave persist locally.
   right thumb a job keeps both hands in the fight.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
+
+## Landscape
+
+Landscape is the design target, and the camera frames by **width** there — about
+36 world units across on a desktop window and a sideways phone alike, so the
+play area is the same shape on both.
+
+That number is why. Portrait shows roughly 14 units across, which is enough to
+see your own feet and not enough to see a horde coming down a street. Sightlines,
+chokepoints and leading the player with light all need the wider frame.
+
+Portrait still works and still frames by height so the player isn't a speck, but
+it is a fallback rather than the target: a phone held upright gets a rotate
+prompt, while a narrow *desktop* window is left alone, since that is a legitimate
+way to play.
 
 ## Darkness and the flashlight
 
