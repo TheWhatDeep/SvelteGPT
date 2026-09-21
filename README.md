@@ -71,10 +71,13 @@ Everything else comes from real lights, on a fixed budget:
   of point lights is reassigned to the closest posts each frame rather than
   lighting all seven at once. The pool size is a quality tier: 1 light on
   battery, 2 on balanced, 3 on high.
-- **The flashlight** is a `SpotLight` mounted high and angled down, not held at
-  chest height. A near-horizontal beam meets the floor at grazing incidence
-  (`N·L ≈ 0.1`) and lights almost nothing; from above, the cone lands as a
-  readable pool.
+- **The flashlight** is a `SpotLight` whose height is a balance rather than a
+  preference. Too low and the beam meets the floor at grazing incidence
+  (`N·L ≈ 0.1`) and lights nothing; too high and the cone touches down several
+  units ahead, so it reads as a projector rather than something the player is
+  carrying. Just above head height, aimed a short way ahead, puts the near edge
+  of the cone about two units from the feet. It is emitted from the weapon —
+  forward and slightly to the gun side — rather than from the player's centre.
 - **Muzzle flash and explosions** are point lights created at startup at zero
   intensity, because adding a light later changes the scene's light count and
   forces every material to recompile.
