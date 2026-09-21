@@ -137,9 +137,8 @@ There are no model or texture files. Every asset is authored in code at runtime:
   — with per-limb walk animation driven by a phase offset per body. Crawlers
   reuse the same six parts in a different pose: torso near-horizontal, front
   limbs pawing at the ground, hind legs kicking out behind.
-- **The ground** is a 2D canvas painted at startup: asphalt grain, cracks, faded
-  parking bays, and the warm pools beneath each streetlight, baked in at the
-  lamps' own coordinates.
+- **The ground** is a 2D canvas painted at startup: asphalt grain, cracks and
+  faded parking bays. Surface only — the light on it is real, not painted.
 - **Audio** is synthesised from oscillators and noise buffers.
 
 This was originally a constraint — the page is published as a sandboxed artifact
