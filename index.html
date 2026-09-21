@@ -85,7 +85,7 @@ body{
 .vit{display:flex;align-items:center;gap:10px;}
 
 .hpwrap{
-  position:relative;flex:1;height:21px;
+  position:relative;flex:1;max-width:420px;height:21px;
   background:rgba(5,7,9,.72);
   border:1px solid var(--fog);
   overflow:hidden;
@@ -107,6 +107,7 @@ body{
   color:var(--bone);text-shadow:0 1px 2px rgba(0,0,0,.9);
   font-variant-numeric:tabular-nums;
 }
+.hudbtns{display:flex;gap:8px;margin-left:auto;flex:none;}
 .pausebtn{
   pointer-events:auto;
   width:46px;height:46px;flex:none;
@@ -482,21 +483,23 @@ body{
           <div class="hpfill" id="hp-fill"></div>
           <div class="hptext" id="hp-text">100 / 100</div>
         </div>
-        <button class="pausebtn" id="btn-cheats" aria-label="Cheats" hidden>
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M1 4h5M10 4h5M1 8h9M14 8h1M1 12h3M8 12h7"
-                  stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-            <circle cx="8" cy="4" r="2" fill="currentColor"/>
-            <circle cx="12" cy="8" r="2" fill="currentColor"/>
-            <circle cx="6" cy="12" r="2" fill="currentColor"/>
-          </svg>
-        </button>
-        <button class="pausebtn" id="btn-pause" aria-label="Pause">
-          <svg viewBox="0 0 12 14" aria-hidden="true">
-            <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
-            <rect x="8" y="0" width="4" height="14" fill="currentColor"/>
-          </svg>
-        </button>
+        <div class="hudbtns">
+          <button class="pausebtn" id="btn-cheats" aria-label="Cheats" hidden>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M1 4h5M10 4h5M1 8h9M14 8h1M1 12h3M8 12h7"
+                    stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+              <circle cx="8" cy="4" r="2" fill="currentColor"/>
+              <circle cx="12" cy="8" r="2" fill="currentColor"/>
+              <circle cx="6" cy="12" r="2" fill="currentColor"/>
+            </svg>
+          </button>
+          <button class="pausebtn" id="btn-pause" aria-label="Pause">
+            <svg viewBox="0 0 12 14" aria-hidden="true">
+              <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
+              <rect x="8" y="0" width="4" height="14" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="readout">
         <span class="wep" id="ro-wep">Rifle</span>
@@ -1691,7 +1694,10 @@ function main(hotData) {
     $('tog-aim2').textContent = label;
     $('tog-aim').setAttribute('aria-pressed', on);
     $('tog-aim2').setAttribute('aria-pressed', on);
-    $('hint-r').textContent = on ? 'aim' : 'aim + fire';
+    $('hint-l').textContent = IS_TOUCH ? 'move' : 'w a s d';
+    $('hint-r').textContent = IS_TOUCH
+      ? (on ? 'aim' : 'aim + fire')
+      : (on ? 'mouse aims' : 'mouse \u00b7 hold to fire');
   }
 
   /* ------------------------------------------------------------ cheat panel */
@@ -1876,6 +1882,14 @@ function main(hotData) {
     }
   });
   window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
+
+  // An app switch swallows the keyup, leaving the key stuck down and the player
+  // walking on return. visibilitychange only covers tab switches, not this.
+  window.addEventListener('blur', function () {
+    for (var k in keys) keys[k] = false;
+    mouse.down = false;
+    input.mx = 0; input.mz = 0;
+  });
 
   var IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
   var mouse = { x: 0, y: 0, down: false, active: false };
