@@ -129,7 +129,7 @@ body{
   color:var(--bone);font-weight:700;font-size:var(--fs-value);
   font-variant-numeric:tabular-nums;letter-spacing:.04em;
 }
-.readout .wv b{color:var(--sodium);}
+.readout .tm b{color:var(--sodium);}
 .readout .wep{
   color:var(--pit);background:var(--sodium);
   font-weight:700;letter-spacing:.1em;
@@ -562,9 +562,9 @@ body{
       </div>
       <div class="readout">
         <span class="wep" id="ro-wep">Rifle</span>
-        <span class="wv"><b id="ro-wave">0:00</b></span>
+        <span class="tm"><b id="ro-time">0:00</b></span>
         <span>Score <b id="ro-score">0</b></span>
-        <span>Kills <b id="ro-left">0</b></span>
+        <span>Kills <b id="ro-kills">0</b></span>
       </div>
     </div>
   </div>
@@ -586,7 +586,7 @@ body{
         <button class="btn ghost" id="btn-how">How to Play</button>
       </div>
       <div class="metarow">
-        <div>Best Time<b id="m-wave">&mdash;</b></div>
+        <div>Best Time<b id="m-time">&mdash;</b></div>
         <div>Best Score<b id="m-score">&mdash;</b></div>
       </div>
       <div class="toggles">
@@ -618,7 +618,7 @@ body{
         <p><b>Pick up a weapon</b> — white crates turn up ahead of you after each horde. A
           <span class="k">white arrow</span> at the screen edge points to one that
           is off-screen. Walk over it to swap.</p>
-        <p><b>The Director</b> — there are no waves. The dead trickle in, build to
+        <p><b>The Director</b> — decides when the dead come. They trickle in, build to
           a <span class="k">horde</span>, then give you a breather once you have
           caught your breath — not on a clock. Survive a horde and choose one of
           three permanent upgrades; they stack for the whole run. Supplies you are
@@ -699,7 +699,7 @@ body{
       <div class="eyebrow" id="o-eyebrow">Shift Ended</div>
       <h1 class="wordmark" style="font-size:clamp(42px,14vw,72px)">Overrun</h1>
       <div class="stats">
-        <div class="stat"><div class="k">Hordes Survived</div><div class="v" id="o-wave">1</div></div>
+        <div class="stat"><div class="k">Hordes Survived</div><div class="v" id="o-hordes">0</div></div>
         <div class="stat"><div class="k">Score</div><div class="v" id="o-score">0</div></div>
         <div class="stat"><div class="k">Kills</div><div class="v" id="o-kills">0</div></div>
         <div class="stat"><div class="k">Time Survived</div><div class="v" id="o-time">0:00</div></div>
@@ -3418,7 +3418,7 @@ function main(hotData) {
   // One set of eight InstancedMeshes per (type, outfit). Solid geometry per
   // group rather than per-instance colour: setColorAt depends on a shader
   // recompile that is fragile across three.js versions, and when it silently
-  // fails every zombie renders white. Groups absent from the wave are hidden.
+  // fails every zombie renders white. Outfits with nobody on screen are hidden.
   var ZNAMES = Object.keys(ZTYPE);
   var zGroups = {}, ZGKEYS = [];
   ZNAMES.forEach(function (name) {
@@ -3512,7 +3512,6 @@ function main(hotData) {
   function spawnZombie(typeName, level, at) {
     if (zombies.length >= Math.min(MAXZ, Q.alive)) return;
     var t = ZTYPE[typeName];
-    var wave = level;
     // By PATH distance on the flow field, outdoors, and out of straight-line
     // reach: close enough to arrive soon, never popping in beside you or
     // inside a room with no way out.
@@ -3526,10 +3525,10 @@ function main(hotData) {
     }
     if (!ok) return;
 
-    var hpScale = 1 + 0.135 * (wave - 1);
-    var spScale = Math.min(1.42, 1 + 0.022 * (wave - 1));
+    var hpScale = 1 + 0.135 * (level - 1);
+    var spScale = Math.min(1.42, 1 + 0.022 * (level - 1));
     // damage scales too — without this, flat armour eventually zeroes every hit
-    var dmgScale = 1 + 0.12 * (wave - 1);
+    var dmgScale = 1 + 0.12 * (level - 1);
 
     zombies.push({
       type: typeName, x: x, z: z, angle: 0,
@@ -3580,6 +3579,8 @@ function main(hotData) {
     shake: 0, running: true
   };
   var best = { time: store.get('bestTime', 0), score: store.get('bestScore', 0) };
+  // best wave was retired with the wave system; drop the stale record
+  try { localStorage.removeItem('gys.bestWave'); } catch (e) {}
 
   /* ---------------------------------------------------------------- upgrades */
   var UPGRADES = [
@@ -3650,7 +3651,7 @@ function main(hotData) {
     hud: $('hud'), menu: $('sc-menu'), how: $('sc-how'), upgrade: $('sc-upgrade'),
     pause: $('sc-pause'), over: $('sc-over'), cheats: $('sc-cheats'),
     hpFill: $('hp-fill'), hpGhost: $('hp-ghost'), hpText: $('hp-text'),
-    roWep: $('ro-wep'), roWave: $('ro-wave'), roScore: $('ro-score'), roLeft: $('ro-left'),
+    roWep: $('ro-wep'), roTime: $('ro-time'), roScore: $('ro-score'), roKills: $('ro-kills'),
     announce: $('announce'), aMain: $('a-main'), aSub: $('a-sub'), hurt: $('hurt')
   };
 
@@ -3668,7 +3669,7 @@ function main(hotData) {
   }
 
   function refreshBest() {
-    $('m-wave').textContent = best.time ? fmtTime(best.time) : '—';
+    $('m-time').textContent = best.time ? fmtTime(best.time) : '—';
     $('m-score').textContent = best.score ? best.score.toLocaleString() : '—';
   }
   refreshBest();
@@ -3696,9 +3697,9 @@ function main(hotData) {
     ui.hpGhost.style.transform = 'scaleX(' + frac + ')';
     ui.hpText.textContent = Math.max(0, Math.ceil(player.hp)) + ' / ' + Math.round(player.maxHp);
     ui.roWep.textContent = WEAPONS[player.wep].short;
-    ui.roWave.textContent = fmtTime(G.time);
+    ui.roTime.textContent = fmtTime(G.time);
     ui.roScore.textContent = G.score.toLocaleString();
-    ui.roLeft.textContent = G.kills;
+    ui.roKills.textContent = G.kills;
   }
 
   function setQuality(name) {
@@ -4244,7 +4245,7 @@ function main(hotData) {
       if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
       refreshBest();
     }
-    $('o-wave').textContent = G.hordes;
+    $('o-hordes').textContent = G.hordes;
     $('o-score').textContent = G.score.toLocaleString();
     $('o-kills').textContent = G.kills;
     var mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
@@ -4255,7 +4256,7 @@ function main(hotData) {
   }
 
   /* ============================================================ the Director
-     Replaces the wave counter. It reads one number — intensity, how hard the
+     Paces the whole run. It reads one number — intensity, how hard the
      player is being pushed right now — and paces the run in a cycle:
 
        BUILD    a rising trickle of the common dead, until intensity climbs
@@ -5017,7 +5018,7 @@ function main(hotData) {
       for (var ki = 0; ki < ZPARTS.length; ki++) {
         var part = group[ZPARTS[ki]];
         part.count = c;
-        part.visible = c > 0;          // skip outfits absent from this wave
+        part.visible = c > 0;          // skip outfits with nobody on screen
         if (c) part.instanceMatrix.needsUpdate = true;
       }
     }

@@ -25,7 +25,7 @@ source of truth, still no build step for development.
 ## What it is
 
 You hold Oakhaven — a small town at night — against the dead, paced by an
-**AI Director** rather than a wave counter. Survive a horde, take one of three
+**AI Director**. Survive a horde, take one of three
 permanent upgrades, repeat until you're overrun. Score and best time persist
 locally.
 
@@ -71,7 +71,7 @@ locally.
 
 ## The Director
 
-There are no waves. An AI Director, after Left 4 Dead's, paces the run from one
+An AI Director, after Left 4 Dead's, paces the run from one
 number — **intensity**, how hard the player is being pushed right now:
 
 ```
@@ -91,7 +91,7 @@ the last body drops. The Director cycles through four states:
 | **Respite** | Nothing; an upgrade, and supplies | 12–20 s, or you push on 50 m |
 
 **Relax is gated on the player, not a clock.** Hurt and cornered, it waits;
-that is the thing a wave counter can never do. A horde is announced with its
+that is the thing a fixed spawn schedule can never do. A horde is announced with its
 own low swell before it arrives.
 
 - **Out of sight.** Every spawn is off screen, outdoors, and reachable by path
@@ -445,7 +445,7 @@ mobile GPU will not enjoy.
 Instead there is one `InstancedMesh` per **body part per outfit**, and limb
 world matrices are composed manually on the CPU each frame — the shin's is the
 thigh's times its knee. Draw calls depend on which outfits are on screen, never
-on how many bodies wear them, and outfits absent from a wave are hidden. A
+on how many bodies wear them, and outfits with nobody on screen are hidden. A
 worst-case horde of every type and outfit measured 141–150 scene draw calls and
 27k triangles, against 105 and 11k for the old six-box figures, at the same
 frame time.
