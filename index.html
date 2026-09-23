@@ -627,7 +627,9 @@ body{
           <span class="k">flashlight</span> from twice as far, and hear gunfire down the
           streets. Their swings wind up first — <span class="k">step back</span> and they
           miss. Runners circle round behind you. A <span class="k">Brute</span> rears before it
-          charges: sidestep into a wall's path and it stuns itself, taking extra damage.</p>
+          charges: sidestep into a wall's path and it stuns itself, taking extra damage.
+          Most of the dead carry a faint red edge in the dark — but not the
+          <span class="k">lurkers</span>: crawlers, spitters and howlers. Sweep the flashlight.</p>
         <p><b>The dead, in order of appearance</b></p>
         <p><span class="k">Shambler</span> — green, slow, arrives in numbers.<br>
           <span class="k">Runner</span> — pale and fast, closes before you notice.<br>
@@ -3394,6 +3396,33 @@ function main(hotData) {
   }
   var CHAR_MAT = new T.MeshLambertMaterial({ map: TX.fabric, vertexColors: true });
 
+  /* ---- the dead's red rim: a very faint red where a body turns away from
+     the camera, so silhouettes read at night without tinting the outfits.
+     From the game camera the tops of heads and shoulders face it and stay
+     clean; the sides of a body catch the rim. Lurkers — the crawler that is
+     easy to lose, the spitter hanging back, the howler sheltering behind the
+     pack — get almost none: find them with the flashlight.                 */
+  var RIM = { normal: 0.13, lurker: 0.02 };
+  var LURKERS = { crawler: 1, spitter: 1, howler: 1 };
+  function rimMat(strength) {
+    var m = new T.MeshLambertMaterial({ map: TX.fabric, vertexColors: true });
+    var u = { value: strength }, col = { value: new T.Color(0xFF2A18) };
+    m.userData.rim = u;
+    m.onBeforeCompile = function (sh) {
+      sh.uniforms.uRim = u; sh.uniforms.uRimColor = col;
+      sh.vertexShader = 'varying vec3 vRimN; varying vec3 vRimV;\n' + sh.vertexShader.replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\n  vRimN = normalize(transformedNormal);\n  vRimV = -mvPosition.xyz;');
+      sh.fragmentShader = 'uniform float uRim; uniform vec3 uRimColor; varying vec3 vRimN; varying vec3 vRimV;\n' +
+        sh.fragmentShader.replace('#include <fog_fragment>',
+        '  float rimF = 1.0 - clamp(dot(normalize(vRimN), normalize(vRimV)), 0.0, 1.0);\n' +
+        '  gl_FragColor.rgb += uRimColor * (rimF * rimF * uRim);\n' +
+        '#include <fog_fragment>');
+    };
+    return m;
+  }
+  var ZMAT = { normal: rimMat(RIM.normal), lurker: rimMat(RIM.lurker) };
+
   /* ------------------------------------------------------------- the player
      The hero is a voxel model (Character_Hero.fbx, from a voxel apocalypse
      pack), baked offline into the arrays below: 5 cm voxels, one palette
@@ -3702,7 +3731,7 @@ function main(hotData) {
                    thighL: thigh, thighR: thigh, shinL: shin, shinR: shin };
       var g = {};
       ZPARTS.forEach(function (k) {
-        var m = new T.InstancedMesh(geos[k], CHAR_MAT, MAXZ);
+        var m = new T.InstancedMesh(geos[k], LURKERS[name] ? ZMAT.lurker : ZMAT.normal, MAXZ);
         m.frustumCulled = false;
         m.count = 0;
         m.visible = false;
