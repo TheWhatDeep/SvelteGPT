@@ -239,12 +239,26 @@ with a fallback source. Everything else is in `index.html`.
 
 There are no model or texture files. Every asset is authored in code at runtime:
 
-- **Zombies** are six-part articulated figures — torso, head, two arms, two legs
-  — with per-limb walk animation driven by a phase offset per body. Crawlers
-  reuse the same six parts in a different pose: torso near-horizontal, front
-  limbs pawing at the ground, hind legs kicking out behind.
-- **The ground** is a 2D canvas painted at startup: asphalt grain, cracks and
-  faded parking bays. Surface only — the light on it is real, not painted.
+- **Characters** are built from tapered segments — a box stretched between two
+  joints and narrowing along its length — so a chest is wider than a waist and
+  a forearm tapers to the wrist. Skin, clothes, blood and eyes are vertex
+  colours baked into each part, over a pixel cloth texture.
+- **Zombies** are eight-part figures — torso, head, two arms, two thighs, two
+  shins. Knees fold while a leg swings forward and straighten to take the
+  weight, which is what stops a walk reading as stilts. Arms carry a fixed
+  elbow bend and grasping fingers. Crawlers reuse the same parts on all fours.
+- **Each type has its own look**, and the common ones come in outfits: three
+  shamblers (white tee and jeans, red flannel, office shirt and tie), two
+  runners (tank top, hoodie), two crawlers with exposed ribs, a brute in a
+  hi-vis vest, a spitter in a hospital gown with an acid-stained throat sac, a
+  bloater covered in boils, a long-haired howler mid-scream. Skin keeps each
+  type's signature colour so they still read apart at a glance.
+- **The survivor** wears a work jacket under a plate carrier with mag pouches,
+  cargo trousers, boots and a cap, with a pack and bedroll on the back. Both
+  hands are on the gun, and each of the five guns is its own model — rifle,
+  pump shotgun, stubby SMG, scoped marksman rifle, drum-fed launcher — with the
+  muzzle flash and light at that gun's muzzle.
+- **The ground** is a painted canvas texture — see [Oakhaven](#oakhaven).
 - **Audio** is synthesised from oscillators and noise buffers.
 
 This was originally a constraint — the page is published as a sandboxed artifact
@@ -337,19 +351,22 @@ and changing a type's speed needs no animation change at all.
 ### Performance notes
 
 The interesting problem is drawing a horde of articulated figures on a phone.
-Six separate meshes per zombie times forty zombies is ~240 draw calls, which a
+Eight separate meshes per zombie times forty zombies is ~320 draw calls, which a
 mobile GPU will not enjoy.
 
-Instead there is one `InstancedMesh` per **body part per zombie type**, and limb
-world matrices are composed manually on the CPU each frame. That is 24 draw
-calls for the entire horde regardless of its size, with every limb still
-animating independently.
+Instead there is one `InstancedMesh` per **body part per outfit**, and limb
+world matrices are composed manually on the CPU each frame — the shin's is the
+thigh's times its knee. Draw calls depend on which outfits are on screen, never
+on how many bodies wear them, and outfits absent from a wave are hidden. A
+worst-case horde of every type and outfit measured 141–150 scene draw calls and
+27k triangles, against 105 and 11k for the old six-box figures, at the same
+frame time.
 
-A per-instance colour approach (`setColorAt`) would cut that to 6, but it
-depends on the renderer recompiling its shader when `instanceColor` first
+A per-instance colour approach (`setColorAt`) would cut the calls further, but
+it depends on the renderer recompiling its shader when `instanceColor` first
 appears — behaviour that varies across three.js versions, and when it silently
-fails every zombie renders pure white. Solid materials per type are boring and
-correct.
+fails every zombie renders pure white. Colour baked into each outfit's geometry
+is boring and correct.
 
 Other deliberate choices:
 
@@ -394,8 +411,9 @@ swallow the keyup and leave the player walking on return.
 
 If you host this yourself, the sandbox restriction goes away and you can load
 real GLTF assets. Add `GLTFLoader`, then replace the per-part `InstancedMesh`
-groups with `SkinnedMesh` clones, or keep instancing and swap `zGeo`'s box
-geometries for meshes extracted from a loaded model. The animation code drives
+groups with `SkinnedMesh` clones, or keep instancing and swap the per-outfit
+part geometries (`zTorso`, `zHead`, `zArm`, `zThigh`, `zShin`) for meshes
+extracted from a loaded model. The animation code drives
 limb transforms by name, so it maps onto a real rig without restructuring the
 game loop.
 
