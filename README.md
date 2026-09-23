@@ -348,29 +348,42 @@ There are no model or texture files. Every asset is authored in code at runtime:
   joints and narrowing along its length — so a chest is wider than a waist and
   a forearm tapers to the wrist. Skin, clothes, blood and eyes are vertex
   colours baked into each part, over a pixel cloth texture.
-- **Zombies** are eight-part figures — torso, head, two arms, two thighs, two
-  shins. Knees fold while a leg swings forward and straighten to take the
-  weight, which is what stops a walk reading as stilts. Arms carry a fixed
-  elbow bend and grasping fingers. Crawlers reuse the same parts on all fours.
-- **Each type has its own look**, and the common ones come in outfits: three
-  shamblers (white tee and jeans, red flannel, office shirt and tie), two
-  runners (tank top, hoodie), two crawlers with exposed ribs, a brute in a
-  hi-vis vest, a spitter in a hospital gown with an acid-stained throat sac, a
-  bloater covered in boils, a long-haired howler mid-scream. Skin keeps each
-  type's signature colour so they still read apart at a glance.
+- **Zombies** are one voxel model — `Character_Zombie.fbx`, from the same
+  pack as the hero — baked offline by `tools/bake-zombie.py`. Unlike the hero
+  it is baked back into **voxels**, not triangles: the mesh is a clean 5 cm
+  voxel surface, so each face is mapped onto its lattice cell and the solid is
+  recovered, 600 voxels in all. It is cut into eight parts — torso, head, two
+  arms, two thighs, two shins — each a small box of voxels stored relative to
+  its joint (about 2 KB for the lot), with the T-pose arms swung down to hang,
+  an exact quarter turn on the lattice. Knees fold while a leg swings forward
+  and straighten to take the weight, which is what stops a walk reading as
+  stilts. Crawlers reuse the same parts on all fours.
+- **Each type and outfit is that body, edited voxel by voxel** at load time,
+  then greedy-meshed (each face merged with its same-coloured neighbours into
+  the biggest rectangles it can), about 1,000 triangles a body. Skin, shirt,
+  trousers and shoes are recoloured by role, keeping the model's own shading
+  within each; features are painted or added voxels. There are three shamblers
+  (the model's own colours, red flannel, office shirt and tie with hair), two
+  runners (tank top, hoodie with the hood up), two crawlers with exposed ribs, a
+  brute in a hi-vis vest, a spitter in a hospital gown with acid for blood and a
+  swollen throat, a bloater covered in boils, and a howler with lank hair and
+  its jaw hanging open. Skin keeps each type's signature colour so they still
+  read apart at a glance.
 - **A glowing outline** picks the dead out at night: a thin, very faint red
   line round each zombie's silhouette. It is the classic inverted hull — each
-  body part drawn again from its main shapes only (no eyes or blood patches,
-  whose shells would speckle through the surface), inflated 1.5 screen pixels
-  along smoothed normals, back faces only, blended additively — with two
-  refinements: the shell is pushed 60 cm back so any zombie body in front
-  covers it (so only the *outer* silhouette glows, not where an arm crosses the
-  chest), and a stencil lets each pixel glow once (so overlapping limbs do not
-  stack into hot spots). It is depth-tested like any geometry, so a wall hides
-  the outline with the body: no seeing through buildings. In a dark yard it adds
-  2.6–3.4 of red (out of 255) to a body. **Lurkers** — crawlers, spitters and
-  howlers — get almost none (under 1): they are found with the flashlight. A
-  worst-case horde with every outfit on screen costs 88 more draw calls.
+  body part meshed again ignoring colour (so it merges into far fewer faces,
+  about 380 triangles a body), inflated 1.5 screen pixels along smoothed
+  normals, back faces only, blended additively — with two refinements: the
+  shell's *depth* is pushed 60 cm back, so any zombie body in front covers it
+  (only the *outer* silhouette glows, not where an arm crosses the chest), and a
+  stencil lets each pixel glow once (so overlapping limbs do not stack into hot
+  spots). Only its depth moves: pushing the point itself back would slide the
+  outline towards the centre of the view, off the body. It is depth-tested like
+  any geometry, so a wall hides the outline with the body: no seeing through
+  buildings. It adds a few points of red (out of 255) to a body in a dark yard;
+  **lurkers** — crawlers, spitters and howlers — get almost none (under 1):
+  they are found with the flashlight. A worst-case horde with every outfit on
+  screen costs 88 more draw calls.
 - **The survivor** is a voxel model — `Character_Hero.fbx` from a voxel
   apocalypse asset pack — baked offline by `tools/bake-hero.py` into a small
   table in the page (about 35 KB): 5 cm voxels, one palette colour per face,
@@ -518,9 +531,8 @@ Instead there is one `InstancedMesh` per **body part per outfit**, and limb
 world matrices are composed manually on the CPU each frame — the shin's is the
 thigh's times its knee. Draw calls depend on which outfits are on screen, never
 on how many bodies wear them, and outfits with nobody on screen are hidden. A
-worst-case horde of every type and outfit measured 141–150 scene draw calls and
-27k triangles, against 105 and 11k for the old six-box figures, at the same
-frame time.
+26-strong horde with every type and outfit on screen measures 160 scene draw
+calls and 59k triangles (248 and 68k with the outlines).
 
 A per-instance colour approach (`setColorAt`) would cut the calls further, but
 it depends on the renderer recompiling its shader when `instanceColor` first
