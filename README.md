@@ -358,6 +358,13 @@ There are no model or texture files. Every asset is authored in code at runtime:
   hi-vis vest, a spitter in a hospital gown with an acid-stained throat sac, a
   bloater covered in boils, a long-haired howler mid-scream. Skin keeps each
   type's signature colour so they still read apart at a glance.
+- **A red rim** picks the dead out at night: a very faint red where a body
+  turns away from the camera (a fresnel term added in a shader patch on the
+  zombie materials), so silhouettes read without tinting the outfits. From the
+  game camera heads and shoulders face it and stay clean; the sides of a body
+  catch the rim. Measured in a dark yard it adds 3.5–8.6 of red (out of 255) to a
+  body. **Lurkers** — crawlers, spitters and howlers — get almost none (under 1):
+  they are found with the flashlight.
 - **The survivor** is a voxel model — `Character_Hero.fbx` from a voxel
   apocalypse asset pack — baked offline by `tools/bake-hero.py` into a small
   table in the page (about 35 KB): 5 cm voxels, one palette colour per face,
