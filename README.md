@@ -253,11 +253,16 @@ There are no model or texture files. Every asset is authored in code at runtime:
   hi-vis vest, a spitter in a hospital gown with an acid-stained throat sac, a
   bloater covered in boils, a long-haired howler mid-scream. Skin keeps each
   type's signature colour so they still read apart at a glance.
-- **The survivor** wears a work jacket under a plate carrier with mag pouches,
-  cargo trousers, boots and a cap, with a pack and bedroll on the back. Both
-  hands are on the gun, and each of the five guns is its own model — rifle,
-  pump shotgun, stubby SMG, scoped marksman rifle, drum-fed launcher — with the
-  muzzle flash and light at that gun's muzzle.
+- **The survivor** is a voxel model — `Character_Hero.fbx` from a voxel
+  apocalypse asset pack — baked offline by `tools/bake-hero.py` into a small
+  table in the page (about 35 KB): 5 cm voxels, one palette colour per face,
+  1,352 triangles. The source is one unrigged mesh in a T-pose, so the bake cuts
+  it at the hips, knees, shoulders and elbows, splitting triangles that cross a
+  cut, and swings the arms onto the gun with a two-bone reach so both hands land
+  on the grip and foregrip. The legs animate with the same knee rule as the
+  horde. Each of the five guns is its own model — rifle, pump shotgun, stubby
+  SMG, scoped marksman rifle, drum-fed launcher — with the muzzle flash and
+  light at that gun's muzzle.
 - **The ground** is a painted canvas texture — see [Oakhaven](#oakhaven).
 - **Audio** is synthesised from oscillators and noise buffers.
 
