@@ -262,9 +262,10 @@ way to play.
 
 The town is dark, and light comes from actual light sources. Streetlamps
 illuminate the ground and everything standing near them; the **flashlight** is a
-found item, left for you after your first horde if you don't have one, and a real spotlight that
-lights the ground, the props and the bodies it falls on. It is not a toggle —
-lose the run and you start blind again.
+found item — one lies a few steps from where each run starts (a blue arrow at
+the screen edge points to it), and another is left after a horde if you have
+none — and a real spotlight that lights the ground, the props and the bodies it
+falls on. It is not a toggle.
 
 An earlier version faked this in screen space, darkening by distance from the
 player. It looked like a filter because it was one: a lamp twenty units away sat
@@ -272,10 +273,14 @@ in shadow under that model, which is backwards. The lamp *is* the light.
 
 ## Lighting
 
-The baseline is moonlight — enough to read the streets and rooftops, not enough
-to see into a dark room. Everything else comes from real lights, on a fixed
-budget:
+The baseline is almost nothing: a sliver of moon and sky, enough to make out
+shapes and the edges of the streets, not enough to see what is standing in them.
+Away from a lamp you need the flashlight. Everything else comes from real
+lights, on a fixed budget:
 
+- **Your eyes.** A faint point light a few steps round the player — the eyes
+  adjusting to the dark — so you can see yourself and whatever is right on top
+  of you, and nothing further.
 - **Streetlamps.** Only the nearest few can ever be on screen, so a small pool
   of point lights is reassigned to the closest of the town's thirty posts. The
   pool size is a quality tier: 2 lights on battery, 3 on balanced, 4 on high. A

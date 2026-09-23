@@ -668,6 +668,9 @@ body{
         <p><b>Auto-aim</b> — off by default. Turn it on in Settings (the cog on the
           menu) or on the pause screen and your weapon tracks the nearest walker on its own, so one thumb
           is enough. Your own aim always overrides it.</p>
+        <p><b>Grab the flashlight</b> — the night is black. One lies a few steps from
+          where you start; a <span class="k">blue arrow</span> points to it if it is
+          off-screen. Without it you can barely see past your own feet.</p>
         <p><b>Pick up a weapon</b> — white crates turn up ahead of you after each horde. A
           <span class="k">white arrow</span> at the screen edge points to one that
           is off-screen. Walk over it to swap.</p>
@@ -1748,12 +1751,13 @@ function main(hotData) {
   scene.add(skirt);
 
   /* ----------------------------------------------------------------- lights */
-  // Night baseline: just enough to read a silhouette. Everything else has to
+  // Night baseline: barely anything. Away from a lamp you can just make out
+  // shapes — the flashlight is how you actually see. Everything else has to
   // come from an actual light in the world.
-  scene.add(new T.AmbientLight(0x1A2430, 0.5));
-  var hemi = new T.HemisphereLight(0x2A3A4E, 0x0E0A06, 0.34);
+  scene.add(new T.AmbientLight(0x1A2430, 0.1));
+  var hemi = new T.HemisphereLight(0x2A3A4E, 0x0E0A06, 0.07);
   scene.add(hemi);
-  var moon = new T.DirectionalLight(0x8FA6C4, 0.36);
+  var moon = new T.DirectionalLight(0x8FA6C4, 0.08);
   moon.position.set(-14, 26, -10);
   scene.add(moon);
 
@@ -1875,6 +1879,12 @@ function main(hotData) {
   // Present from frame one at zero intensity: adding a light later changes the
   // light count and forces every material in the scene to recompile, which
   // shows up as a hitch exactly when you fire.
+  // Eyes adjusted to the dark: a faint glow a few steps round the player, so
+  // you can see yourself and whatever is right on top of you. Nothing more.
+  var nearLight = new T.PointLight(0x8FA2BA, 0, 5.5, 2);
+  nearLight.position.set(0, 2.4, 0);
+  scene.add(nearLight);
+
   var muzzleLight = new T.PointLight(0xFFC468, 0, 10, 2);
   muzzleLight.position.set(0, 1.2, 0);
   scene.add(muzzleLight);
@@ -4676,13 +4686,14 @@ function main(hotData) {
     return best;
   }
 
-  function spawnDrop(kind) {
+  function spawnDrop(kind, d0, d1) {
+    d0 = d0 || 7; d1 = d1 || 16;
     for (var tries = 0; tries < 24; tries++) {
       // somewhere you can walk to, a short path away, ahead of where you are going
-      var ds = supplySpot(7, 16);
+      var ds = supplySpot(d0, d1);
       if (!ds) continue;
       var x = ds.x, z = ds.z;
-      if (Math.hypot(x - player.x, z - player.z) < 5) continue;
+      if (Math.hypot(x - player.x, z - player.z) < Math.min(5, d0 - 0.5)) continue;
       if (blockedAt(x, z) || blockedAt(x + 1.2, z) || blockedAt(x, z + 1.2)) continue;
       pickups.push({ x: x, z: z, kind: kind, spin: rand(0, TAU), life: 9999 });
       return;
@@ -5029,6 +5040,8 @@ function main(hotData) {
     G.shake = 0; G.cheated = false;
     input.mx = input.mz = 0; input.aiming = false;
     resetDirector();
+    // the night is black: the first flashlight lies a few steps away
+    spawnDrop('torch', 4, 8);
     updateHud();
   }
 
@@ -6225,6 +6238,7 @@ function main(hotData) {
 
       for (var pi2 = 0; pi2 < pickups.length && used < threatPool.length; pi2++) {
         if (pickups[pi2].kind === 'weapon') mark(pickups[pi2].x, pickups[pi2].z, '#EDE7D9', 40);
+        else if (pickups[pi2].kind === 'torch' && !player.torch) mark(pickups[pi2].x, pickups[pi2].z, '#BFE6FF', 40);
       }
 
       for (var i = 0; i < zombies.length && used < threatPool.length; i++) {
@@ -6592,6 +6606,9 @@ function main(hotData) {
     } else {
       torchLight.intensity = 0;
     }
+    var inRun = G.screen !== 'menu' && G.screen !== 'how';
+    nearLight.intensity = inRun ? 0.55 : 0;
+    if (inRun) nearLight.position.set(player.x, 2.4, player.z);
 
     if (G.blastT > 0) {
       G.blastT -= dt;
