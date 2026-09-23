@@ -628,7 +628,7 @@ body{
           streets. Their swings wind up first — <span class="k">step back</span> and they
           miss. Runners circle round behind you. A <span class="k">Brute</span> rears before it
           charges: sidestep into a wall's path and it stuns itself, taking extra damage.
-          Most of the dead carry a faint red edge in the dark — but not the
+          Most of the dead carry a faint red glowing outline in the dark — but not the
           <span class="k">lurkers</span>: crawlers, spitters and howlers. Sweep the flashlight.</p>
         <p><b>The dead, in order of appearance</b></p>
         <p><span class="k">Shambler</span> — green, slow, arrives in numbers.<br>
@@ -3386,7 +3386,9 @@ function main(hotData) {
     quadOut(b, b0, b1, b2, b3, _sc, hex, wb * 2 * k, db * 2 * k);
   }
   // an axis-aligned block, for small details (eyes, pouches, buckles)
+  var _cgNoDetail = false;           // set while building outline hulls
   function blk(b, cx, cy, cz, sx, sy, sz, hex) {
+    if (_cgNoDetail) return;         // details (eyes, blood, pouches) never outline
     seg(b, [cx, cy - sy / 2, cz], [cx, cy + sy / 2, cz], sx / 2, sz / 2, sx / 2, sz / 2, hex);
   }
   function shade(hex, f) {
@@ -3396,32 +3398,85 @@ function main(hotData) {
   }
   var CHAR_MAT = new T.MeshLambertMaterial({ map: TX.fabric, vertexColors: true });
 
-  /* ---- the dead's red rim: a very faint red where a body turns away from
-     the camera, so silhouettes read at night without tinting the outfits.
-     From the game camera the tops of heads and shoulders face it and stay
-     clean; the sides of a body catch the rim. Lurkers — the crawler that is
-     easy to lose, the spitter hanging back, the howler sheltering behind the
-     pack — get almost none: find them with the flashlight.                 */
-  var RIM = { normal: 0.13, lurker: 0.02 };
+  /* ---- the dead's glowing outline: a thin, faint red line round each
+     zombie's silhouette so the dead read at night. Drawn the classic way —
+     each body part again, inflated a fixed number of screen pixels along its
+     smoothed normals, back faces only, and pushed 60 cm back so any zombie
+     body in front covers it — leaving only the outer silhouette. It is
+     depth-tested like any other geometry, so a wall hides the outline along
+     with the body (no seeing through walls). Blended additively, so it reads as a glow on dark ground, and faded
+     with the fog. Lurkers — the crawler that is easy to lose, the spitter
+     hanging back, the howler sheltering behind the pack — get almost none:
+     find them with the flashlight.                                         */
+  var OUTLINE = { normal: 0.12, lurker: 0.018, px: 1.5 };
   var LURKERS = { crawler: 1, spitter: 1, howler: 1 };
-  function rimMat(strength) {
-    var m = new T.MeshLambertMaterial({ map: TX.fabric, vertexColors: true });
-    var u = { value: strength }, col = { value: new T.Color(0xFF2A18) };
-    m.userData.rim = u;
-    m.onBeforeCompile = function (sh) {
-      sh.uniforms.uRim = u; sh.uniforms.uRimColor = col;
-      sh.vertexShader = 'varying vec3 vRimN; varying vec3 vRimV;\n' + sh.vertexShader.replace(
-        '#include <project_vertex>',
-        '#include <project_vertex>\n  vRimN = normalize(transformedNormal);\n  vRimV = -mvPosition.xyz;');
-      sh.fragmentShader = 'uniform float uRim; uniform vec3 uRimColor; varying vec3 vRimN; varying vec3 vRimV;\n' +
-        sh.fragmentShader.replace('#include <fog_fragment>',
-        '  float rimF = 1.0 - clamp(dot(normalize(vRimN), normalize(vRimV)), 0.0, 1.0);\n' +
-        '  gl_FragColor.rgb += uRimColor * (rimF * rimF * uRim);\n' +
-        '#include <fog_fragment>');
-    };
-    return m;
+  var OUT_U = {
+    uWidth: { value: OUTLINE.px }, uRes: { value: new T.Vector2(1280, 720) },
+    uFogNear: { value: 20 }, uFogFar: { value: 60 }
+  };
+  function outlineMat(alpha) {
+    return new T.ShaderMaterial({
+      uniforms: { uWidth: OUT_U.uWidth, uRes: OUT_U.uRes, uFogNear: OUT_U.uFogNear, uFogFar: OUT_U.uFogFar,
+                  uColor: { value: new T.Color(0xFF3020) }, uAlpha: { value: alpha } },
+      vertexShader: [
+        'uniform float uWidth; uniform vec2 uRes; varying float vDepth;',
+        'void main() {',
+        '  vec4 p = vec4(position, 1.0); vec3 n = normal;',
+        '  #ifdef USE_INSTANCING',
+        '    p = instanceMatrix * p; n = mat3(instanceMatrix) * n;',
+        '  #endif',
+        '  vec4 mv = modelViewMatrix * p;',
+        // pushed back behind the body: anywhere the shell overlaps a zombie the
+        // body wins the depth test, so only the outer silhouette glows (no
+        // lines where an arm crosses the chest)
+        '  mv.z -= 0.6;',
+        '  vec4 clip = projectionMatrix * mv;',
+        '  vec2 d = (projectionMatrix * vec4(normalMatrix * n, 0.0)).xy;',
+        '  float dl = length(d);',
+        '  if (dl > 1e-5) clip.xy += (d / dl) * (uWidth * 2.0 / uRes) * clip.w;',
+        '  vDepth = -mv.z;',
+        '  gl_Position = clip;',
+        '}'].join('\n'),
+      fragmentShader: [
+        'uniform vec3 uColor; uniform float uAlpha; uniform float uFogNear; uniform float uFogFar; varying float vDepth;',
+        'void main() {',
+        '  float f = 1.0 - smoothstep(uFogNear, uFogFar, vDepth);',
+        '  gl_FragColor = vec4(uColor * uAlpha * f, 1.0);',
+        '}'].join('\n'),
+      side: T.BackSide, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+      // each pixel glows once: where limbs' shells overlap (the gaps between an
+      // arm and the body) additive blending would otherwise stack into a spot
+      stencilWrite: true, stencilRef: 1, stencilFunc: T.NotEqualStencilFunc,
+      stencilZPass: T.ReplaceStencilOp, stencilFail: T.KeepStencilOp, stencilZFail: T.KeepStencilOp
+    });
   }
-  var ZMAT = { normal: rimMat(RIM.normal), lurker: rimMat(RIM.lurker) };
+  var OUT_MAT = { normal: outlineMat(OUTLINE.normal), lurker: outlineMat(OUTLINE.lurker) };
+  // Outline geometry: the part's own positions with normals averaged across
+  // every face meeting at a corner, so the inflated shell stays closed rather
+  // than splitting at each box edge.
+  var _outlineCache = {};
+  function outlineGeo(geo) {
+    if (_outlineCache[geo.uuid]) return _outlineCache[geo.uuid];
+    var pos = geo.attributes.position.array, nor = geo.attributes.normal.array;
+    var acc = {}, keys = new Array(pos.length / 3);
+    for (var i = 0; i < pos.length; i += 3) {
+      var key = Math.round(pos[i] * 1000) + ',' + Math.round(pos[i + 1] * 1000) + ',' + Math.round(pos[i + 2] * 1000);
+      keys[i / 3] = key;
+      var a = acc[key] || (acc[key] = [0, 0, 0]);
+      a[0] += nor[i]; a[1] += nor[i + 1]; a[2] += nor[i + 2];
+    }
+    var sm = new Float32Array(nor.length);
+    for (var v = 0; v < keys.length; v++) {
+      var q = acc[keys[v]], l = Math.hypot(q[0], q[1], q[2]) || 1;
+      sm[v * 3] = q[0] / l; sm[v * 3 + 1] = q[1] / l; sm[v * 3 + 2] = q[2] / l;
+    }
+    var g = new T.BufferGeometry();
+    g.setAttribute('position', geo.attributes.position);
+    g.setAttribute('normal', new T.BufferAttribute(sm, 3));
+    if (geo.index) g.setIndex(geo.index);
+    g.boundingSphere = geo.boundingSphere;
+    return (_outlineCache[geo.uuid] = g);
+  }
 
   /* ------------------------------------------------------------- the player
      The hero is a voxel model (Character_Hero.fbx, from a voxel apocalypse
@@ -3729,14 +3784,30 @@ function main(hotData) {
       var arm = zArm(L), thigh = zThigh(L), shin = zShin(L);
       var geos = { torso: zTorso(L), head: zHead(L), armL: arm, armR: arm,
                    thighL: thigh, thighR: thigh, shinL: shin, shinR: shin };
+      // outline hulls from the main shapes only: a small detail block would
+      // poke its own shell through the body surface as red speckle
+      _cgNoDetail = true;
+      var hArm = outlineGeo(zArm(L)), hThigh = outlineGeo(zThigh(L)), hShin = outlineGeo(zShin(L));
+      var hulls = { torso: outlineGeo(zTorso(L)), head: outlineGeo(zHead(L)), armL: hArm, armR: hArm,
+                    thighL: hThigh, thighR: hThigh, shinL: hShin, shinR: hShin };
+      _cgNoDetail = false;
       var g = {};
       ZPARTS.forEach(function (k) {
-        var m = new T.InstancedMesh(geos[k], LURKERS[name] ? ZMAT.lurker : ZMAT.normal, MAXZ);
+        var m = new T.InstancedMesh(geos[k], CHAR_MAT, MAXZ);
         m.frustumCulled = false;
         m.count = 0;
         m.visible = false;
         scene.add(m);
         g[k] = m;
+        // its outline shares the part's instance matrices: no extra CPU work
+        var om = new T.InstancedMesh(hulls[k], LURKERS[name] ? OUT_MAT.lurker : OUT_MAT.normal, MAXZ);
+        om.instanceMatrix = m.instanceMatrix;
+        om.frustumCulled = false;
+        om.count = 0;
+        om.visible = false;
+        om.renderOrder = 1;
+        scene.add(om);
+        g[k + '_o'] = om;
       });
       zGroups[key] = g;
       ZGKEYS.push(key);
@@ -5704,9 +5775,9 @@ function main(hotData) {
       var group = zGroups[ZGKEYS[gi]];
       var c = zCounts[ZGKEYS[gi]];
       for (var ki = 0; ki < ZPARTS.length; ki++) {
-        var part = group[ZPARTS[ki]];
-        part.count = c;
-        part.visible = c > 0;          // skip outfits with nobody on screen
+        var part = group[ZPARTS[ki]], outl = group[ZPARTS[ki] + '_o'];
+        part.count = c; outl.count = c;
+        part.visible = outl.visible = c > 0;          // skip outfits with nobody on screen
         if (c) part.instanceMatrix.needsUpdate = true;
       }
     }
@@ -6182,7 +6253,9 @@ function main(hotData) {
     function target(w, h, depth) {
       return new T.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), {
         minFilter: T.LinearFilter, magFilter: T.LinearFilter,
-        depthBuffer: !!depth, stencilBuffer: false
+        // the scene target carries a stencil so the zombie outline can mark
+        // pixels it has already lit (see "the dead's glowing outline")
+        depthBuffer: !!depth, stencilBuffer: !!depth
       });
     }
 
@@ -6406,6 +6479,9 @@ function main(hotData) {
     syncPostSize(false);
     camera.updateMatrixWorld();
     updateFade();
+    OUT_U.uRes.value.set(Post.bufW, Post.bufH);
+    OUT_U.uWidth.value = OUTLINE.px * renderer.getPixelRatio();
+    OUT_U.uFogNear.value = scene.fog.near; OUT_U.uFogFar.value = scene.fog.far;
     Post.render(scene, camera);
   }
 
