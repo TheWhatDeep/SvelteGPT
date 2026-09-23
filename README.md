@@ -24,15 +24,16 @@ source of truth, still no build step for development.
 
 ## What it is
 
-You hold Oakhaven — a small town at night — against escalating waves of the
-dead. Clear a wave, take one of three permanent upgrades, repeat until you're
-overrun. Score
-and best wave persist locally.
+You hold Oakhaven — a small town at night — against the dead, paced by an
+**AI Director** rather than a wave counter. Survive a horde, take one of three
+permanent upgrades, repeat until you're overrun. Score and best time persist
+locally.
 
-- **Endless waves** with seven enemy types, each entering a few waves apart so
-  you meet one new threat at a time:
+- **Seven enemy types**, each entering at a higher level so you meet one new
+  threat at a time. Level grows with hordes survived and time (see
+  [The Director](#the-director)):
 
-  | Type | From wave | Behaviour |
+  | Type | From level | Behaviour |
   |---|---|---|
   | Shambler | 1 | Slow, weak, arrives in numbers |
   | Runner | 2 | Fast, fragile, closes before you notice |
@@ -44,7 +45,7 @@ and best wave persist locally.
 
   Bloaters and Howlers exist to break the "hold the trigger" reflex: one
   punishes killing at arm's length, the other makes target priority matter.
-- **Five weapons**, found in crates that drop around town each wave rather than
+- **Five weapons**, found in crates the Director leaves after each horde rather than
   chosen from a menu — walking out to get one mid-fight is the decision:
 
   | Weapon | Shape of it |
@@ -67,6 +68,47 @@ and best wave persist locally.
   right thumb a job keeps both hands in the fight.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
+
+## The Director
+
+There are no waves. An AI Director, after Left 4 Dead's, paces the run from one
+number — **intensity**, how hard the player is being pushed right now:
+
+```
+target = 0.55 · proximity      bodies within 14 m, weighted by closeness
+       + 0.30 · recent damage  HP lost, decaying over a few seconds
+       + 0.15 · kill rate      fighting hard even when unhurt
+```
+
+Intensity rises fast (1.5/s) and falls slowly (0.25/s), so a scare lingers after
+the last body drops. The Director cycles through four states:
+
+| State | Spawns | Leaves when |
+|---|---|---|
+| **Build** | A rising trickle of the common dead | intensity > 0.55, or 35 s |
+| **Peak** | The horde: a budget of bodies from one direction, or two from level 6 | budget spent and ≥ 8 s, or 45 s |
+| **Relax** | Nothing | intensity < 0.15 for 4 s (40 s cap) |
+| **Respite** | Nothing; an upgrade, and supplies | 12–20 s, or you push on 50 m |
+
+**Relax is gated on the player, not a clock.** Hurt and cornered, it waits;
+that is the thing a wave counter can never do. A horde is announced with its
+own low swell before it arrives.
+
+- **Out of sight.** Every spawn is off screen, outdoors, and reachable by path
+  (18–38 m by path, never under 14 m in a straight line), preferring behind
+  the player — or ahead of where they are heading, for an ambush.
+- **Specials** run on their own timer and caps — one Howler, two Bloaters, two
+  Spitters, one Brute at a time and at most one every 40 s — so a run never
+  dies to a dice roll of three Brutes. They never spawn in the lulls.
+- **Supplies go where you are heading.** After each horde: a weapon crate
+  (two from level 8), health if you are under half, and a flashlight if you
+  have none — placed ahead along your direction of travel.
+- **Stragglers are recycled.** A body more than 42 m away and out of sight for
+  4 s is quietly removed, so outrunning the dead does not fill the alive cap
+  with a trail nobody will meet.
+- **Difficulty is separate from rhythm.** `level = 1 + hordes survived + time /
+  150 s` scales the horde budget, the enemies and which types appear, so the
+  shape of a fight stays the same while the peaks grow.
 
 ## Oakhaven
 
@@ -156,7 +198,7 @@ way to play.
 
 The town is dark, and light comes from actual light sources. Streetlamps
 illuminate the ground and everything standing near them; the **flashlight** is a
-found item, guaranteed to drop from wave 2, and it is a real spotlight that
+found item, left for you after your first horde if you don't have one, and a real spotlight that
 lights the ground, the props and the bodies it falls on. It is not a toggle —
 lose the run and you start blind again.
 
@@ -216,9 +258,13 @@ HUD beside pause. It opens a panel with every weapon (tap to equip) and every
 upgrade (tap to add a level, up to its normal cap). The world freezes while the
 panel is open, so you can build a loadout without being eaten.
 
-Touching anything in the panel marks the run: it will not write a best wave or
-best score, and the game-over screen says so. Testing a wave-12 Howler pack
+Touching anything in the panel marks the run: it will not write a best time or
+best score, and the game-over screen says so. Testing a level-12 Howler pack
 shouldn't quietly overwrite a real record.
+
+With cheats on, a readout along the bottom edge also shows what the Director is
+thinking: its state and time in it, intensity and where it is heading, the horde
+budget spent, bodies alive, level, and time to the next special.
 
 ## Controls
 
@@ -272,12 +318,12 @@ zero network requests after the engine loads.
 
 ### Difficulty scales on three axes, damage included
 
-Enemy health, speed **and damage** all scale with wave number:
+Enemy health, speed **and damage** all scale with the Director's level:
 
 ```js
-hpScale  = 1 + 0.135 * (wave - 1)
-spScale  = min(1.42, 1 + 0.022 * (wave - 1))
-dmgScale = 1 + 0.12  * (wave - 1)
+hpScale  = 1 + 0.135 * (level - 1)
+spScale  = min(1.42, 1 + 0.022 * (level - 1))
+dmgScale = 1 + 0.12  * (level - 1)
 ```
 
 Damage scaling is load-bearing, not decoration. Without it, flat damage
@@ -290,7 +336,7 @@ not be killed by anything except Brutes and Bloaters.
 The fix is three-part: damage scales, armour is a **percentage** (7%/level to a
 35% cap) so it can never trivialise a hit, and regen only ticks **2.2 seconds
 after you were last hit**, making it a between-fights recovery tool rather than
-a combat one. A fully-maxed defensive build standing still in nine wave-7
+a combat one. A fully-maxed defensive build standing still in nine level-7
 zombies now loses ~19 HP/sec.
 
 ### Post-processing: bloom and FXAA
