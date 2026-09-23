@@ -791,7 +791,7 @@ function main(hotData) {
   var PI = Math.PI, TAU = Math.PI * 2;
 
   /* ---------------------------------------------------------------- config */
-  var ARENA = 70;              // half-extent of the district
+  var ARENA = 26;              // half-extent of the playable area
   var STEP = 1 / 60;           // fixed simulation timestep
   var MAX_STEPS = 5;
 
@@ -1144,133 +1144,13 @@ function main(hotData) {
 
   var BLOCK = 28, ROAD = 11;
 
+  // Cleared, awaiting a layout. The generator, the collider broad phase, the
+  // AABB walls and the light pooling all stay — only the content is gone, so a
+  // layout can be dropped straight in.
   function planCity() {
-    var rng = mulberry32(20260923);
-    var pick_ = function (arr) { return arr[(rng() * arr.length) | 0]; };
-    var rnd = function (a, b) { return a + rng() * (b - a); };
-
-    var centres = [];
-    for (var v = -ARENA + BLOCK * 0.6; v < ARENA; v += BLOCK) centres.push(Math.round(v));
-
-    // Reserve set pieces: the lot you already know, and a forecourt.
-    var plazaX = centres[(centres.length / 2) | 0], plazaZ = plazaX;
-
-    centres.forEach(function (bx) {
-      centres.forEach(function (bz) {
-        var inner = BLOCK - ROAD;                  // buildable square
-        var isPlaza = (bx === plazaX && bz === plazaZ);
-        var isForecourt = (bx === centres[1] && bz === centres[centres.length - 2]);
-        var empty = !isPlaza && !isForecourt && rng() < 0.12;
-
-        // kerb ring marks every block, built or not
-        CITY.kerbs.push({ x: bx, z: bz, w: inner + 1.4, d: inner + 1.4 });
-
-        if (isPlaza) {                              // open lot: the old arena
-          for (var c = 0; c < 5; c++) {
-            CITY.crates.push({ x: bx + rnd(-7, 7), z: bz + rnd(-7, 7), r: rnd(0, TAU),
-                               s: rnd(0.85, 1.3) });
-          }
-          for (var b2 = 0; b2 < 3; b2++) {
-            CITY.barrels.push({ x: bx + rnd(-7, 7), z: bz + rnd(-7, 7), r: rnd(0, TAU) });
-          }
-          return;
-        }
-        if (isForecourt) {                          // fuel station apron
-          for (var pmp = -1; pmp <= 1; pmp += 2) {
-            CITY.crates.push({ x: bx + pmp * 3.4, z: bz - 2, r: 0, s: 0.75 });
-            CITY.crates.push({ x: bx + pmp * 3.4, z: bz + 2, r: 0, s: 0.75 });
-          }
-          CITY.fires.push({ x: bx + 6, z: bz + 6 });
-          for (var bl = 0; bl < 4; bl++) {
-            CITY.barrels.push({ x: bx + rnd(-7, 7), z: bz + rnd(-7, 7), r: rnd(0, TAU) });
-          }
-          return;
-        }
-        if (empty) {                                // cleared lot: rubble field
-          for (var rb = 0; rb < 9; rb++) {
-            CITY.rubble.push({ x: bx + rnd(-8, 8), z: bz + rnd(-8, 8),
-                               r: rnd(0, TAU), s: rnd(0.5, 1.5) });
-          }
-          if (rng() < 0.5) CITY.fires.push({ x: bx + rnd(-5, 5), z: bz + rnd(-5, 5) });
-          return;
-        }
-
-        // Otherwise: split the block into 1-4 footprints with alleys between.
-        var split = rng() < 0.45 ? 1 : 2;
-        var cell = inner / split, alley = 1.8;
-        for (var ix = 0; ix < split; ix++) {
-          for (var iz = 0; iz < split; iz++) {
-            if (split === 2 && rng() < 0.18) continue;      // gap = through-alley
-            var w = cell - alley, d = cell - alley;
-            var cxp = bx - inner / 2 + cell * (ix + 0.5);
-            var czp = bz - inner / 2 + cell * (iz + 0.5);
-            var h = rnd(4.4, 7.2);
-            CITY.buildings.push({ x: cxp, z: czp, w: w, d: d, h: h,
-                                  tone: pick_([0x2E3238, 0x353A40, 0x2A3036, 0x3A3A38]) });
-            CITY.walls.push({ x: cxp, z: czp, w: w, d: d });
-            // roof vents give the tops some silhouette
-            if (rng() < 0.7) {
-              CITY.vents.push({ x: cxp + rnd(-w / 4, w / 4), z: czp + rnd(-d / 4, d / 4),
-                                y: h, s: rnd(0.7, 1.2) });
-            }
-          }
-        }
-      });
-    });
-
-    // ---- streets: lamps, markings, and the clutter that lives on a kerb
-    centres.forEach(function (c, i) {
-      var edge = c + BLOCK / 2 - ROAD / 2;          // street centre line
-      if (Math.abs(edge) > ARENA - 3) return;
-      for (var t = -ARENA + 6; t < ARENA - 6; t += 9) {
-        // lane dashes both ways
-        CITY.marks.push({ x: edge, z: t, w: 0.34, d: 3.4 });
-        CITY.marks.push({ x: t, z: edge, w: 3.4, d: 0.34 });
-      }
-      for (var L = -ARENA + BLOCK * 0.6; L < ARENA; L += BLOCK) {
-        LAMPS.push({ x: edge - ROAD / 2 + 0.9, z: Math.round(L) });
-        LAMPS.push({ x: Math.round(L), z: edge + ROAD / 2 - 0.9 });
-      }
-      if (i % 2 === 0) {
-        CITY.lights.push({ x: edge - ROAD / 2 + 1.2, z: centres[1] + BLOCK / 2 - ROAD / 2 });
-      }
-    });
-
-    // ---- scatter the street furniture along road corridors
-    var onRoad = function (x, z) {
-      var m = function (v) {
-        var k = ((v + ARENA) % BLOCK) - (BLOCK - ROAD) / 2 - ROAD / 2;
-        return Math.abs(k);
-      };
-      return m(x) < ROAD * 0.42 || m(z) < ROAD * 0.42;
-    };
-    var tries = 0;
-    while (CITY.cars.length < 26 && tries < 900) {
-      tries++;
-      var x = rnd(-ARENA + 7, ARENA - 7), z = rnd(-ARENA + 7, ARENA - 7);
-      if (!onRoad(x, z)) continue;
-      CITY.cars.push({ x: x, z: z, r: (rng() < 0.5 ? 0 : PI / 2) + rnd(-0.28, 0.28),
-                       tone: pick_([0x5A2B28, 0x2C3A4A, 0x46483F, 0x6A5B36, 0x38343A]) });
-    }
-    var kinds = ['skips', 'barriers', 'hydrants', 'benches', 'cones', 'pallets', 'sacks'];
-    var wanted = { skips: 16, barriers: 30, hydrants: 14, benches: 14, cones: 40,
-                   pallets: 18, sacks: 34 };
-    kinds.forEach(function (k) {
-      var n = 0, tr = 0;
-      while (n < wanted[k] && tr < 1500) {
-        tr++;
-        var px = rnd(-ARENA + 5, ARENA - 5), pz = rnd(-ARENA + 5, ARENA - 5);
-        if (!onRoad(px, pz)) continue;
-        CITY[k].push({ x: px, z: pz, r: rnd(0, TAU), s: rnd(0.85, 1.2) });
-        n++;
-      }
-    });
-    for (var d2 = 0; d2 < 90; d2++) {               // loose debris anywhere
-      CITY.rubble.push({ x: rnd(-ARENA + 4, ARENA - 4), z: rnd(-ARENA + 4, ARENA - 4),
-                         r: rnd(0, TAU), s: rnd(0.4, 1.0) });
-    }
-    // burn barrels double as warm light sources
-    CITY.fires.forEach(function (f) { LAMPS.push({ x: f.x, z: f.z, fire: true }); });
+    [{ x: -13, z: -13 }, { x: 13, z: -13 }, { x: -13, z: 13 },
+     { x: 13, z: 13 }, { x: 0, z: -9 }, { x: -19, z: 3 }, { x: 19, z: -3 }]
+      .forEach(function (l) { LAMPS.push(l); });
   }
   planCity();
 
@@ -1393,21 +1273,70 @@ function main(hotData) {
   }
 
   var lampSortAt = -9;
-  function updateLampLights() {
-    if (G.time - lampSortAt < 0.25) return;
-    lampSortAt = G.time;
-    lampOrder.sort(function (a, b) {
-      return (Math.hypot(LAMPS[a].x - player.x, LAMPS[a].z - player.z)) -
-             (Math.hypot(LAMPS[b].x - player.x, LAMPS[b].z - player.z));
-    });
-    for (var i = 0; i < lampsActive; i++) {
-      var L = LAMPS[lampOrder[i]];
-      lampLights[i].position.set(L.x, L.fire ? 1.3 : 6.4, L.z);
-      lampLights[i].color.setHex(L.fire ? 0xFF7A26 : 0xFFB042);
-      lampLights[i].distance = L.fire ? 13 : 19;
-      lampLights[i].intensity = L.fire ? 2.2 + Math.sin(G.time * 11 + L.x) * 0.35 : 2.5;
+  var _wanted = [];
+  function updateLampLights(dt) {
+    if (G.time - lampSortAt > 0.3) {
+      lampSortAt = G.time;
+      lampOrder.sort(function (a, b) {
+        return (Math.hypot(LAMPS[a].x - player.x, LAMPS[a].z - player.z)) -
+               (Math.hypot(LAMPS[b].x - player.x, LAMPS[b].z - player.z));
+      });
+
+      // Match slots to anchors by what each already holds. Assigning slot i the
+      // i-th nearest lamp means two slots swap places whenever the ordering
+      // flips, blacking out both lights for a reorder that should change
+      // nothing at all.
+      _wanted.length = 0;
+      for (var w = 0; w < lampsActive; w++) _wanted.push(lampOrder[w]);
+
+      var k, lt;
+      for (k = 0; k < lampsActive; k++) {
+        lt = lampLights[k];
+        var held = _wanted.indexOf(lt.userData.anchor);
+        if (held !== -1) { _wanted[held] = -1; lt.userData.want = lt.userData.anchor; }
+      }
+      for (k = 0; k < lampsActive; k++) {
+        lt = lampLights[k];
+        if (_wanted.indexOf(lt.userData.anchor) !== -1) continue;   // already kept
+        if (lt.userData.want === lt.userData.anchor &&
+            lt.userData.anchor !== undefined) continue;
+        for (var q = 0; q < _wanted.length; q++) {
+          if (_wanted[q] === -1) continue;
+          lt.userData.want = _wanted[q];
+          _wanted[q] = -1;
+          break;
+        }
+      }
+    }
+
+    var step = Math.min(1, (dt || 0.016) * 4.5);
+    for (var j = 0; j < lampsActive; j++) {
+      var lj = lampLights[j];
+      var queued = lj.userData.want !== undefined && lj.userData.want !== lj.userData.anchor;
+
+      if (queued) {
+        // Fade out, move while dark, fade back in. Moving a lit light across
+        // the map reads far worse than a brief dip.
+        lj.intensity -= (dt || 0.016) * 5.5;
+        if (lj.intensity <= 0.02) {
+          lj.intensity = 0;
+          var N = LAMPS[lj.userData.want];
+          lj.userData.anchor = lj.userData.want;
+          lj.position.set(N.x, N.fire ? 1.3 : 6.4, N.z);
+          lj.color.setHex(N.fire ? 0xFF7A26 : 0xFFB042);
+          lj.distance = N.fire ? 13 : 19;
+        }
+        continue;
+      }
+
+      var A = LAMPS[lj.userData.anchor];
+      if (!A) continue;
+      var want = A.fire ? 2.2 + Math.sin(G.time * 11 + A.x) * 0.35 : 2.5;
+      lj.intensity += (want - lj.intensity) * step;
     }
   }
+
+
 
   // The flashlight is a real spotlight, not a mask: it lights the ground, the
   // props and the bodies it falls on, and leaves everything outside it dark.
@@ -1489,7 +1418,13 @@ function main(hotData) {
       list.forEach(function (o) { if (n < mesh.count) { fn(o); dm.updateMatrix(); mesh.setMatrixAt(n++, dm.matrix); } });
       mesh.count = n;
       mesh.instanceMatrix.needsUpdate = true;
-      mesh.frustumCulled = true;
+      // NEVER true for these. InstancedMesh derives its bounding sphere from
+      // the base geometry, not the instance transforms, so every instance
+      // shares one small sphere at the origin — walk away from the middle of
+      // the map and the whole batch culls at once. Measured: 20 of 20 city
+      // meshes vanished at a far corner. Every other instanced mesh in this
+      // file is false for exactly this reason.
+      mesh.frustumCulled = false;
       if (n) scene.add(mesh);
       return mesh;
     }
@@ -3671,7 +3606,7 @@ function main(hotData) {
     syncDecals();
 
     // ---- real lights: nearest lamps, and the torch beam following the aim
-    updateLampLights();
+    updateLampLights(dt);
     if (player.torch && G.screen !== 'menu' && G.screen !== 'how') {
       // Emitted from the weapon, not from the player's centre: forward and a
       // little to the gun side, so the cone looks carried rather than cast.
