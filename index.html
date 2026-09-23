@@ -1475,7 +1475,7 @@ function main(hotData) {
      surface id per texel (grass, asphalt, sidewalk...), then a colour pass that
      turns each id into a pattern using world-space texel coordinates, so slab
      joints and planks line up across neighbouring regions.                    */
-  var TPX = 0.8;                                         // texels per blueprint px
+  var TPX = 1;                                           // texels per blueprint px: one per voxel
   var GW = Math.ceil((OAK.bounds[2] - OAK.bounds[0]) * TPX);
   var GH = Math.ceil((OAK.bounds[3] - OAK.bounds[1]) * TPX);
   var S_ = { GRASS: 1, OVER: 2, ASPH: 3, WALK: 4, PLAZA: 5, CONC: 6, FORE: 7,
@@ -1554,7 +1554,7 @@ function main(hotData) {
       var s = horiz ? span(d[0], d[1] - 1.2, d[2], d[1] + 1.2) : span(d[0] - 1.2, d[1], d[0] + 1.2, d[3]);
       for (var j = s[1]; j < s[3]; j++) for (var i = s[0]; i < s[2]; i++) {
         var along = horiz ? i : j;
-        if (along % 24 < 12) id[j * GW + i] = S_.DASH;      // 1.5 m dash, 1.5 m gap
+        if (along % 30 < 15) id[j * GW + i] = S_.DASH;      // 1.5 m dash, 1.5 m gap
       }
     });
     OAK.crosswalks.forEach(function (r) { fill(r, r[4] === 'h' ? S_.ZEBH : S_.ZEBV); });
@@ -1576,8 +1576,9 @@ function main(hotData) {
     for (var j = 0; j < GH; j++) {
       for (var i = 0; i < GW; i++) {
         var k = j * GW + i, v = id[k];
-        var h = hash2(i, j, 1), n = h - 0.5;
-        var lf = vnoise(i / 26, j / 26, 3) - 0.5;
+        // flat levels, not noise: four per-voxel shades, three broad bands
+        var h = hash2(i, j, 1), n = Math.floor(h * 4) / 3 - 0.5;
+        var lf = Math.round((vnoise(i / 32, j / 32, 3) - 0.5) * 3) / 3;
         switch (v) {
           case S_.GRASS:
             set(50 + lf * 18 + n * 9, 69 + lf * 22 + n * 11, 35 + lf * 8 + n * 6);
@@ -1603,13 +1604,13 @@ function main(hotData) {
             break;
           case S_.ZEBH: case S_.ZEBV: {
             var a = v === S_.ZEBH ? j : i;
-            if (a % 7 < 4 && hash2(i, j, 7) > 0.05) set(180 + n * 14, 178 + n * 14, 168 + n * 12);
+            if (a % 8 < 5 && hash2(i, j, 7) > 0.05) set(180 + n * 14, 178 + n * 14, 168 + n * 12);
             else set(46 + n * 12, 48 + n * 12, 52 + n * 12);
             break;
           }
           case S_.WALK:
             set(116 + n * 10 + lf * 8, 114 + n * 10 + lf * 8, 108 + n * 10 + lf * 8);
-            if (i % 16 === 0 || j % 16 === 0) set(rgb[0] - 30, rgb[1] - 30, rgb[2] - 30);
+            if (i % 15 === 0 || j % 15 === 0) set(rgb[0] - 30, rgb[1] - 30, rgb[2] - 30);
             break;
           case S_.PLAZA: {
             var tt = hash2(Math.floor(i / 20), Math.floor(j / 20), 11) - 0.5;
@@ -1619,34 +1620,34 @@ function main(hotData) {
           }
           case S_.CONC:
             set(126 + n * 9 + lf * 6, 122 + n * 9 + lf * 6, 114 + n * 9 + lf * 6);
-            if (i % 12 === 0 || j % 12 === 0) set(rgb[0] - 22, rgb[1] - 22, rgb[2] - 22);
+            if (i % 10 === 0 || j % 10 === 0) set(rgb[0] - 22, rgb[1] - 22, rgb[2] - 22);
             break;
           case S_.FORE: {
             var oil = vnoise(i / 9, j / 9, 13);
             set(90 + n * 10, 90 + n * 10, 92 + n * 10);
             if (oil < 0.26) set(rgb[0] - 22, rgb[1] - 21, rgb[2] - 18);
-            if (i % 24 === 0 || j % 24 === 0) set(rgb[0] - 16, rgb[1] - 16, rgb[2] - 16);
+            if (i % 25 === 0 || j % 25 === 0) set(rgb[0] - 16, rgb[1] - 16, rgb[2] - 16);
             break;
           }
           case S_.WOOD: {
-            var plank = Math.floor(j / 3), pt = hash2(plank, 0, 21) - 0.5;
-            set(116 + pt * 22 + n * 10, 82 + pt * 16 + n * 8, 50 + pt * 10 + n * 6);
-            if (j % 3 === 0 || (i + plank * 7) % 18 === 0) set(rgb[0] - 22, rgb[1] - 18, rgb[2] - 12);
+            var plank = Math.floor(j / 2), pt = Math.floor(hash2(plank, Math.floor((i + plank * 7) / 20), 21) * 3) / 2 - 0.5;
+            set(116 + pt * 22 + n * 6, 82 + pt * 16 + n * 5, 50 + pt * 10 + n * 4);
+            if ((i + plank * 7) % 20 === 0) set(rgb[0] - 22, rgb[1] - 18, rgb[2] - 12);
             break;
           }
           case S_.CHECK:
-            if ((Math.floor(i / 4) + Math.floor(j / 4)) % 2) set(190 + n * 10, 186 + n * 10, 176 + n * 10);
+            if ((Math.floor(i / 5) + Math.floor(j / 5)) % 2) set(190 + n * 10, 186 + n * 10, 176 + n * 10);
             else set(42 + n * 8, 44 + n * 8, 50 + n * 8);
             break;
           case S_.TILE:
             set(146 + n * 8, 146 + n * 8, 142 + n * 8);
-            if (i % 5 === 0 || j % 5 === 0) set(116, 116, 112);
+            if (i % 4 === 0 || j % 4 === 0) set(116, 116, 112);
             break;
           case S_.STONE: {
-            var row = Math.floor(j / 6), col = Math.floor((i + (row % 2) * 4) / 8);
-            var sv = hash2(col, row, 31) - 0.5;
-            set(104 + sv * 20 + n * 8, 98 + sv * 18 + n * 8, 90 + sv * 16 + n * 8);
-            if (j % 6 === 0 || (i + (row % 2) * 4) % 8 === 0) set(62, 58, 54);
+            var row = Math.floor(j / 4), col = Math.floor((i + (row % 2) * 3) / 6);
+            var sv = Math.floor(hash2(col, row, 31) * 4) / 3 - 0.5;
+            set(104 + sv * 20 + n * 6, 98 + sv * 18 + n * 6, 90 + sv * 16 + n * 6);
+            if (j % 4 === 0 || (i + (row % 2) * 3) % 6 === 0) set(62, 58, 54);
             break;
           }
           default: set(50, 69, 35);
@@ -1899,59 +1900,53 @@ function main(hotData) {
     return t;
   }
   function g1(v) { v = clamp(Math.round(v), 0, 255); return [v, v, v]; }
+  // Voxel palette textures. One texel is one voxel face: 10 cm on architecture,
+  // 5 cm on furniture and props (see TEXEL), always aligned to the world grid.
+  // Shading is a handful of flat levels, never smooth noise — that is what
+  // makes a flat face read as a surface built from blocks. Near-white, so the
+  // vertex colour carries the hue.
+  function lv(levels, h) { return levels[Math.min(levels.length - 1, Math.floor(h * levels.length))]; }
   var TX = {
-    // lap siding: 25 cm boards with a shadow line under each
+    // lap siding: 20 cm boards, the lower voxel of each board in its shadow
     siding: pixTex(16, 16, function (x, y) {
-      return g1(y % 4 === 3 ? 168 : 236 - (y % 4) * 5 + (hash2(x, y, 41) - 0.5) * 12);
+      var board = y >> 1;
+      return g1(y & 1 ? 196 : lv([226, 234, 242], hash2(0, board, 41)));
     }),
+    // bricks: one voxel high, two long, every course offset by one
     brick: pixTex(16, 16, function (x, y) {
-      var row = y >> 2, off = (row & 1) * 4;
-      if (y % 4 === 3 || (x + off) % 8 === 7) return g1(196);
-      return g1(226 + (hash2((x + off) >> 3, row, 42) - 0.5) * 34 + (hash2(x, y, 43) - 0.5) * 10);
+      var off = y & 1, id = (x + off) >> 1;
+      return g1(lv([196, 212, 226, 240], hash2(id, y, 42)));
     }),
+    // dressed stone: blocks three voxels by two
     stone: pixTex(16, 16, function (x, y) {
-      var row = y >> 2, off = (row & 1) * 5;
-      if (y % 4 === 3 || (x + off) % 10 === 9) return g1(160);
-      return g1(222 + (hash2((x + off) / 10 | 0, row, 44) - 0.5) * 30 + (hash2(x, y, 45) - 0.5) * 14);
+      var row = y >> 1, off = (row & 1) * 2, id = Math.floor((x + off) / 3);
+      var edge = (y & 1) === 1 && hash2(id, row, 44) < 0.5;
+      return g1(edge ? 188 : lv([204, 216, 228, 238], hash2(id, row, 45)));
     }),
-    plaster: pixTex(16, 16, function (x, y) { return g1(232 + (hash2(x, y, 46) - 0.5) * 10); }),
+    plaster: pixTex(16, 16, function (x, y) { var h = hash2(x, y, 46); return g1(h < 0.08 ? 220 : h > 0.94 ? 244 : 234); }),
+    // shingles: one voxel rows, tiles two wide, offset per row, four tones
     shingle: pixTex(16, 16, function (x, y) {
-      var row = y >> 2, off = (row & 1) * 3;
-      if (y % 4 === 3) return g1(128);
-      if ((x + off) % 6 === 5) return g1(170);
-      return g1(214 + (hash2((x + off) / 6 | 0, row, 47) - 0.5) * 50 + (hash2(x, y, 48) - 0.5) * 14);
+      var off = y & 1, id = (x + off) >> 1;
+      return g1(lv([168, 190, 210, 228], hash2(id, y, 47)));
     }),
-    gravel: pixTex(16, 16, function (x, y) { var h = hash2(x, y, 49); return g1(h < 0.2 ? 150 : h > 0.85 ? 250 : 206 + h * 20); }),
+    gravel: pixTex(16, 16, function (x, y) { return g1(lv([176, 196, 214, 232], hash2(x, y, 49))); }),
+    // planks three voxels wide, with the odd dark knot
     wood: pixTex(16, 16, function (x, y) {
-      if (x % 4 === 0) return g1(160);
-      return g1(214 + (hash2(x >> 2, 0, 50) - 0.5) * 30 + (hash2(x, y >> 1, 51) - 0.5) * 18);
+      var plank = Math.floor(x / 3);
+      if (hash2(x, y, 51) < 0.04) return g1(170);
+      return g1(lv([200, 214, 228], hash2(plank, y >> 3, 50)));
     }),
-    fabric: pixTex(16, 16, function (x, y) { return g1(224 + ((x + y) & 1 ? 8 : -8) + (hash2(x, y, 52) - 0.5) * 8); }),
-    metal: pixTex(16, 16, function (x, y) { return g1((y === 0 ? 206 : 232) + (hash2(x, y, 53) - 0.5) * 8); }),
+    fabric: pixTex(16, 16, function (x, y) { return g1(((x + y) & 1) ? 222 : 232); }),
+    metal: pixTex(16, 16, function (x, y) { return g1((y & 3) === 0 ? 214 : lv([228, 236], hash2(x >> 2, y >> 2, 53))); }),
+    // foliage: clumps of three or four greens
     leaf: pixTex(16, 16, function (x, y) {
-      var c = vnoise(x / 3, y / 3, 54), h = hash2(x, y, 55);
-      return g1(c > 0.62 ? 255 : c < 0.3 ? 128 : 196 + (h - 0.5) * 36);
+      var c = vnoise(x / 2.5, y / 2.5, 54);
+      return g1(c > 0.66 ? 250 : c > 0.46 ? 222 : c > 0.3 ? 190 : 156);
     }),
-    bark: pixTex(16, 16, function (x, y) {
-      return g1(190 + (hash2(x, 0, 56) - 0.5) * 60 + (hash2(x, y >> 2, 57) - 0.5) * 30);
-    }),
+    bark: pixTex(16, 16, function (x, y) { return g1(lv([156, 180, 200], hash2(x, y >> 2, 56))); }),
     birch: pixTex(16, 16, function (x, y) {
-      var mark = hash2(x >> 2, y, 58) < 0.12 && hash2(0, y, 59) < 0.5;
-      return g1(mark ? 40 : 238 + (hash2(x, y, 60) - 0.5) * 12);
-    }),
-    // alpha-tested fences: 1 texture tile = 1 m wide, 1 m tall
-    picket: pixTex(16, 16, function (x, y) {
-      var rail = y === 4 || y === 12;
-      var slat = x % 4 < 2 && (y > 1 || (y === 1 && x % 4 === 0) || (y === 0 && false));
-      if (!(rail || slat)) return [0, 0, 0, 0];
-      return g1(222 + (hash2(x >> 2, y, 61) - 0.5) * 30);
-    }),
-    iron: pixTex(16, 16, function (x, y) {
-      var rail = y === 1 || y === 14;
-      var bar = x % 3 === 0;
-      var spike = y === 0 && x % 3 === 0;
-      if (!(rail || bar || spike)) return [0, 0, 0, 0];
-      return g1(200);
+      var mark = hash2(0, y, 59) < 0.22 && hash2(x >> 1, y, 58) < 0.6;
+      return g1(mark ? 50 : lv([230, 240], hash2(x, y, 60)));
     }),
     // store stock: one tile = 2 m of shelving, 1.5 m tall, four shelves
     products: pixTex(32, 16, function (x, y) {
@@ -1966,6 +1961,13 @@ function main(hotData) {
     }),
     stripe: pixTex(16, 4, function (x, y) { return ((x + y) >> 2) & 1 ? [214, 206, 196] : [196, 84, 40]; })
   };
+  // metres per texel, per material; box and addGeo turn it into a UV scale
+  var TEXEL = { siding: 0.1, brick: 0.1, stone: 0.1, plaster: 0.1, shingle: 0.1, gravel: 0.1,
+                leaf: 0.1, bark: 0.1, birch: 0.1, wood: 0.05, woodF: 0.05, fabric: 0.05,
+                metal: 0.05, metalF: 0.05 };
+  function uvScale(mat) { return TEXEL[mat] ? 1 / (16 * TEXEL[mat]) : 1; }
+  var VOX = 0.1;                                   // the world's voxel: one blueprint pixel
+  function vs(v) { return Math.round(v / VOX) * VOX; }
 
   // ---- see-through: anything between the camera and the player dithers away
   // in a small circle around the player instead of hiding them. Screen-space, so it
@@ -2008,8 +2010,6 @@ function main(hotData) {
     wood: lam(TX.wood), fabric: lam(TX.fabric), metal: lam(TX.metal), plain: lam(null),
     woodF: fadeable(lam(TX.wood)), metalF: fadeable(lam(TX.metal)),
     leaf: fadeable(lam(TX.leaf)), bark: fadeable(lam(TX.bark)), birch: fadeable(lam(TX.birch)),
-    picket: lam(TX.picket, { alphaTest: 0.5, side: T.DoubleSide }),
-    iron: lam(TX.iron, { alphaTest: 0.5, side: T.DoubleSide }),
     products: lam(TX.products), stripe: lam(TX.stripe),
     glass: fadeable(new T.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x5A6878 })),
     lens: new T.MeshBasicMaterial({ vertexColors: true })
@@ -2025,6 +2025,13 @@ function main(hotData) {
     var key = mat + '@' + cx + ',' + cz;
     return BINS[key] || (BINS[key] = { mat: mat, p: [], n: [], u: [], c: [] });
   }
+  // Bins are indexed: a quad shares its corner vertices (4, not 6), which is a
+  // third less vertex work on a world built entirely out of boxes.
+  function vtx(b, x, y, z, u, v, nx, ny, nz) {
+    b.p.push(x, y, z); b.n.push(nx, ny, nz); b.u.push(u, v);
+    b.c.push(_col.r, _col.g, _col.b);
+    return b.p.length / 3 - 1;
+  }
   var _col = new T.Color();
   function pushTri(b, ax, ay, az, bx, by, bz, cx, cy, cz, ua, va, ub, vb, uc, vc, hex) {
     var ex = bx - ax, ey = by - ay, ez = bz - az, fx = cx - ax, fy = cy - ay, fz = cz - az;
@@ -2032,16 +2039,25 @@ function main(hotData) {
     var nl = Math.hypot(nx, ny, nz) || 1;
     nx /= nl; ny /= nl; nz /= nl;
     _col.setHex(hex);
-    b.p.push(ax, ay, az, bx, by, bz, cx, cy, cz);
-    b.n.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
-    b.u.push(ua, va, ub, vb, uc, vc);
-    b.c.push(_col.r, _col.g, _col.b, _col.r, _col.g, _col.b, _col.r, _col.g, _col.b);
+    if (!b.i) b.i = [];
+    var i0 = vtx(b, ax, ay, az, ua, va, nx, ny, nz);
+    vtx(b, bx, by, bz, ub, vb, nx, ny, nz); vtx(b, cx, cy, cz, uc, vc, nx, ny, nz);
+    b.i.push(i0, i0 + 1, i0 + 2);
   }
   // quad a-b-c-d counter-clockwise seen from the front; uv in metres
   function quad(b, A, B, C, D, hex, uw, vh, u0, v0) {
     u0 = u0 || 0; v0 = v0 || 0;
-    pushTri(b, A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2], u0, v0, u0 + uw, v0, u0 + uw, v0 + vh, hex);
-    pushTri(b, A[0], A[1], A[2], C[0], C[1], C[2], D[0], D[1], D[2], u0, v0, u0 + uw, v0 + vh, u0, v0 + vh, hex);
+    var ex = B[0] - A[0], ey = B[1] - A[1], ez = B[2] - A[2], fx = C[0] - A[0], fy = C[1] - A[1], fz = C[2] - A[2];
+    var nx = ey * fz - ez * fy, ny = ez * fx - ex * fz, nz = ex * fy - ey * fx;
+    var nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl; ny /= nl; nz /= nl;
+    _col.setHex(hex);
+    if (!b.i) b.i = [];
+    var i0 = vtx(b, A[0], A[1], A[2], u0, v0, nx, ny, nz);
+    vtx(b, B[0], B[1], B[2], u0 + uw, v0, nx, ny, nz);
+    vtx(b, C[0], C[1], C[2], u0 + uw, v0 + vh, nx, ny, nz);
+    vtx(b, D[0], D[1], D[2], u0, v0 + vh, nx, ny, nz);
+    b.i.push(i0, i0 + 1, i0 + 2, i0, i0 + 2, i0 + 3);
   }
   function triangle(b, A, B, C, hex, uvs) {
     pushTri(b, A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2],
@@ -2056,7 +2072,7 @@ function main(hotData) {
     var b = o.bin || binFor(mat, cx, cz);
     var c = Math.cos(ry || 0), s = Math.sin(ry || 0), hx = sx / 2, hz = sz / 2;
     function P(lx, y, lz) { return [cx + lx * c + lz * s, y, cz - lx * s + lz * c]; }
-    var k = o.uvs || 1, sh = o.shade === undefined ? 1 : o.shade;
+    var k = (o.uvs || 1) * uvScale(mat);
     var hexTop = o.top !== undefined ? o.top : hex;
     var h = y1 - y0, u0 = (o.uoff || 0);
     var v0 = y0 * k;
@@ -2067,7 +2083,6 @@ function main(hotData) {
     quad(b, P(-hx, y0, -hz), P(-hx, y0, hz), P(-hx, y1, hz), P(-hx, y1, -hz), hex, sz * k, h * k, u0, v0);
     quad(b, P(-hx, y1, hz), P(hx, y1, hz), P(hx, y1, -hz), P(-hx, y1, -hz), hexTop, sx * k, sz * k, u0, 0);
     if (!o.noBottom) quad(b, P(-hx, y0, -hz), P(hx, y0, -hz), P(hx, y0, hz), P(-hx, y0, hz), hex, sx * k, sz * k);
-    void sh;
   }
   // axis-aligned box from world corners
   function aabb(mat, x0, z0, x1, z1, y0, y1, hex, o) {
@@ -2077,8 +2092,10 @@ function main(hotData) {
   // Append any three.js geometry through a matrix (used for round things).
   var _m4 = new T.Matrix4(), _v3 = new T.Vector3(), _q = new T.Quaternion(), _e = new T.Euler();
   var PROTO = {
-    cyl6: new T.CylinderGeometry(1, 1, 1, 6, 1).toNonIndexed(),
-    cyl8: new T.CylinderGeometry(1, 1, 1, 8, 1).toNonIndexed(),
+    // round things are square in a voxel world: a 'cylinder' of radius r is a
+    // 2r-wide square prism, so poles, posts and stools stay blocky
+    cyl6: new T.BoxGeometry(2, 1, 2).toNonIndexed(),
+    cyl8: new T.BoxGeometry(2, 1, 2).toNonIndexed(),
     cone7: new T.ConeGeometry(1, 1, 7, 1).toNonIndexed(),
     ico0: new T.IcosahedronGeometry(1, 0),
     ico1: new T.IcosahedronGeometry(1, 1),
@@ -2091,7 +2108,7 @@ function main(hotData) {
     _q.setFromEuler(_e);
     _m4.compose(_v3.set(x, y, z), _q, new T.Vector3(sx, sy, sz));
     var pa = geo.attributes.position.array, ua = geo.attributes.uv.array;
-    var k = o.uvs || 1, jit = o.jitter || 0;
+    var k = (o.uvs || 1) * uvScale(mat), jit = o.jitter || 0;
     var tmp = [];
     for (var i = 0; i < pa.length; i += 3) {
       _v3.set(pa[i], pa[i + 1], pa[i + 2]).applyMatrix4(_m4);
@@ -2123,6 +2140,7 @@ function main(hotData) {
       geo.setAttribute('normal', new T.Float32BufferAttribute(b.n, 3));
       geo.setAttribute('uv', new T.Float32BufferAttribute(b.u, 2));
       geo.setAttribute('color', new T.Float32BufferAttribute(b.c, 3));
+      if (b.i) geo.setIndex(b.p.length / 3 > 65535 ? new T.Uint32BufferAttribute(b.i, 1) : new T.Uint16BufferAttribute(b.i, 1));
       geo.computeBoundingSphere();
       var mesh = new T.Mesh(geo, MAT[b.mat]);
       mesh.matrixAutoUpdate = false;
@@ -2140,12 +2158,12 @@ function main(hotData) {
   /* ------------------------------------------------------------ buildings */
   var KIND = {
     //        wall height, thickness, outer material, roof
-    house:  { h: 2.8, t: 0.26, mat: 'siding', roof: 'gable', pitch: 0.5 },
-    cafe:   { h: 3.0, t: 0.26, mat: 'siding', roof: 'gable', pitch: 0.42 },
-    diner:  { h: 3.4, t: 0.3,  mat: 'brick',  roof: 'flat' },
-    store:  { h: 4.4, t: 0.34, mat: 'brick',  roof: 'flat' },
+    house:  { h: 2.8, t: 0.2,  mat: 'siding', roof: 'gable', pitch: 0.5 },
+    cafe:   { h: 3.0, t: 0.2,  mat: 'siding', roof: 'gable', pitch: 0.5 },
+    diner:  { h: 3.4, t: 0.4,  mat: 'brick',  roof: 'flat' },
+    store:  { h: 4.4, t: 0.4,  mat: 'brick',  roof: 'flat' },
     church: { h: 5.2, t: 0.6,  mat: 'stone',  roof: 'gable', pitch: 0.95 },
-    school: { h: 3.6, t: 0.32, mat: 'brick',  roof: 'gable', pitch: 0.45 }
+    school: { h: 3.6, t: 0.4,  mat: 'brick',  roof: 'gable', pitch: 0.5 }
   };
   // tone -> [outer wall, roof, trim, kitchen cabinets]
   var TONES = [
@@ -2182,46 +2200,104 @@ function main(hotData) {
     var H = K.h, TH = B.wall || K.t, outer = K.mat;
     var wallHex = B.kind === 'store' ? 0xA86E54 : B.kind === 'church' ? 0xB8B2A6 :
                   B.kind === 'school' ? 0xA0604A : B.kind === 'diner' ? 0xD2C4A8 : tone[0];
+    var homey = B.kind === 'house' || B.kind === 'cafe';
+    var trim = tone[2], doorHex = [0x6A4A34, 0x3E5064, 0x7A2E2A, 0x4E5A3A][B.tone % 4];
 
+    // which side of a wall is indoors: probe half a metre either way
+    function insideAt(x, z) {
+      for (var k = 0; k < BI.parts.length; k++) {
+        var r = BI.parts[k];
+        if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
+      }
+      return false;
+    }
+
+    // One straight wall, cut for its doors and (on the outside) its windows.
+    // Everything lands on the 10 cm grid; frames, sills and jambs stand 5 cm
+    // proud of the wall so they read as separate blocks.
     function wallRun(seg, doors, mat, hex, th, exterior) {
       var cd = cutDoors(seg[0], seg[1], seg[2], seg[3], doors);
-      cd.pieces.forEach(function (p) {
-        var lo = p[0], hi = p[1];
-        var ext = th / 2;
-        var A = (cd.vert ? wz(lo) : wx(lo)) - (p[2] ? ext : 0);
-        var Bn = (cd.vert ? wz(hi) : wx(hi)) + (p[3] ? ext : 0);
-        var f = cd.vert ? wx(cd.fixed) : wz(cd.fixed);
-        if (cd.vert) {
-          aabb(mat, f - th / 2, A, f + th / 2, Bn, 0, H, hex, { uoff: A });
-          colRect(f - th / 2, A, f + th / 2, Bn, false);
-        } else {
-          aabb(mat, A, f - th / 2, Bn, f + th / 2, 0, H, hex, { uoff: A });
-          colRect(A, f - th / 2, Bn, f + th / 2, false);
-        }
-        // windows on long exterior runs: glass set into the wall, with a sill
+      var f = cd.vert ? wx(cd.fixed) : wz(cd.fixed);
+      // box along the run: a..b along it, d0..d1 across it (relative to f)
+      function run(m, a, b, d0, d1, y0, y1, c, bin) {
+        if (b - a < 1e-3 || y1 - y0 < 1e-3) return;
+        var o = bin ? { bin: bin } : { uoff: a };
+        if (cd.vert) aabb(m, f + d0, a, f + d1, b, y0, y1, c, o);
+        else aabb(m, a, f + d0, b, f + d1, y0, y1, c, o);
+      }
+      var h = th / 2, p = h + 0.05;
+      // exterior side, for shutters and door leaves
+      var inSide = 0;
+      if (exterior) {
+        var mid = (cd.pieces.length ? (cd.pieces[0][0] + cd.pieces[0][1]) / 2 : (cd.vert ? seg[1] : seg[0]));
+        var mx = cd.vert ? f : wx(mid), mz = cd.vert ? wz(mid) : f;
+        inSide = insideAt(mx + (cd.vert ? 0.5 : 0), mz + (cd.vert ? 0 : 0.5)) ? 1 : -1;
+      }
+
+      cd.pieces.forEach(function (pc) {
+        // exterior corners extend half a thickness to close the corner; an
+        // interior wall stops at the centre line, inside the outer wall, so its
+        // end never lands on the outer wall's face (two colours in one plane
+        // flicker)
+        var cap = exterior ? h : 0;
+        var A = vs((cd.vert ? wz(pc[0]) : wx(pc[0])) - (pc[2] ? cap : 0));
+        var Bn = vs((cd.vert ? wz(pc[1]) : wx(pc[1])) + (pc[3] ? cap : 0));
+        if (cd.vert) colRect(f - h, A, f + h, Bn, false); else colRect(A, f - h, Bn, f + h, false);
+
+        // windows: evenly spaced along long exterior runs
+        var wins = [];
         if (exterior && B.kind !== 'store') {
+          var ww = B.kind === 'church' ? 0.8 : 1.2;
+          var wy0 = B.kind === 'church' ? 1.4 : 0.9, wy1 = B.kind === 'church' ? 4.2 : 2.0;
           var len = Bn - A, n = Math.floor((len - 1.4) / 3.1);
           for (var w = 0; w < n; w++) {
-            var c = A + (len - (n - 1) * 3.1) / 2 + w * 3.1;
-            var ww = B.kind === 'church' ? 0.9 : 1.15;
-            var wy0 = B.kind === 'church' ? 1.4 : 0.95, wy1 = B.kind === 'church' ? 4.1 : 2.05;
-            if (cd.vert) {
-              aabb('glass', f - th / 2 - 0.03, c - ww / 2, f + th / 2 + 0.03, c + ww / 2, wy0, wy1, 0x1C2630);
-              aabb(mat, f - th / 2 - 0.08, c - ww / 2 - 0.1, f + th / 2 + 0.08, c + ww / 2 + 0.1, wy0 - 0.1, wy0, tone[2]);
-            } else {
-              aabb('glass', c - ww / 2, f - th / 2 - 0.03, c + ww / 2, f + th / 2 + 0.03, wy0, wy1, 0x1C2630);
-              aabb(mat, c - ww / 2 - 0.1, f - th / 2 - 0.08, c + ww / 2 + 0.1, f + th / 2 + 0.08, wy0 - 0.1, wy0, tone[2]);
-            }
+            var c = vs(A + (len - (n - 1) * 3.1) / 2 + w * 3.1);
+            wins.push([c - ww / 2, c + ww / 2, wy0, wy1]);
           }
         }
+        // solid wall between the windows, and below and above each one
+        var cur = A;
+        wins.forEach(function (wn) {
+          run(mat, cur, wn[0] - 0.1, -h, h, 0, H, hex);
+          run(mat, wn[0] - 0.1, wn[1] + 0.1, -h, h, 0, wn[2] - 0.1, hex);
+          run(mat, wn[0] - 0.1, wn[1] + 0.1, -h, h, wn[3] + 0.1, H, hex);
+          cur = wn[1] + 0.1;
+          // frame: jambs and head proud of both faces, a deeper sill
+          run('woodF', wn[0] - 0.1, wn[0], -p, p, wn[2], wn[3] + 0.1, trim);
+          run('woodF', wn[1], wn[1] + 0.1, -p, p, wn[2], wn[3] + 0.1, trim);
+          run('woodF', wn[0] - 0.1, wn[1] + 0.1, -p, p, wn[3], wn[3] + 0.1, trim);
+          run('woodF', wn[0] - 0.2, wn[1] + 0.2, -h - 0.1, h + 0.1, wn[2] - 0.1, wn[2], trim);
+          // glass set back in the middle of the wall, with a cross of glazing bars
+          run('glass', wn[0], wn[1], -0.05, 0.05, wn[2], wn[3], B.kind === 'church' ? 0x2A2A44 : 0x1C2630);
+          var cx = vs((wn[0] + wn[1]) / 2), cy = vs((wn[2] + wn[3]) / 2);
+          run('woodF', cx - 0.05, cx + 0.05, -0.08, 0.08, wn[2], wn[3], trim);
+          run('woodF', wn[0], wn[1], -0.08, 0.08, cy - 0.05, cy + 0.05, trim);
+          // shutters on the outside of a home
+          if (homey && inSide) {
+            var sd0 = inSide > 0 ? -h - 0.1 : h, sd1 = inSide > 0 ? -h : h + 0.1;
+            run('woodF', wn[0] - 0.5, wn[0] - 0.1, sd0, sd1, wn[2], wn[3], doorHex);
+            run('woodF', wn[1] + 0.1, wn[1] + 0.5, sd0, sd1, wn[2], wn[3], doorHex);
+          }
+        });
+        run(mat, cur, Bn, -h, h, 0, H, hex);
+        // a darker footing course where the wall meets the ground
+        if (exterior) run('plaster', A, Bn, -h - 0.05, h + 0.05, 0, 0.3, 0x7E7A72);
       });
-      // lintels over the doorways
+
+      // doorways: trimmed jambs and head, a lintel above, and on the outside an
+      // open door swung flat against the inner face
       cd.gaps.forEach(function (g) {
-        var A = cd.vert ? wz(g[0]) : wx(g[0]), Bn = cd.vert ? wz(g[1]) : wx(g[1]);
-        var f = cd.vert ? wx(cd.fixed) : wz(cd.fixed), top = Math.min(H, 2.25);
-        if (H - top < 0.05) return;
-        if (cd.vert) aabb(mat, f - th / 2, A, f + th / 2, Bn, top, H, hex);
-        else aabb(mat, A, f - th / 2, Bn, f + th / 2, top, H, hex);
+        var A = vs(cd.vert ? wz(g[0]) : wx(g[0])), Bn = vs(cd.vert ? wz(g[1]) : wx(g[1]));
+        var top = Math.min(H, 2.2);
+        if (H - top > 0.05) run(mat, A, Bn, -h, h, top + 0.1, H, hex);
+        run('woodF', A - 0.1, A, -p, p, 0, top + 0.1, trim);
+        run('woodF', Bn, Bn + 0.1, -p, p, 0, top + 0.1, trim);
+        run('woodF', A - 0.1, Bn + 0.1, -p, p, top, top + 0.1, trim);
+        if (exterior && inSide && B.kind !== 'store' && Bn - A <= 2.2) {
+          var leaf = Math.min(1.0, Bn - A);
+          var d0 = inSide > 0 ? h : -h - 0.05, d1 = inSide > 0 ? h + 0.05 : -h;
+          run('woodF', A - 0.1 - leaf, A - 0.1, d0, d1, 0.05, 2.1, doorHex);
+        }
       });
     }
 
@@ -2229,72 +2305,166 @@ function main(hotData) {
     for (var i = 0; i < O.length; i++) {
       var a = O[i], b = O[(i + 1) % O.length];
       wallRun([a[0], a[1], b[0], b[1]], B.doors, outer, wallHex, TH, true);
+      // corner boards on a home: a trim column wrapping each outside corner
+      if (homey) {
+        var cx0 = wx(a[0]), cz0 = wz(a[1]), hh = TH / 2 + 0.05;
+        aabb('woodF', cx0 - hh, cz0 - hh, cx0 + hh, cz0 + hh, 0.3, H, trim);
+      }
     }
-    B.inner.forEach(function (s) { wallRun(s, B.doors, 'plaster', 0xE2DBCC, 0.13, false); });
+    B.inner.forEach(function (s) { wallRun(s, B.doors, 'plaster', 0xE2DBCC, 0.2, false); });
 
     buildRoof(BI, K, tone, H, TH);
     B.f.forEach(function (f) { furniture(f, tone, B); });
   }
 
-  /* ---- roofs: one mesh group per building so it can lift off when you walk in */
+  /* ---- roofs: a voxel height map, one mesh group per building so it can
+     lift off when you walk in.
+
+     Every 10 cm cell over the building (plus the eaves) gets a roof height:
+     the highest of the gables of every wing that covers it. Taking the
+     highest is exactly how intersecting roofs meet, so an L-shaped house gets
+     a proper valley instead of two roofs through each other. Heights are then
+     quantised to 10 cm steps and meshed: flat runs of equal height merge into
+     one face, and the steps between them become risers. The same pass gives
+     the gable-end walls (roof above, wall below) and the fascia boards round
+     the eaves for free.                                                     */
   function buildRoof(BI, K, tone, H, TH) {
     var B = BI.spec, bins = {};
     function rb(mat) { return bins[mat] || (bins[mat] = { mat: mat, p: [], n: [], u: [], c: [] }); }
-    var roofHex = B.kind === 'store' || B.kind === 'diner' || B.flat ? 0x6E6C68 : tone[1];
-    var gable = K.roof === 'gable' && !B.flat;
+    var flat = !(K.roof === 'gable' && !B.flat);
+    var roofHex = flat ? 0x6E6C68 : tone[1];
+    var wallMat = K.mat === 'brick' ? 'brick' : K.mat === 'stone' ? 'stone' : 'siding';
     var wallHex = B.kind === 'church' ? 0xB8B2A6 : B.kind === 'school' ? 0xA0604A : tone[0];
+    var h2 = TH / 2;
+    // the solid footprint: wall centre-lines out to the wall's outer face
+    var fp = BI.parts.map(function (r) { return [vs(r[0] - h2), vs(r[1] - h2), vs(r[2] + h2), vs(r[3] + h2)]; });
 
-    BI.parts.forEach(function (r) {
-      var x0 = r[0], z0 = r[1], x1 = r[2], z1 = r[3];
-      if (!gable) {
-        aabb('gravel', x0 - TH / 2, z0 - TH / 2, x1 + TH / 2, z1 + TH / 2, H, H + 0.16, roofHex, { bin: rb('gravel'), noBottom: true });
-        return;
-      }
-      var alongX = B.ridge ? B.ridge === 'EW' : (x1 - x0) >= (z1 - z0);
-      var o = 0.45;
-      var X0 = x0 - o, X1 = x1 + o, Z0 = z0 - o, Z1 = z1 + o;
-      var half = alongX ? (z1 - z0) / 2 : (x1 - x0) / 2;
-      var rise = Math.min(K.pitch * half, 3.6);
-      var top = H + rise, eave = H - o * K.pitch;
-      var bS = rb('shingle'), bW = rb(K.mat === 'brick' ? 'brick' : K.mat === 'stone' ? 'stone' : 'siding');
-      var slope = Math.hypot(half + o, rise + o * K.pitch);
-      if (alongX) {
-        var zm = (z0 + z1) / 2;
-        quad(bS, [X0, eave, Z1], [X1, eave, Z1], [X1, top, zm], [X0, top, zm], roofHex, X1 - X0, slope);
-        quad(bS, [X1, eave, Z0], [X0, eave, Z0], [X0, top, zm], [X1, top, zm], roofHex, X1 - X0, slope);
-        // gable ends, flush with the walls
-        triangle(bW, [x0, H, z0], [x0, H, z1], [x0, top, zm], wallHex, [0, H, z1 - z0, H, half, top]);
-        triangle(bW, [x1, H, z1], [x1, H, z0], [x1, top, zm], wallHex, [0, H, z1 - z0, H, half, top]);
-        // fascia and ridge cap
-        aabb('woodF', X0, Z1 - 0.06, X1, Z1 + 0.06, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
-        aabb('woodF', X0, Z0 - 0.06, X1, Z0 + 0.06, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
-        aabb('woodF', X0, zm - 0.12, X1, zm + 0.12, top - 0.04, top + 0.1, 0x3A3430, { bin: rb('woodF') });
-      } else {
-        var xm = (x0 + x1) / 2;
-        quad(bS, [X1, eave, Z1], [X1, eave, Z0], [xm, top, Z0], [xm, top, Z1], roofHex, Z1 - Z0, slope);
-        quad(bS, [X0, eave, Z0], [X0, eave, Z1], [xm, top, Z1], [xm, top, Z0], roofHex, Z1 - Z0, slope);
-        triangle(bW, [x1, H, z0], [x0, H, z0], [xm, top, z0], wallHex, [0, H, x1 - x0, H, half, top]);
-        triangle(bW, [x0, H, z1], [x1, H, z1], [xm, top, z1], wallHex, [0, H, x1 - x0, H, half, top]);
-        aabb('woodF', X1 - 0.06, Z0, X1 + 0.06, Z1, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
-        aabb('woodF', X0 - 0.06, Z0, X0 + 0.06, Z1, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
-        aabb('woodF', xm - 0.12, Z0, xm + 0.12, Z1, top - 0.04, top + 0.1, 0x3A3430, { bin: rb('woodF') });
-      }
-      BI.roofTop = Math.max(BI.roofTop || 0, top);
-      BI.ridgeAlongX = alongX;
-    });
-
-    // flat roofs get a parapet along the real outline
-    if (!gable) {
+    if (flat) {
+      fp.forEach(function (r) {
+        aabb('gravel', r[0], r[1], r[2], r[3], H, H + 0.2, roofHex, { bin: rb('gravel'), noBottom: true });
+      });
       var Ol = B.outline;
       for (var i = 0; i < Ol.length; i++) {
         var a = Ol[i], b = Ol[(i + 1) % Ol.length];
         var ax = wx(a[0]), az = wz(a[1]), bx = wx(b[0]), bz = wz(b[1]);
-        aabb(KIND[B.kind].mat === 'stone' ? 'stone' : 'brick',
-          Math.min(ax, bx) - TH / 2, Math.min(az, bz) - TH / 2, Math.max(ax, bx) + TH / 2, Math.max(az, bz) + TH / 2,
-          H, H + 0.55, B.kind === 'store' ? 0x8E5A46 : 0xB8AA92, { bin: rb('brick') });
+        aabb('brick', vs(Math.min(ax, bx) - h2), vs(Math.min(az, bz) - h2), vs(Math.max(ax, bx) + h2), vs(Math.max(az, bz) + h2),
+          H, H + 0.6, B.kind === 'store' ? 0x8E5A46 : 0xB8AA92, { bin: rb('brick') });
+        aabb('plaster', vs(Math.min(ax, bx) - h2 - 0.05), vs(Math.min(az, bz) - h2 - 0.05),
+          vs(Math.max(ax, bx) + h2 + 0.05), vs(Math.max(az, bz) + h2 + 0.05), H + 0.6, H + 0.7, 0x9A948A, { bin: rb('plaster') });
+      }
+      BI.roofs = flushBins(bins);
+      return;
+    }
+
+    var o = 0.4, pitch = K.pitch, cap = B.kind === 'church' ? 6.5 : 3.6;
+    var gx0 = 1e9, gz0 = 1e9, gx1 = -1e9, gz1 = -1e9;
+    var wings = fp.map(function (r) {
+      var alongX = B.ridge ? B.ridge === 'EW' : (r[2] - r[0]) >= (r[3] - r[1]);
+      gx0 = Math.min(gx0, r[0] - o); gz0 = Math.min(gz0, r[1] - o);
+      gx1 = Math.max(gx1, r[2] + o); gz1 = Math.max(gz1, r[3] + o);
+      return { r: r, alongX: alongX, mid: alongX ? (r[1] + r[3]) / 2 : (r[0] + r[2]) / 2,
+               half: alongX ? (r[3] - r[1]) / 2 : (r[2] - r[0]) / 2 };
+    });
+    var nx = Math.round((gx1 - gx0) / VOX), nz = Math.round((gz1 - gz0) / VOX);
+    var T_ = new Float32Array(nx * nz).fill(NaN), B_ = new Float32Array(nx * nz), IN = new Uint8Array(nx * nz);
+    for (var j = 0; j < nz; j++) for (var ii = 0; ii < nx; ii++) {
+      var x = gx0 + (ii + 0.5) * VOX, z = gz0 + (j + 0.5) * VOX, best = -1e9, inFp = 0;
+      for (var w = 0; w < wings.length; w++) {
+        var W = wings[w], r = W.r;
+        if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) inFp = 1;
+        if (x < r[0] - o || x > r[2] + o || z < r[1] - o || z > r[3] + o) continue;
+        var d = W.alongX ? Math.abs(z - W.mid) : Math.abs(x - W.mid);
+        best = Math.max(best, H + Math.min(cap, pitch * (W.half - d)));
+      }
+      if (best < -1e8) continue;
+      var k = j * nx + ii, t = Math.floor(best / VOX + 1e-6) * VOX + VOX;
+      T_[k] = t; IN[k] = inFp; B_[k] = inFp ? H : t - 0.2;
+      BI.roofTop = Math.max(BI.roofTop || 0, t);
+    }
+    var ks = uvScale('shingle'), kw = uvScale(wallMat), kf = uvScale('woodF');
+    var riser = shadeHex(roofHex, 0.82);
+
+    // tops: greedy rectangles of equal height
+    var used = new Uint8Array(nx * nz);
+    for (j = 0; j < nz; j++) for (ii = 0; ii < nx; ii++) {
+      var k0 = j * nx + ii;
+      if (used[k0] || isNaN(T_[k0])) continue;
+      var tv = T_[k0], w1 = 1;
+      while (ii + w1 < nx && !used[k0 + w1] && T_[k0 + w1] === tv) w1++;
+      var h1 = 1, ok = true;
+      while (j + h1 < nz && ok) {
+        for (var q = 0; q < w1; q++) { var kk = (j + h1) * nx + ii + q; if (used[kk] || T_[kk] !== tv) { ok = false; break; } }
+        if (ok) h1++;
+      }
+      for (var jj = 0; jj < h1; jj++) for (q = 0; q < w1; q++) used[(j + jj) * nx + ii + q] = 1;
+      var X0 = gx0 + ii * VOX, X1 = X0 + w1 * VOX, Z0 = gz0 + j * VOX, Z1 = Z0 + h1 * VOX;
+      quad(rb('shingle'), [X0, tv, Z1], [X1, tv, Z1], [X1, tv, Z0], [X0, tv, Z0], roofHex,
+        (X1 - X0) * ks, (Z1 - Z0) * ks, X0 * ks, Z0 * ks);
+    }
+
+    // sides: for every cell edge, what the neighbour does not cover
+    function cellAt(i2, j2) { return i2 < 0 || j2 < 0 || i2 >= nx || j2 >= nz ? -1 : j2 * nx + i2; }
+    var DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    DIRS.forEach(function (D) {
+      var alongI = D[1] !== 0;                  // faces along x when the normal is ±z
+      var outer = alongI ? nz : nx, inner = alongI ? nx : nz;
+      for (var a = 0; a < outer; a++) {
+        var runS = null;
+        for (var bb = 0; bb <= inner; bb++) {
+          var face = null;
+          if (bb < inner) {
+            var ci = alongI ? bb : a, cj = alongI ? a : bb;
+            var k1 = cellAt(ci, cj);
+            if (!isNaN(T_[k1])) {
+              var nk = cellAt(ci + D[0], cj + D[1]);
+              var t1 = T_[k1], b1 = B_[k1];
+              var has = nk >= 0 && !isNaN(T_[nk]);
+              var nt = has ? T_[nk] : -1e9, nb = has ? B_[nk] : 1e9;
+              // above the neighbour: a roof riser (or the fascia at the edge)
+              var y0 = Math.max(b1, nt);
+              if (t1 > y0 + 1e-4) face = { y0: y0, y1: t1, m: has ? 'shingle' : 'woodF', c: has ? riser : tone[2] };
+              // below the neighbour's underside, indoors: the gable-end wall
+              if (has && IN[k1] && !IN[nk] && Math.min(t1, nb) > b1 + 1e-4) {
+                emitSide(D, ci, cj, 1, b1, Math.min(t1, nb), wallMat, wallHex, alongI);
+              }
+            }
+          }
+          // merge equal faces along the row
+          if (runS && face && runS.y0 === face.y0 && runS.y1 === face.y1 && runS.m === face.m) { runS.n++; continue; }
+          if (runS) emitSide(D, runS.ci, runS.cj, runS.n, runS.y0, runS.y1, runS.m, runS.c, alongI);
+          runS = face ? { ci: alongI ? bb : a, cj: alongI ? a : bb, n: 1, y0: face.y0, y1: face.y1, m: face.m, c: face.c } : null;
+        }
+      }
+    });
+    function emitSide(D, ci, cj, n, y0, y1, m, c, alongI) {
+      var b2 = rb(m), kk2 = m === 'shingle' ? ks : m === 'woodF' ? kf : kw;
+      if (alongI) {
+        var X0 = gx0 + ci * VOX, X1 = X0 + n * VOX, Zp = gz0 + (cj + (D[1] > 0 ? 1 : 0)) * VOX;
+        if (D[1] > 0) quad(b2, [X0, y0, Zp], [X1, y0, Zp], [X1, y1, Zp], [X0, y1, Zp], c, (X1 - X0) * kk2, (y1 - y0) * kk2, X0 * kk2, y0 * kk2);
+        else quad(b2, [X1, y0, Zp], [X0, y0, Zp], [X0, y1, Zp], [X1, y1, Zp], c, (X1 - X0) * kk2, (y1 - y0) * kk2, X0 * kk2, y0 * kk2);
+      } else {
+        var Z0 = gz0 + cj * VOX, Z1 = Z0 + n * VOX, Xp = gx0 + (ci + (D[0] > 0 ? 1 : 0)) * VOX;
+        if (D[0] > 0) quad(b2, [Xp, y0, Z1], [Xp, y0, Z0], [Xp, y1, Z0], [Xp, y1, Z1], c, (Z1 - Z0) * kk2, (y1 - y0) * kk2, Z0 * kk2, y0 * kk2);
+        else quad(b2, [Xp, y0, Z0], [Xp, y0, Z1], [Xp, y1, Z1], [Xp, y1, Z0], c, (Z1 - Z0) * kk2, (y1 - y0) * kk2, Z0 * kk2, y0 * kk2);
       }
     }
+
+    // a chimney on a home, riding the ridge of its biggest wing
+    if (B.kind === 'house' || B.kind === 'cafe') {
+      var big = wings.reduce(function (m, W) { return (W.r[2] - W.r[0]) * (W.r[3] - W.r[1]) > (m.r[2] - m.r[0]) * (m.r[3] - m.r[1]) ? W : m; });
+      var r0 = big.r, cxh, czh;
+      if (big.alongX) { cxh = vs(r0[0] + (r0[2] - r0[0]) * 0.22); czh = vs(big.mid + big.half * 0.3); }
+      else { czh = vs(r0[1] + (r0[3] - r0[1]) * 0.22); cxh = vs(big.mid + big.half * 0.3); }
+      var ctop = vs(H + Math.min(cap, pitch * big.half) + 0.6);
+      aabb('brick', cxh - 0.3, czh - 0.3, cxh + 0.3, czh + 0.3, H, ctop, 0x8A4A3A, { bin: rb('brick') });
+      aabb('brick', cxh - 0.4, czh - 0.4, cxh + 0.4, czh + 0.4, ctop, ctop + 0.1, 0x6E3A2E, { bin: rb('brick') });
+      aabb('plaster', cxh - 0.2, czh - 0.2, cxh + 0.2, czh + 0.2, ctop + 0.1, ctop + 0.11, 0x141414, { bin: rb('plaster') });
+    }
     BI.roofs = flushBins(bins);
+  }
+  function shadeHex(hex, f) {
+    var r = ((hex >> 16) & 255) * f, g = ((hex >> 8) & 255) * f, b = (hex & 255) * f;
+    return (Math.min(255, r | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, b | 0);
   }
 
   /* ------------------------------------------------------------ furniture
@@ -2548,60 +2718,92 @@ function main(hotData) {
     if (ps.vents) ps.roofs = ps.roofs.concat(flushBins({ v: ps.vents }));
   }
   /* ---------------------------------------------------------------- trees
-     Five species, sized from the canopy the blueprint draws. The forest strip
-     down the west edge is mostly conifers; yards and the park get broadleaf. */
+     Voxel trees, five species, sized from the canopy the blueprint draws.
+     Canopies are clusters of blocks in a few greens rather than one blob, so
+     each reads as leaves stacked in clumps. The forest strip down the west
+     edge is mostly conifers; yards and the park get broadleaf.              */
+  var LEAVES = {
+    oak: [0x3E5A2E, 0x466532, 0x4F6E36, 0x36502A],
+    maple: [0x55692C, 0x5E7432, 0x4C6028, 0x6A7A34],
+    pine: [0x2A4A34, 0x24402E, 0x30523A],
+    spruce: [0x24402E, 0x1E3828, 0x2A4834],
+    birch: [0x6E8A3A, 0x7A9442, 0x62803A]
+  };
+  function vc(v) { return Math.max(VOX, vs(v)); }     // a voxel size, never zero
+  function lump(x, y, z, w, h, d, hex) {
+    w = vc(w); h = vc(h); d = vc(d);
+    var cx = vs(x), cz = vs(z), y0 = vs(y);
+    aabb('leaf', cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, y0, y0 + h, hex);
+  }
   var TREE_KINDS = {
     oak: function (x, z, R, s) {
-      var th = 1.9 + 0.45 * R, tr = 0.14 + 0.07 * R;
-      addGeo('bark', PROTO.cyl6, x, th / 2, z, tr, th, tr, 0, s * 6, 0, 0x5A4634, { uvs: 2 });
-      addGeo('leaf', PROTO.ico1, x, th + 0.75 * R, z, 0.82 * R, 0.68 * R, 0.82 * R, 0, s * 3, 0, 0x3E5A2E, { jitter: 0.22, uvs: 1.5 });
+      var th = vs(1.8 + 0.4 * R), tw = vc(0.25 + 0.1 * R), L = LEAVES.oak;
+      aabb('bark', vs(x) - tw / 2, vs(z) - tw / 2, vs(x) + tw / 2, vs(z) + tw / 2, 0, th + 0.4, 0x5A4634);
+      lump(x, th, z, 1.5 * R, 1.2 * R, 1.5 * R, L[0]);
       for (var k = 0; k < 4; k++) {
-        var a = s * 9 + k * TAU / 4, dd = 0.52 * R;
-        addGeo('leaf', PROTO.ico0, x + Math.cos(a) * dd, th + 0.45 * R + (k & 1) * 0.2 * R, z + Math.sin(a) * dd,
-          0.56 * R, 0.48 * R, 0.56 * R, 0, a, 0, 0x466532, { jitter: 0.25, uvs: 1.5 });
+        var a = s * 9 + k * TAU / 4;
+        lump(x + Math.cos(a) * 0.7 * R, th + 0.15 * R + (k & 1) * 0.15 * R, z + Math.sin(a) * 0.7 * R,
+             0.9 * R, 0.85 * R, 0.9 * R, L[1 + (k % 3)]);
       }
-      return tr;
+      lump(x + 0.1 * R, th + 1.2 * R, z - 0.1 * R, 1.0 * R, 0.4 * R, 1.0 * R, L[2]);
+      for (var p = 0; p < 3; p++) {
+        var b = s * 17 + p * 2.3;
+        lump(x + Math.cos(b) * 0.95 * R, th + (0.3 + p * 0.3) * R, z + Math.sin(b) * 0.95 * R, 0.4 * R, 0.4 * R, 0.4 * R, L[3]);
+      }
+      return tw / 2;
     },
     maple: function (x, z, R, s) {
-      var th = 2.3 + 0.4 * R, tr = 0.12 + 0.06 * R;
-      addGeo('bark', PROTO.cyl6, x, th / 2, z, tr, th, tr, 0, s * 6, 0, 0x5E4A38, { uvs: 2 });
-      addGeo('leaf', PROTO.ico1, x, th + 0.8 * R, z, 0.95 * R, 0.85 * R, 0.95 * R, 0, s * 3, 0, 0x55692C, { jitter: 0.2, uvs: 1.5 });
-      addGeo('leaf', PROTO.ico0, x + 0.2 * R, th + 1.45 * R, z - 0.1 * R, 0.5 * R, 0.42 * R, 0.5 * R, 0, s, 0, 0x5E7432, { jitter: 0.2, uvs: 1.5 });
-      return tr;
+      var th = vs(2.2 + 0.4 * R), tw = vc(0.2 + 0.1 * R), L = LEAVES.maple;
+      aabb('bark', vs(x) - tw / 2, vs(z) - tw / 2, vs(x) + tw / 2, vs(z) + tw / 2, 0, th + 0.4, 0x5E4A38);
+      lump(x, th, z, 1.3 * R, 0.6 * R, 1.3 * R, L[0]);
+      lump(x, th + 0.6 * R, z, 1.8 * R, 0.9 * R, 1.7 * R, L[1]);
+      lump(x + 0.1 * R, th + 1.5 * R, z, 1.2 * R, 0.6 * R, 1.2 * R, L[2]);
+      lump(x + Math.cos(s * 7) * 0.8 * R, th + 0.9 * R, z + Math.sin(s * 7) * 0.8 * R, 0.7 * R, 0.6 * R, 0.7 * R, L[3]);
+      return tw / 2;
     },
     pine: function (x, z, R, s) {
-      var trunk = 1.0 + 0.2 * R, tr = 0.1 + 0.05 * R;
-      addGeo('bark', PROTO.cyl6, x, trunk / 2 + 0.3, z, tr, trunk + 0.6, tr, 0, s * 6, 0, 0x4E3A2A, { uvs: 2 });
-      for (var k = 0; k < 4; k++) {
-        var rr = R * (1.0 - k * 0.2), hh = 1.25 * R + 0.6;
-        addGeo('leaf', PROTO.cone7, x, trunk + k * 0.62 * R + hh / 2, z, rr, hh, rr, 0, s * 5 + k, 0, 0x2A4A34, { jitter: 0.18, uvs: 1.5 });
+      var trunk = vs(0.9 + 0.2 * R), tw = vc(0.2 + 0.08 * R), L = LEAVES.pine;
+      aabb('bark', vs(x) - tw / 2, vs(z) - tw / 2, vs(x) + tw / 2, vs(z) + tw / 2, 0, trunk + 0.3, 0x4E3A2A);
+      var y = trunk;
+      for (var k = 0; k < 5; k++) {
+        var wdt = 2 * R * (1 - k * 0.19), h = 0.35 * R + 0.3;
+        // a plus of two slabs per tier: an octagon-ish silhouette from above
+        lump(x, y, z, wdt, h, wdt * 0.55, L[k % 3]);
+        lump(x, y, z, wdt * 0.55, h, wdt, L[(k + 1) % 3]);
+        lump(x, y + h * 0.4, z, wdt * 0.72, h * 0.8, wdt * 0.72, L[(k + 2) % 3]);
+        y += h * 0.9;
       }
-      return tr;
+      lump(x, y, z, 0.3, 0.5, 0.3, L[0]);
+      return tw / 2;
     },
     spruce: function (x, z, R, s) {
-      var trunk = 0.8, tr = 0.09 + 0.04 * R, rr0 = 0.72 * R;
-      addGeo('bark', PROTO.cyl6, x, 0.6, z, tr, 1.2, tr, 0, 0, 0, 0x4A3828, { uvs: 2 });
-      for (var k = 0; k < 5; k++) {
-        var rr = rr0 * (1.0 - k * 0.17), hh = 1.1 * R + 0.8;
-        addGeo('leaf', PROTO.cone7, x, trunk + k * 0.72 * R + hh / 2, z, rr, hh, rr, 0, s * 7 + k, 0, 0x24402E, { jitter: 0.16, uvs: 1.5 });
+      var trunk = 0.7, tw = vc(0.2 + 0.06 * R), L = LEAVES.spruce;
+      aabb('bark', vs(x) - tw / 2, vs(z) - tw / 2, vs(x) + tw / 2, vs(z) + tw / 2, 0, 1.0, 0x4A3828);
+      var y = trunk;
+      for (var k = 0; k < 7; k++) {
+        var wdt = 1.5 * R * (1 - k * 0.13), h = 0.3 * R + 0.3;
+        lump(x, y, z, wdt, h, wdt * 0.6, L[k % 3]);
+        lump(x, y, z, wdt * 0.6, h, wdt, L[(k + 1) % 3]);
+        y += h * 0.8;
       }
-      return tr;
+      lump(x, y, z, 0.2, 0.5, 0.2, L[1]);
+      return tw / 2;
     },
     birch: function (x, z, R, s) {
-      var th = 2.0 + 0.45 * R, tr = 0.1 + 0.03 * R;
-      addGeo('birch', PROTO.cyl6, x, (th + 0.5 * R) / 2, z, tr, th + 0.5 * R, tr, 0, 0, 0, 0xE0DCD2, { uvs: 3 });
+      var th = vs(2.0 + 0.45 * R), tw = VOX * 2, L = LEAVES.birch;
+      aabb('birch', vs(x) - tw / 2, vs(z) - tw / 2, vs(x) + tw / 2, vs(z) + tw / 2, 0, th + 0.6 * R, 0xE0DCD2);
       for (var k = 0; k < 3; k++) {
         var a = s * 11 + k * 2.1;
-        addGeo('leaf', PROTO.ico1, x + Math.cos(a) * 0.3 * R, th + 0.45 * R + k * 0.5 * R, z + Math.sin(a) * 0.3 * R,
-          0.72 * R, 0.8 * R, 0.72 * R, 0, a, 0, 0x6E8A3A, { jitter: 0.2, uvs: 1.5 });
+        lump(x + Math.cos(a) * 0.35 * R, th + 0.2 * R + k * 0.45 * R, z + Math.sin(a) * 0.35 * R,
+             1.0 * R, 0.7 * R, 1.0 * R, L[k]);
       }
-      return tr;
+      return tw / 2;
     }
   };
   function buildTrees() {
     var forest = ['pine', 'spruce', 'pine', 'oak', 'spruce', 'maple'];
     var yard = ['oak', 'maple', 'birch', 'oak', 'maple'];
-    OAK.trees.forEach(function (t, i) {
+    OAK.trees.forEach(function (t) {
       var s = hash2(t[0], t[1], 100);
       var inForest = t[0] < 175 || (t[1] > 960 && t[0] < 520);
       var list = inForest ? forest : yard;
@@ -2609,43 +2811,67 @@ function main(hotData) {
       var R = Math.max(1.0, t[2] / 10);
       var tr = TREE_KINDS[kind](wx(t[0]), wz(t[1]), R, s);
       colCircle(wx(t[0]), wz(t[1]), tr + 0.14, false);
-      void i;
     });
     OAK.bushes.forEach(function (b) {
       var x = wx(b[0]), z = wz(b[1]), R = b[2] / 10;
-      for (var k = 0; k < 4; k++) {
-        var a = k * 1.7 + b[0];
-        addGeo('leaf', PROTO.ico0, x + Math.cos(a) * 0.35 * R, 0.45 * R, z + Math.sin(a) * 0.35 * R,
-          0.62 * R, 0.5 * R, 0.62 * R, 0, a, 0, 0x34502C, { jitter: 0.25, uvs: 2 });
-      }
+      lump(x, 0, z, 1.3 * R, 0.8 * R, 1.2 * R, 0x34502C);
+      lump(x + 0.3 * R, 0.2 * R, z - 0.2 * R, 0.9 * R, 0.8 * R, 0.9 * R, 0x3E5C32);
+      lump(x - 0.35 * R, 0.1 * R, z + 0.3 * R, 0.7 * R, 0.6 * R, 0.8 * R, 0x2E4828);
       colCircle(x, z, 0.8 * R, true);
     });
   }
 
-  /* --------------------------------------------------------------- fences */
+  /* --------------------------------------------------------------- fences
+     Built from real parts: posts every run, two rails, and a picket every
+     20 cm — or, round the church and park, iron bars every 25 cm between a
+     top and bottom rail. (No cap blocks: from the game camera they cost as
+     many vertices as the pickets themselves and cannot be seen.)            */
   function buildFences() {
     OAK.fences.forEach(function (f) {
       var x0 = wx(f[0]), z0 = wz(f[1]), x1 = wx(f[2]), z1 = wz(f[3]);
       var iron = f[0] >= 1590;             // the church and park lots
-      var len = Math.hypot(x1 - x0, z1 - z0), vert = x0 === x1;
-      var hgt = iron ? 1.3 : 1.05, post = iron ? 0x24272B : 0xB8B0A0;
-      var n = Math.max(1, Math.round(len / 2.4));
-      for (var k = 0; k < n; k++) {
-        var a = k / n, b = (k + 1) / n;
-        var ax = x0 + (x1 - x0) * a, az = z0 + (z1 - z0) * a, bx = x0 + (x1 - x0) * b, bz = z0 + (z1 - z0) * b;
-        var bin = binFor(iron ? 'iron' : 'picket', ax, az);
-        var L = Math.hypot(bx - ax, bz - az);
-        if (vert) quad(bin, [ax, 0, az], [bx, 0, bz], [bx, hgt, bz], [ax, hgt, az], iron ? 0x2E3136 : 0xC8C0B0, L, 1);
-        else quad(bin, [ax, 0, az], [bx, 0, bz], [bx, hgt, bz], [ax, hgt, az], iron ? 0x2E3136 : 0xC8C0B0, L, 1);
-        aabb(iron ? 'metal' : 'wood', ax - 0.06, az - 0.06, ax + 0.06, az + 0.06, 0, hgt + 0.08, post);
+      var vert = Math.abs(x0 - x1) < 1e-6;
+      var a0 = vert ? Math.min(z0, z1) : Math.min(x0, x1), a1 = vert ? Math.max(z0, z1) : Math.max(x0, x1);
+      var fx = vert ? x0 : z0;
+      // box along the fence: a..b along it, d0..d1 across it
+      function part(m, a, b, d0, d1, y0, y1, c) {
+        if (vert) aabb(m, fx + d0, a, fx + d1, b, y0, y1, c, { noBottom: true });
+        else aabb(m, a, fx + d0, b, fx + d1, y0, y1, c, { noBottom: true });
       }
-      aabb(iron ? 'metal' : 'wood', x1 - 0.06, z1 - 0.06, x1 + 0.06, z1 + 0.06, 0, hgt + 0.08, post);
+      var len = a1 - a0, nPost = Math.max(1, Math.round(len / 2.4));
+      if (iron) {
+        var iHex = 0x2A2D32;
+        part('metal', a0, a1, -0.03, 0.03, 0.1, 0.15, iHex);
+        part('metal', a0, a1, -0.03, 0.03, 1.15, 1.2, iHex);
+        for (var bI = a0 + 0.125; bI < a1 - 0.05; bI += 0.25) {
+          part('metal', bI - 0.025, bI + 0.025, -0.025, 0.025, 0, 1.3, iHex);
+        }
+        for (var k = 0; k <= nPost; k++) {
+          var pA = a0 + (len * k) / nPost;
+          part('metal', pA - 0.05, pA + 0.05, -0.05, 0.05, 0, 1.45, 0x22252A);
+        }
+      } else {
+        var wHex = 0xC8C0B0, pHex = 0xB0A898;
+        part('wood', a0, a1, 0.025, 0.075, 0.3, 0.4, pHex);
+        part('wood', a0, a1, 0.025, 0.075, 0.75, 0.85, pHex);
+        for (var pk = a0 + 0.1; pk < a1 - 0.05; pk += 0.2) {
+          var shade = hash2(pk * 10 | 0, f[1], 61) < 0.2 ? 0xB8B0A0 : wHex;
+          part('wood', pk - 0.05, pk + 0.05, -0.025, 0.025, 0, 1.0, shade);
+        }
+        for (var k2 = 0; k2 <= nPost; k2++) {
+          var pB = a0 + (len * k2) / nPost;
+          part('wood', pB - 0.075, pB + 0.075, -0.05, 0.1, 0, 1.15, pHex);
+        }
+      }
       colRect(Math.min(x0, x1) - 0.1, Math.min(z0, z1) - 0.1, Math.max(x0, x1) + 0.1, Math.max(z0, z1) + 0.1, true);
     });
   }
 
   /* ------------------------------------------------------------------ cars
-     Built along local +X (nose), then turned to the blueprint's heading.     */
+     Voxel cars, built along local +X (nose) then turned to the blueprint's
+     heading: a body cut round its wheel arches, block wheels with hubs, a
+     glasshouse on four pillars with a stepped windscreen, bumpers, lights and
+     mirrors. Wrecks have lost their glass and a wheel and gone to rust.      */
   var PAINT = [0x8A2F2A, 0x2F4E78, 0xC9C6BC, 0x8E9398, 0x3E5A44, 0x6A5A3A, 0x1E2226, 0x7A6A9A];
   function buildCar(kind, px, py, deg) {
     var x = wx(px), z = wz(py), ry = -deg * PI / 180;
@@ -2654,69 +2880,98 @@ function main(hotData) {
     var paint = PAINT[Math.floor(seed * PAINT.length)];
     var wreck = kind === 'wreck' || kind === 'pickupWreck';
     if (wreck) paint = kind === 'wreck' ? 0x3A2E26 : 0x5A4632;
+    var dark = 0x18191B, trimC = 0x2A2C2E, glassC = 0x1C2630, rust = 0x7A4A2A;
     function P(lx, lz) { return [x + lx * c + lz * s, z - lx * s + lz * c]; }
-    function part(mat, lx, lz, sx, sz, y0, y1, hex) {
-      var p = P(lx, lz);
-      box(mat, p[0], p[1], sx, sz, y0, y1, hex, ry);
+    // box by local extents: x0..x1 along the car, z0..z1 across it
+    function part(mat, x0, x1, z0, z1, y0, y1, hex) {
+      var p = P((x0 + x1) / 2, (z0 + z1) / 2);
+      box(mat, p[0], p[1], x1 - x0, z1 - z0, y0, y1, hex, ry, { noBottom: true });
     }
-    function wheel(lx, lz, r) {
-      var p = P(lx, lz);
-      addGeo('plain', PROTO.cyl8, p[0], r, p[1], r, 0.26, r, PI / 2, ry, 0, 0x16181A, { order: 'YXZ' });
+    function wheel(lx, side, r) {
+      var zo = side * 1;
+      var zIn = zo > 0 ? W / 2 - 0.3 : -W / 2, zOut = zo > 0 ? W / 2 : -W / 2 + 0.3;
+      part('plain', lx - r, lx + r, zIn, zOut, 0, 2 * r, dark);
+      var hz0 = zo > 0 ? W / 2 : -W / 2 - 0.05, hz1 = zo > 0 ? W / 2 + 0.05 : -W / 2;
+      part('metal', lx - 0.15, lx + 0.15, hz0, hz1, r - 0.15, r + 0.15, 0x6A6E72);
     }
     var L, W;
     if (kind === 'moto') {
       // on its side in the road
-      part('metal', 0, 0, 1.3, 0.28, 0.1, 0.34, 0x6A2A26);
-      part('plain', 0.1, 0.05, 0.5, 0.35, 0.1, 0.3, 0x1A1C1E);
-      [[-0.75, 0], [0.75, 0]].forEach(function (w) {
-        var p = P(w[0], w[1]);
-        addGeo('plain', PROTO.cyl8, p[0], 0.1, p[1], 0.34, 0.12, 0.34, 0, 0, 0, 0x16181A);
-      });
+      part('metal', -0.6, 0.6, -0.15, 0.15, 0.1, 0.35, 0x6A2A26);
+      part('plain', -0.2, 0.3, -0.2, 0.2, 0.1, 0.3, 0x1A1C1E);
+      part('plain', -0.95, -0.55, -0.1, 0.1, 0, 0.4, dark);
+      part('plain', 0.55, 0.95, -0.1, 0.1, 0, 0.4, dark);
+      part('metal', 0.5, 0.6, -0.4, 0.4, 0.3, 0.4, 0x8A8E92);          // bars
       colCircle(x, z, 0.8, true);
       return;
     }
     if (kind === 'boxtruck') {
       L = 8.6; W = 2.4;
-      part('metal', 2.9, 0, 2.2, 2.3, 0.55, 1.9, 0xD8D4CA);                // cab
-      part('glass', 3.55, 0, 0.9, 2.1, 1.35, 2.35, 0x1C2630);
-      part('metal', 3.0, 0, 1.9, 2.3, 1.9, 2.5, 0xD8D4CA);
-      part('metal', -1.1, 0, 5.9, 2.44, 0.8, 3.4, 0xB8B4AC);               // box
-      part('metal', -1.1, 1.23, 5.6, 0.02, 1.4, 2.6, 0x9A4A32);             // livery stripe
-      part('metal', -1.1, -1.23, 5.6, 0.02, 1.4, 2.6, 0x9A4A32);
-      part('plain', 0, 0, 8.4, 1.4, 0.35, 0.8, 0x26282A);                   // chassis
-      [[3.0, 1.05], [3.0, -1.05], [-2.4, 1.05], [-2.4, -1.05], [-3.4, 1.05], [-3.4, -1.05]].forEach(function (w) { wheel(w[0], w[1], 0.46); });
+      part('plain', -4.2, 4.2, -0.7, 0.7, 0.4, 0.8, 0x26282A);                    // chassis
+      part('metal', 1.9, 4.1, -1.15, 1.15, 0.6, 1.9, 0xD8D4CA);                    // cab
+      part('metal', 2.0, 3.8, -1.15, 1.15, 1.9, 2.5, 0xD8D4CA);
+      part('glass', 3.8, 4.15, -1.05, 1.05, 1.3, 2.3, glassC);                     // windscreen
+      part('glass', 2.3, 3.6, -1.2, 1.2, 1.4, 2.2, glassC);                        // side windows
+      part('plain', 4.1, 4.3, -1.2, 1.2, 0.5, 0.8, trimC);                         // bumper
+      part('lens', 4.15, 4.25, 0.7, 1.0, 0.9, 1.1, 0x8C8A70);
+      part('lens', 4.15, 4.25, -1.0, -0.7, 0.9, 1.1, 0x8C8A70);
+      part('metal', -4.2, 1.8, -1.22, 1.22, 0.8, 3.4, 0xB8B4AC);                   // box
+      part('metal', -4.0, 1.6, 1.22, 1.27, 1.4, 2.6, 0x9A4A32);                    // livery
+      part('metal', -4.0, 1.6, -1.27, -1.22, 1.4, 2.6, 0x9A4A32);
+      part('metal', -4.3, -4.2, -1.1, 1.1, 0.9, 3.3, 0x8E8A84);                    // roller door
+      [[3.0, 1], [3.0, -1], [-2.4, 1], [-2.4, -1], [-3.4, 1], [-3.4, -1]].forEach(function (w) { wheel(w[0], w[1], 0.45); });
       for (var k = -3; k <= 3; k++) { var q = P(k * 1.2, 0); colCircle(q[0], q[1], 1.3, false); }
       return;
     }
     if (kind === 'pickupWreck') {
-      L = 5.3; W = 1.95;
-      part('metal', 0, 0, L, W, 0.42, 1.0, paint);
-      part('metal', 0.55, 0, 1.6, 1.8, 1.0, 1.62, paint);
-      part('plain', 0.55, 0, 1.5, 1.7, 1.0, 1.55, 0x121416);               // glass long gone
-      part('metal', -1.55, 0, 2.1, 1.84, 1.0, 1.02, 0x2A2420);               // empty bed
-      part('metal', -1.55, 0.9, 2.1, 0.08, 1.0, 1.32, paint);
-      part('metal', -1.55, -0.9, 2.1, 0.08, 1.0, 1.32, paint);
-      [[1.7, 0.86], [1.7, -0.86], [-1.6, 0.86]].forEach(function (w) { wheel(w[0], w[1], 0.4); });
+      L = 5.3; W = 2.0;
+      part('metal', -2.65, 2.65, -1, 1, 0.45, 1.0, paint);
+      part('metal', -0.1, 1.5, -0.9, 0.9, 1.0, 1.6, paint);                        // cab
+      part('plain', 0.0, 1.55, -0.85, 0.85, 1.05, 1.55, 0x121416);                 // no glass left
+      part('metal', 1.5, 2.65, -1, 1, 1.0, 1.05, paint);                           // hood
+      part('metal', -2.6, -0.2, -0.95, 0.95, 1.0, 1.05, 0x2A2420);                 // empty bed
+      part('metal', -2.6, -0.2, 0.9, 1.0, 1.0, 1.3, paint);
+      part('metal', -2.6, -0.2, -1.0, -0.9, 1.0, 1.3, paint);
+      part('metal', 0.4, 1.2, -0.3, 0.3, 1.6, 1.62, rust);
+      part('metal', -1.8, -0.9, 0.2, 0.9, 1.05, 1.07, rust);
+      [[1.7, 1], [1.7, -1], [-1.6, 1]].forEach(function (w) { wheel(w[0], w[1], 0.4); });
     } else {
       var hatch = kind === 'hatch';
-      L = hatch ? 4.0 : 4.6; W = hatch ? 1.76 : 1.84;
-      var cabL = hatch ? 2.3 : 2.2, cabX = hatch ? -0.35 : -0.15;
-      part('metal', 0, 0, L, W, 0.34, 0.86, paint);                           // lower body
-      part('metal', 0.02, 0, L - 0.2, W - 0.1, 0.86, 0.9, paint);
-      part(wreck ? 'plain' : 'glass', cabX, 0, cabL, W - 0.16, 0.9, 1.34, wreck ? 0x101214 : 0x1C2630);
-      part('metal', cabX - 0.05, 0, cabL - 0.6, W - 0.26, 1.34, 1.42, wreck ? 0x241C18 : paint);
-      part('plain', L / 2 - 0.04, 0, 0.12, W - 0.1, 0.3, 0.5, 0x2A2C2E);    // bumpers
-      part('plain', -L / 2 + 0.04, 0, 0.12, W - 0.1, 0.3, 0.5, 0x2A2C2E);
+      L = hatch ? 4.0 : 4.6; W = hatch ? 1.8 : 1.9;
+      var hl = L / 2, hw = W / 2, wb = vs(hl - 0.8), r = 0.35;
+      var cab0 = hatch ? -1.5 : -1.2, cab1 = hatch ? 0.8 : 0.9;           // glasshouse along the car
+      // lower body, cut round both wheel arches
+      var arches = [[-wb - 0.45, -wb + 0.45], [wb - 0.45, wb + 0.45]];
+      part('metal', -hl, arches[0][0], -hw, hw, 0.3, 0.85, paint);
+      part('metal', arches[0][1], arches[1][0], -hw, hw, 0.3, 0.85, paint);
+      part('metal', arches[1][1], hl, -hw, hw, 0.3, 0.85, paint);
+      arches.forEach(function (a) { part('metal', a[0], a[1], -hw, hw, 0.75, 0.85, paint); });
+      // a door seam and sills
+      part('plain', cab0 + 1.0, cab0 + 1.05, -hw - 0.02, hw + 0.02, 0.4, 0.85, trimC);
+      // glasshouse: glass, four pillars, a roof, and a windscreen that steps
+      part(wreck ? 'plain' : 'glass', cab0 + 0.1, cab1 - 0.1, -hw + 0.1, hw - 0.1, 0.85, 1.3, wreck ? 0x101214 : glassC);
+      part(wreck ? 'plain' : 'glass', cab1 - 0.1, cab1 + 0.2, -hw + 0.15, hw - 0.15, 0.85, 1.1, wreck ? 0x101214 : glassC);
+      [[cab0, -hw + 0.05], [cab0, hw - 0.15], [cab1 - 0.1, -hw + 0.05], [cab1 - 0.1, hw - 0.15]].forEach(function (pp) {
+        part('metal', pp[0], pp[0] + 0.1, pp[1], pp[1] + 0.1, 0.85, 1.3, paint);
+      });
+      part('metal', cab0, cab1, -hw + 0.05, hw - 0.05, 1.3, 1.4, wreck ? 0x241C18 : paint);
+      if (hatch) part('metal', -hl, cab0, -hw, hw, 0.85, 1.25, paint);         // hatchback rear
+      part('plain', hl, hl + 0.1, -hw, hw, 0.3, 0.5, trimC);                    // bumpers
+      part('plain', -hl - 0.1, -hl, -hw, hw, 0.3, 0.5, trimC);
+      part('metal', cab1 - 0.1, cab1, hw, hw + 0.1, 1.0, 1.1, paint);          // mirrors
+      part('metal', cab1 - 0.1, cab1, -hw - 0.1, -hw, 1.0, 1.1, paint);
       if (!wreck) {
-        part('lens', L / 2 - 0.01, W / 2 - 0.28, 0.04, 0.34, 0.62, 0.74, 0x8C8A70);
-        part('lens', L / 2 - 0.01, -W / 2 + 0.28, 0.04, 0.34, 0.62, 0.74, 0x8C8A70);
-        part('plain', -L / 2 + 0.01, W / 2 - 0.26, 0.04, 0.3, 0.62, 0.76, 0x6A1C18);
-        part('plain', -L / 2 + 0.01, -W / 2 + 0.26, 0.04, 0.3, 0.62, 0.76, 0x6A1C18);
+        part('lens', hl, hl + 0.05, hw - 0.4, hw - 0.1, 0.6, 0.75, 0x8C8A70);
+        part('lens', hl, hl + 0.05, -hw + 0.1, -hw + 0.4, 0.6, 0.75, 0x8C8A70);
+        part('plain', -hl - 0.05, -hl, hw - 0.35, hw - 0.1, 0.6, 0.8, 0x6A1C18);
+        part('plain', -hl - 0.05, -hl, -hw + 0.1, -hw + 0.35, 0.6, 0.8, 0x6A1C18);
+      } else {
+        part('metal', -0.6, 0.4, -0.4, 0.5, 1.4, 1.42, rust);
+        part('metal', 1.2, 2.0, -0.6, 0.2, 0.85, 0.87, rust);
       }
-      var wb = L / 2 - 0.78;
-      [[wb, W / 2 - 0.12], [wb, -W / 2 + 0.12], [-wb, W / 2 - 0.12], [-wb, -W / 2 + 0.12]].forEach(function (w, k) {
+      [[wb, 1], [wb, -1], [-wb, 1], [-wb, -1]].forEach(function (w, k) {
         if (wreck && k === 3) return;                    // one wheel gone
-        wheel(w[0], w[1], 0.34);
+        wheel(w[0], w[1], r);
       });
     }
     var n = Math.ceil(L / W);
