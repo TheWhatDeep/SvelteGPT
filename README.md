@@ -60,12 +60,17 @@ locally.
   pickup magnet, and more.
 - **Twin-stick by default.** The left half of the screen is a floating movement
   stick, the right half aims and fires. **Auto-aim is off by default** and can be
-  switched on from the menu or pause screen — with it on, the weapon tracks the
+  switched on in Settings (the cog on the menu) or on the pause screen — with it on, the weapon tracks the
   nearest walker and one thumb is enough. Manual aim always overrides it.
 
   The default is deliberate: auto-aim plus auto-fire leaves the player with only
   one verb ("don't die"), which rewards standing still in a corner. Giving the
   right thumb a job keeps both hands in the fight.
+- **A quiet menu.** The logo — traced from the artwork into a vector path, so
+  it is sharp at any size on a transparent background — a Start button and your
+  best run. Settings (auto-aim, cheats, quality, effects, sound) sit behind the
+  **cog** in the bottom-right corner, in a pop-up over the menu; the **i** beside
+  it opens How to Play. Escape closes either.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
@@ -312,7 +317,7 @@ DOM nodes, and it became necessary the moment darkness landed.
 
 ## Cheats
 
-Turn **Cheats: On** in the menu or pause screen and a slider button appears in the
+Turn **Cheats: On** in Settings (the cog on the menu) or on the pause screen and a slider button appears in the
 HUD beside pause. It opens a panel with every weapon (tap to equip) and every
 upgrade (tap to add a level, up to its normal cap). The world freezes while the
 panel is open, so you can build a loadout without being eaten.
@@ -424,7 +429,7 @@ after you were last hit**, making it a between-fights recovery tool rather than
 a combat one. A fully-maxed defensive build standing still in nine level-7
 zombies now loses ~19 HP/sec.
 
-### Post-processing: bloom and FXAA
+### Post-processing: bloom, FXAA and the grade
 
 Written by hand rather than with three.js `EffectComposer` + `UnrealBloomPass`,
 which live in the examples bundle and would mean a second CDN fetch this page
@@ -436,6 +441,11 @@ downsamples, a separable blur in two directions, then a composite.
 - The composite also runs **FXAA**, which is load-bearing: rendering into a
   render target bypasses the canvas's MSAA entirely, so without it turning
   effects on would make edges *worse*.
+- The composite ends with the **grade** that gives the night its grit: colour
+  pulled 20% towards grey, the shadows crushed a touch and cooled, and a fine
+  film grain that changes every frame. The grain is strongest in the midtones,
+  so black stays black and the lamp pools stay clean. It runs on every quality
+  tier; it is one hash per pixel.
 - Bloom buffers run at 20–40% resolution depending on quality tier. FXAA is the
   only full-resolution pass, and it is skipped on the battery tier.
 - Render targets tolerate a 6% size drift before reallocating, because the
