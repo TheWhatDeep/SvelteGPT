@@ -159,15 +159,56 @@ stipple, extracted as a density mask and run-length encoded into the page.
   strip along the west edge is mostly conifer; yards and the park are
   broadleaf.
 
-### Zombies path-find
+### Zombie brains
 
-Walls and furniture made straight-line chasing useless, so the horde follows a
-**flow field**: a breadth-first distance map from the player over a 0.5 m grid,
-rebuilt when the player changes cell (**0.8 ms**). Each zombie walks downhill on it,
-looking a few cells ahead so paths are straight rather than stair-stepped.
-Spitters walk it until they have line of sight, then hold and spit.
+Three layers, after how Left 4 Dead's infected behave.
 
-Zombies spawn **outdoors, 18–34 m away by path**, so nothing materialises beside
+**Senses.** A zombie is *wandering*, *hunting* or *searching*. About half the
+Director's build-up trickle arrives wandering and has to notice you; hordes and
+specials arrive hunting.
+
+| Sense | Rule |
+|---|---|
+| Sight | A forward cone, blocked by walls: 10 m in the dark, 16 m under a lamp, 22 m if you carry a torch |
+| Hearing | Gunfire, measured by **path distance along the streets** — it carries round corners, not through buildings. 26 m (SMG) to 38 m (marksman); blasts 32 m |
+| Pain | Being shot |
+| Each other | A hunter wakes wanderers within 7 m; a Howler's shriek wakes the street |
+
+A hunter that has sensed nothing for 14 s searches for 8 s, then loses interest.
+
+**Pathing.** Far off, hunters walk the **flow field**: a breadth-first
+distance map from the player over a 0.5 m grid, rebuilt when the player changes
+cell (0.8 ms), looked a few cells ahead so paths are straight rather than
+stair-stepped.
+
+- **Flanking.** Runners (70%), crawlers (40%) and shamblers (25%) follow a second
+  field to a point behind the player, routed round a 7 m no-go half-disc over the
+  player's front, and turn in at the end — unless the detour is far longer than
+  the direct route, which is not a flank. Measured on Main Street, direct runners
+  arrive at 0–19° off the aim; flankers at 85–97°.
+- **Surround.** Within 7.5 m every melee hunter takes a slot on a ring, spread
+  evenly and weighted behind the player, in the order they already stand so
+  nobody crosses. A pack of ten from one direction ended up in all eight
+  directions around the player, half of them behind.
+- **Unsticking.** A body that makes no progress for 1.5 s sidesteps.
+
+**Attacks you can read.** Every melee hit has a wind-up — arms rise, then
+slam — and lands only if you are still in reach when it does, so stepping away
+dodges it. Only 3 zombies may be mid-swing at once (rising to 6 with level);
+the rest hold their slots just outside reach.
+
+| Type | Attack |
+|---|---|
+| Shambler, Bloater | Wind-up and slam |
+| Runner | A quick wind-up (0.22 s) |
+| Crawler | Pounces from 2–5 m: crouch, then a leading leap |
+| Brute | Charges from 5–13 m with a clear line: plants and rears for 0.8 s, then runs straight at 12 m/s. A hit does 1.6× and knocks you back; a miss into a wall **stuns it for 1.8 s, taking 1.6× damage** |
+| Spitter | Holds 6.5–12 m with a clear line, strafes and relocates after each shot, backs off when rushed, leads its shots; claws if cornered |
+| Howler | Shelters 9–13 m back, flees a rush, shrieks when there is a pack to send |
+
+The brains cost about 0.1 ms per simulation step for 26 zombies.
+
+Zombies spawn **outdoors, 18–38 m away by path**, so nothing materialises beside
 you or inside a room it cannot leave. From the spawn, 99.9% of walkable ground
 is reachable; the unreachable remainder is a couple of closets behind stairs.
 
