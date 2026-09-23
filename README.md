@@ -140,24 +140,42 @@ The trees were located with a Hough-circle pass over the drawing's green
 outlines and then corrected by hand; the overgrown ground is the drawing's own
 stipple, extracted as a density mask and run-length encoded into the page.
 
-### How it is built
+### How it is built: voxels
 
-- **Pixel textures.** Walls, roofs, wood, fabric, leaves and bark each use a
-  16×16 canvas texture, nearest-filtered and repeated at a fixed density in
-  world space, near-white so vertex colours carry the hue. The ground is one
-  painted 1408×832 texture at 8 texels per metre: asphalt with cracks, worn
-  paint, slab-jointed sidewalks, paving, oil-stained concrete, plank and tile
-  floors, lawn and tall grass.
-- **Merged geometry.** Every static object is baked into one mesh per material
-  per 32 m chunk — about 118k vertices in all, drawn in **40–70 calls and
-  8–9k triangles a frame** because chunks off screen are culled with their real
-  bounding spheres.
+The world is **voxel**, to match the hero model. The voxel is **10 cm — one
+blueprint pixel** — so every wall, window and roof step lands exactly on the
+drawing's grid; small props and furniture sit on a 5 cm grid, the hero's own
+voxel size.
+
+- **Voxel palette textures.** One texel is one voxel face (10 cm on
+  architecture, 5 cm on furniture and props), aligned to the world grid, and
+  shaded in a handful of flat levels rather than noise: lap siding in 20 cm
+  boards, bricks one voxel high and two long, shingles, planks, dressed stone,
+  leaves in clumps of three or four greens. The ground is one 1759×1038 texture
+  at a texel per voxel, in the same flat levels.
+- **Buildings.** Walls sit on the grid with real window openings — a frame and
+  sill standing 5 cm proud, glass set back mid-wall, a cross of glazing bars,
+  shutters on the homes — trimmed doorways with the door swung open against
+  the inner face, corner boards and a darker footing course. Interior walls stop
+  inside the outer wall, so no two colours ever share a plane (which flickers).
+- **Roofs are a height map.** Every 10 cm cell over a building and its eaves
+  gets the height of the highest wing gable that covers it — which is exactly
+  how intersecting roofs meet, so L-shaped houses get a real valley — then
+  quantised to 10 cm steps and meshed: flat runs merge into single faces, the
+  steps become risers, and the gable-end walls and fascia boards fall out of
+  the same pass. Homes get a chimney on their main ridge.
+- **Props.** Trees are block clusters in five species; fences are built from
+  posts, rails and a picket every 20 cm (iron bars every 25 cm round the church
+  and park); cars have bodies cut round their wheel arches, block wheels with
+  hubs, a glasshouse on four pillars with a stepped windscreen, bumpers,
+  lights and mirrors. Anything that was round is square.
+- **Merged, indexed geometry.** Every static object is baked into one mesh per
+  material per 32 m chunk, indexed so a face shares its corners — about 222k
+  vertices in all, drawn in **30–70 calls and 21–31k triangles a frame** because
+  chunks off screen are culled with their real bounding spheres.
 - **Roofs lift off** the building you walk into, so its rooms read from above.
 - **See-through.** Walls, roofs and canopies between the camera and the player
   dither away in a small screen-space circle around the player instead of hiding them.
-- **Trees** come in five species — oak, maple, birch, pine, spruce. The forest
-  strip along the west edge is mostly conifer; yards and the park are
-  broadleaf.
 
 ### Zombie brains
 
