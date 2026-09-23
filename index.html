@@ -136,7 +136,15 @@ body{
   padding:2px 8px 1px;
 }
 
-/* Wave announcement */
+/* Director readout (cheats only) */
+#dir-dbg{
+  position:absolute;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;
+  max-width:calc(100% - 24px);pointer-events:none;
+  font:600 11px/1.35 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.02em;
+  color:#BFE6FF;background:rgba(5,7,9,.72);border:1px solid var(--fog);padding:4px 7px;
+}
+
+/* Horde announcement */
 #announce{
   position:absolute;left:0;right:0;top:34%;
   text-align:center;pointer-events:none;z-index:4;
@@ -554,14 +562,15 @@ body{
       </div>
       <div class="readout">
         <span class="wep" id="ro-wep">Rifle</span>
-        <span class="wv">Wave <b id="ro-wave">1</b></span>
+        <span class="wv"><b id="ro-wave">0:00</b></span>
         <span>Score <b id="ro-score">0</b></span>
-        <span>Left <b id="ro-left">0</b></span>
+        <span>Kills <b id="ro-left">0</b></span>
       </div>
     </div>
   </div>
 
-  <div id="announce"><div class="a-sub" id="a-sub">Wave</div><div class="a-main" id="a-main">1</div></div>
+  <div id="announce"><div class="a-sub" id="a-sub">Horde</div><div class="a-main" id="a-main">Incoming</div></div>
+  <div id="dir-dbg" hidden></div>
   <div id="hurt"></div>
   <div id="toast"><div class="t-name" id="toast-name"></div><div class="t-sub" id="toast-sub"></div></div>
 
@@ -577,7 +586,7 @@ body{
         <button class="btn ghost" id="btn-how">How to Play</button>
       </div>
       <div class="metarow">
-        <div>Best Wave<b id="m-wave">&mdash;</b></div>
+        <div>Best Time<b id="m-wave">&mdash;</b></div>
         <div>Best Score<b id="m-score">&mdash;</b></div>
       </div>
       <div class="toggles">
@@ -606,11 +615,14 @@ body{
         <p><b>Auto-aim</b> — off by default. Turn it on from the menu or the pause
           screen and your weapon tracks the nearest walker on its own, so one thumb
           is enough. Your own aim always overrides it.</p>
-        <p><b>Pick up a weapon</b> — white crates drop in the lot each wave. A
+        <p><b>Pick up a weapon</b> — white crates turn up ahead of you after each horde. A
           <span class="k">white arrow</span> at the screen edge points to one that
           is off-screen. Walk over it to swap.</p>
-        <p><b>Upgrade</b> — clear a wave and choose one of three permanent upgrades.
-          They stack for the whole run.</p>
+        <p><b>The Director</b> — there are no waves. The dead trickle in, build to
+          a <span class="k">horde</span>, then give you a breather once you have
+          caught your breath — not on a clock. Survive a horde and choose one of
+          three permanent upgrades; they stack for the whole run. Supplies you are
+          short of turn up ahead of where you are heading.</p>
         <p><b>The dead, in order of appearance</b></p>
         <p><span class="k">Shambler</span> — green, slow, arrives in numbers.<br>
           <span class="k">Runner</span> — pale and fast, closes before you notice.<br>
@@ -634,7 +646,7 @@ body{
   <section class="screen" id="sc-upgrade" hidden>
     <div class="panel">
       <div class="up-head">
-        <div class="up-title" id="up-title">Wave 1 Cleared</div>
+        <div class="up-title" id="up-title">Horde 1 Survived</div>
         <div class="up-sub">Choose one &mdash; it is permanent</div>
       </div>
       <div class="cards" id="up-cards"></div>
@@ -646,7 +658,7 @@ body{
     <div class="panel">
       <div class="up-head">
         <div class="up-title">Paused</div>
-        <div class="up-sub" id="p-sub">Wave 1</div>
+        <div class="up-sub" id="p-sub">0:00</div>
       </div>
       <div class="stack">
         <button class="btn" id="btn-resume">Resume</button>
@@ -676,7 +688,7 @@ body{
       <div class="cheat-grid" id="cheat-ups"></div>
       <div class="cheat-note">
         The world is frozen while this is open. Using anything here marks the run:
-        it <b>will not set a best wave or score</b>.
+        it <b>will not set a best time or score</b>.
       </div>
     </div>
   </section>
@@ -687,7 +699,7 @@ body{
       <div class="eyebrow" id="o-eyebrow">Shift Ended</div>
       <h1 class="wordmark" style="font-size:clamp(42px,14vw,72px)">Overrun</h1>
       <div class="stats">
-        <div class="stat"><div class="k">Wave Reached</div><div class="v" id="o-wave">1</div></div>
+        <div class="stat"><div class="k">Hordes Survived</div><div class="v" id="o-wave">1</div></div>
         <div class="stat"><div class="k">Score</div><div class="v" id="o-score">0</div></div>
         <div class="stat"><div class="k">Kills</div><div class="v" id="o-kills">0</div></div>
         <div class="stat"><div class="k">Time Survived</div><div class="v" id="o-time">0:00</div></div>
@@ -1056,6 +1068,19 @@ function main(hotData) {
         o.type = 'sine'; o.frequency.value = hz;
         Audio_.env(o, t + i * 0.055, 0.004, 0.1, 0.16);
         o.start(t + i * 0.055); o.stop(t + i * 0.055 + 0.12);
+      });
+    },
+    // the horde cue: a low detuned swell that rises before the dead arrive
+    horde: function () {
+      if (!this.on || !this.ready) return;
+      var t = this.ctx.currentTime;
+      [55, 55.7, 82.4].forEach(function (hz, i) {
+        var o = Audio_.ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(hz, t);
+        o.frequency.linearRampToValueAtTime(hz * 1.06, t + 1.6);
+        Audio_.env(o, t, 0.9, 1.4, i === 2 ? 0.07 : 0.11);
+        o.start(t); o.stop(t + 2.5);
       });
     },
     fanfare: function () {
@@ -3482,16 +3507,17 @@ function main(hotData) {
   /* --------------------------------------------------------------- the horde */
   var zombies = [];
 
-  function spawnZombie(typeName, wave) {
+  // level scales the body (hp, speed, damage). at: a spot the Director chose;
+  // without one (the menu's wanderers) it finds its own.
+  function spawnZombie(typeName, level, at) {
     if (zombies.length >= Math.min(MAXZ, Q.alive)) return;
     var t = ZTYPE[typeName];
-    // Spawn in a ring just beyond the visible frame, measured from the PLAYER
-    // rather than the arena centre — otherwise a cornered player gets a free
-    // breather while the horde walks the length of the lot.
+    var wave = level;
     // By PATH distance on the flow field, outdoors, and out of straight-line
     // reach: close enough to arrive soon, never popping in beside you or
     // inside a room with no way out.
     var x = 0, z = 0, ok = false;
+    if (at) { x = at.x; z = at.z; ok = true; }
     for (var tries = 0; tries < 12 && !ok; tries++) {
       var spot = navSpot(18, 34, true);
       if (!spot) continue;
@@ -3550,11 +3576,10 @@ function main(hotData) {
   /* ------------------------------------------------------------------ state */
   var G = {
     screen: 'menu',        // menu | how | playing | upgrade | pause | over
-    wave: 1, score: 0, kills: 0, time: 0, cheated: false, blastT: 0,
-    toSpawn: 0, spawnCd: 0, waveActive: false, betweenCd: 0,
+    hordes: 0, level: 1, score: 0, kills: 0, time: 0, cheated: false, blastT: 0,
     shake: 0, running: true
   };
-  var best = { wave: store.get('bestWave', 0), score: store.get('bestScore', 0) };
+  var best = { time: store.get('bestTime', 0), score: store.get('bestScore', 0) };
 
   /* ---------------------------------------------------------------- upgrades */
   var UPGRADES = [
@@ -3643,7 +3668,7 @@ function main(hotData) {
   }
 
   function refreshBest() {
-    $('m-wave').textContent = best.wave ? best.wave : '—';
+    $('m-wave').textContent = best.time ? fmtTime(best.time) : '—';
     $('m-score').textContent = best.score ? best.score.toLocaleString() : '—';
   }
   refreshBest();
@@ -3671,9 +3696,9 @@ function main(hotData) {
     ui.hpGhost.style.transform = 'scaleX(' + frac + ')';
     ui.hpText.textContent = Math.max(0, Math.ceil(player.hp)) + ' / ' + Math.round(player.maxHp);
     ui.roWep.textContent = WEAPONS[player.wep].short;
-    ui.roWave.textContent = G.wave;
+    ui.roWave.textContent = fmtTime(G.time);
     ui.roScore.textContent = G.score.toLocaleString();
-    ui.roLeft.textContent = zombies.length + G.toSpawn;
+    ui.roLeft.textContent = G.kills;
   }
 
   function setQuality(name) {
@@ -4082,6 +4107,7 @@ function main(hotData) {
     if (player.hurtCd > 0) return;
     var dealt = amount * (1 - player.armor);
     player.hp -= dealt;
+    D.dmg += dealt;
     player.lastHurt = G.time;
     player.hurtCd = 0.42;
     G.shake = Math.min(0.55, G.shake + 0.28);
@@ -4141,10 +4167,25 @@ function main(hotData) {
     }
   }
 
+  // Supplies go where the player is heading, so they are found by pushing on
+  // rather than backtracking: the best of a handful of reachable spots, scored
+  // by how far ahead along the direction of travel it lies.
+  function supplySpot(d0, d1) {
+    var best = null, bestS = -9;
+    for (var k = 0; k < 16; k++) {
+      var sp = navSpot(d0, d1, false);
+      if (!sp) continue;
+      var dx = sp.x - player.x, dz = sp.z - player.z, dl = Math.hypot(dx, dz) || 1;
+      var sc = (dx * D.travelX + dz * D.travelZ) / dl + Math.random() * 0.3;
+      if (sc > bestS) { bestS = sc; best = sp; }
+    }
+    return best;
+  }
+
   function spawnDrop(kind) {
     for (var tries = 0; tries < 24; tries++) {
-      // somewhere you can actually walk to, a short path away
-      var ds = navSpot(7, 16, false);
+      // somewhere you can walk to, a short path away, ahead of where you are going
+      var ds = supplySpot(7, 16);
       if (!ds) continue;
       var x = ds.x, z = ds.z;
       if (Math.hypot(x - player.x, z - player.z) < 5) continue;
@@ -4164,8 +4205,8 @@ function main(hotData) {
     if (!pool.length || pickups.length >= MAXPK) return;
     var id = pick(pool);
     for (var tries = 0; tries < 24; tries++) {
-      // somewhere you can actually walk to, a short path away
-      var ds = navSpot(8, 18, false);
+      // somewhere you can walk to, a short path away, ahead of where you are going
+      var ds = supplySpot(8, 18);
       if (!ds) continue;
       var x = ds.x, z = ds.z;
       if (Math.hypot(x - player.x, z - player.z) < 5) continue;
@@ -4178,7 +4219,8 @@ function main(hotData) {
   function killZombie(z, i) {
     if (ZTYPE[z.type].explodes) detonate(z);
     G.kills++;
-    G.score += Math.round(ZTYPE[z.type].score * (1 + Math.floor(G.wave / 5) * 0.25));
+    G.score += Math.round(ZTYPE[z.type].score * (1 + Math.floor(G.level / 5) * 0.25));
+    D.kills += 1;
     burst(z.x, 0.85 * z.scale, z.z, 9, 'gore', 3.4);
     addDecal(z.x, z.z, rand(0.9, 1.7) * z.scale);
     Audio_.splat();
@@ -4198,48 +4240,266 @@ function main(hotData) {
     G.shake = 0.9;
     Audio_.dead();
     if (!G.cheated) {
-      if (G.wave > best.wave) { best.wave = G.wave; store.set('bestWave', best.wave); }
+      if (G.time > best.time) { best.time = G.time; store.set('bestTime', best.time); }
       if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
       refreshBest();
     }
-    $('o-wave').textContent = G.wave;
+    $('o-wave').textContent = G.hordes;
     $('o-score').textContent = G.score.toLocaleString();
     $('o-kills').textContent = G.kills;
     var mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
     $('o-time').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
     $('o-eyebrow').textContent = G.cheated ? 'Cheated Run \u2014 Not Recorded'
-      : ((G.wave >= best.wave && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended');
+      : ((G.time >= best.time && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended');
     setTimeout(function () { show('over'); }, 900);
   }
 
-  function startWave(n) {
-    G.wave = n;
-    G.toSpawn = Math.min(90, 4 + Math.round(n * 2.4));
-    G.spawnCd = 0.4;
-    G.waveActive = true;
-    announce('Wave', String(n));
-    if (n >= 2) spawnWeaponCrate();
-    if (!player.torch && n >= 2 && !pickups.some(function (p) { return p.kind === 'torch'; })) {
-      spawnDrop('torch');
-    }
-    if (n >= 8 && Math.random() < 0.5) spawnWeaponCrate();
+  /* ============================================================ the Director
+     Replaces the wave counter. It reads one number — intensity, how hard the
+     player is being pushed right now — and paces the run in a cycle:
+
+       BUILD    a rising trickle of the common dead, until intensity climbs
+                past 0.55 or 35 s pass
+       PEAK     the horde: a budget of bodies from one or two directions,
+                held for at least 8 s
+       RELAX    nothing spawns until intensity has stayed under 0.15 for 4 s.
+                Gated on the player, not a clock: hurt and cornered, it waits
+       RESPITE  still nothing; an upgrade, and supplies placed ahead of where
+                the player is heading. 12-20 s, or until they push on 50 m
+
+     Intensity rises fast and falls slowly, so a scare lingers after the last
+     body drops. Specials run on their own timer and caps, so no run dies to a
+     dice roll of three brutes. Difficulty is separate from rhythm: G.level
+     grows with hordes survived and time, and scales the budget and the dead
+     themselves, so the shape of a fight stays constant while peaks get bigger.
+     Everything spawns out of sight: never on screen, reachable by path, and
+     outdoors, preferring behind the player or ahead of where they are going. */
+  var D = {
+    state: 'build', t: 0, intensity: 0, target: 0,
+    dmg: 0, kills: 0, calm: 0,
+    trickleCd: 2, specCd: 12, budget: 0, spawned: 0, hordeCd: 0,
+    origins: [], respiteLen: 15, respiteFrom: null, recycled: 0,
+    travelX: 0, travelZ: 1, lastSpec: {}
+  };
+  var SPECIAL_CAP = { brute: 1, spitter: 2, bloater: 2, howler: 1 };
+  var SPECIAL_FROM = { brute: 4, spitter: 6, bloater: 7, howler: 9 };
+
+  function levelNow() { return 1 + G.hordes + G.time / 150; }
+
+  function commonMix(L) {
+    var bag = ['shambler', 'shambler', 'shambler'];
+    if (L >= 2) bag.push('runner');
+    if (L >= 3) bag.push('crawler', 'runner');
+    if (L >= 5) bag.push('crawler', 'shambler');
+    if (L >= 11) bag.push('crawler');
+    if (L >= 13) bag.push('runner');
+    return pick(bag);
   }
 
-  // Each type enters a few waves apart so you meet one new threat at a time.
-  function waveMix(n) {
-    var bag = ['shambler', 'shambler', 'shambler'];
-    if (n >= 2) bag.push('runner');
-    if (n >= 3) bag.push('crawler', 'runner');
-    if (n >= 4) bag.push('brute');
-    if (n >= 5) bag.push('crawler', 'shambler');
-    if (n >= 6) bag.push('spitter');
-    if (n >= 7) bag.push('bloater');
-    if (n >= 8) bag.push('brute', 'spitter');
-    if (n >= 9) bag.push('howler');
-    if (n >= 11) bag.push('bloater', 'crawler');
-    if (n >= 13) bag.push('runner', 'brute', 'howler');
-    if (n >= 16) bag.push('spitter', 'bloater', 'crawler');
-    return pick(bag);
+  // on screen, with a margin so nothing pops in at the edge either
+  var _pv = new T.Vector3();
+  function onScreen(x, z) {
+    _pv.set(x, 1, z).project(camera);
+    return Math.abs(_pv.x) < 1.12 && Math.abs(_pv.y) < 1.15 && _pv.z < 1;
+  }
+
+  // A spawn point d0..d1 m away BY PATH, outdoors, off screen. prefer: 'behind'
+  // (opposite the aim), 'ahead' (along travel) or null.
+  function directorSpot(d0, d1, prefer) {
+    var best = null, bestS = -9;
+    var ax = Math.sin(player.angle), az = Math.cos(player.angle);
+    for (var k = 0; k < 18; k++) {
+      var sp = navSpot(d0, d1, true);
+      if (!sp) continue;
+      var dx = sp.x - player.x, dz = sp.z - player.z, dl = Math.hypot(dx, dz);
+      if (dl < 12 || onScreen(sp.x, sp.z) || blockedAt(sp.x, sp.z)) continue;
+      dx /= dl; dz /= dl;
+      var sc = Math.random() * 0.5;
+      if (prefer === 'behind') sc -= (dx * ax + dz * az) * 0.7;
+      if (prefer === 'ahead') sc += (dx * D.travelX + dz * D.travelZ) * 0.7;
+      if (sc > bestS) { bestS = sc; best = sp; }
+    }
+    return best;
+  }
+
+  // somewhere walkable near a horde origin, still off screen
+  function nearSpot(o, r) {
+    for (var k = 0; k < 10; k++) {
+      var x = o.x + rand(-r, r), z = o.z + rand(-r, r);
+      var c = navCell(x, z);
+      if (c < 0 || NAV.block[c] || NAV.indoor[c] || NAV.dist[c] === 65535) continue;
+      if (onScreen(x, z) || blockedAt(x, z)) continue;
+      if (Math.hypot(x - player.x, z - player.z) < 14) continue;   // a long path round a house is not distance
+      return { x: x, z: z };
+    }
+    return null;
+  }
+
+  function spawnAt(type, sp) {
+    var n = zombies.length;
+    spawnZombie(type, G.level, sp);
+    return zombies.length > n;
+  }
+
+  function aliveOf(type) {
+    var n = 0;
+    for (var i = 0; i < zombies.length; i++) if (zombies[i].type === type) n++;
+    return n;
+  }
+
+  function setState(s) {
+    D.state = s; D.t = 0; D.calm = 0;
+    if (s === 'build') {
+      D.trickleCd = 1.5;
+    } else if (s === 'peak') {
+      var L = G.level;
+      D.budget = Math.min(60, Math.round(8 + 2.6 * L));
+      D.spawned = 0; D.hordeCd = 1.2;
+      // one direction early on, two from level 6: a pincer
+      D.origins = [];
+      var o1 = directorSpot(24, 38, 'behind');
+      if (o1) D.origins.push(o1);
+      if (L >= 6) { var o2 = directorSpot(24, 38, 'ahead'); if (o2) D.origins.push(o2); }
+      Audio_.horde();
+      announce('Horde', 'Incoming');
+    } else if (s === 'respite') {
+      G.hordes++;
+      D.respiteLen = rand(12, 20);
+      D.respiteFrom = { x: player.x, z: player.z };
+      Audio_.fanfare();
+      showUpgrades();                // pauses; supplies land once a card is chosen
+    }
+  }
+
+  // Once the upgrade is chosen: what is the player short of? Put it ahead.
+  function placeSupplies() {
+    spawnWeaponCrate();
+    if (G.level >= 8 && Math.random() < 0.5) spawnWeaponCrate();
+    if (player.hp < player.maxHp * 0.5) spawnDrop('health');
+    if (!player.torch && !pickups.some(function (p) { return p.kind === 'torch'; })) spawnDrop('torch');
+  }
+
+  function directorStep(dt) {
+    G.level = levelNow();
+    D.t += dt;
+
+    // remember which way the player is heading, for ambushes and supplies
+    var mv = Math.hypot(player.vx, player.vz);
+    if (mv > 1) {
+      D.travelX = lerp(D.travelX, player.vx / mv, 1 - Math.pow(0.05, dt));
+      D.travelZ = lerp(D.travelZ, player.vz / mv, 1 - Math.pow(0.05, dt));
+      var tl = Math.hypot(D.travelX, D.travelZ) || 1;
+      D.travelX /= tl; D.travelZ /= tl;
+    }
+
+    /* ---- intensity */
+    var prox = 0;
+    for (var i = 0; i < zombies.length; i++) {
+      var dz = Math.hypot(zombies[i].x - player.x, zombies[i].z - player.z);
+      if (dz < 14) prox += 1 - dz / 14;
+    }
+    D.dmg *= Math.exp(-dt / 2.5);
+    D.kills *= Math.exp(-dt / 3);
+    D.target = 0.55 * clamp(prox / 5, 0, 1) +
+               0.30 * clamp(D.dmg / (player.maxHp * 0.3), 0, 1) +
+               0.15 * clamp(D.kills / 8, 0, 1);
+    D.intensity += D.target > D.intensity
+      ? Math.min(D.target - D.intensity, 1.5 * dt)
+      : Math.max(D.target - D.intensity, -0.25 * dt);
+
+    // Stragglers: a body that has fallen far behind, out of sight, is quietly
+    // taken back — otherwise a player who outruns the dead fills the alive cap
+    // with a trail nobody will ever meet, and the Director has nothing to spend.
+    for (var si = zombies.length - 1; si >= 0; si--) {
+      var sz = zombies[si];
+      var far = Math.hypot(sz.x - player.x, sz.z - player.z) > 42;
+      sz.lost = far && !onScreen(sz.x, sz.z) ? (sz.lost || 0) + dt : 0;
+      if (sz.lost > 4) { zombies.splice(si, 1); D.recycled++; }
+    }
+
+    var alive = zombies.length, cap = Math.min(MAXZ, Q.alive);
+    var L = G.level;
+
+    /* ---- the cycle */
+    if (D.state === 'build') {
+      // a trickle that quickens the longer nothing happens, so camping in a
+      // quiet corner does not make the game go quiet with it
+      var trickleCap = Math.min(cap, Math.round(3 + L * 0.6));
+      D.trickleCd -= dt;
+      if (D.trickleCd <= 0 && alive < trickleCap) {
+        var sp = directorSpot(18, 30, Math.random() < 0.5 ? 'behind' : null);
+        if (sp) spawnAt(commonMix(L), sp);
+        D.trickleCd = Math.max(1.0, 3.6 - 0.15 * L) * (1 - 0.5 * Math.min(1, D.t / 30)) * rand(0.7, 1.3);
+      }
+      if ((D.intensity > 0.55 && D.t > 6) || D.t > 35) setState('peak');
+    } else if (D.state === 'peak') {
+      D.hordeCd -= dt;
+      if (D.spawned < D.budget && D.hordeCd <= 0 && alive < cap) {
+        if (!D.origins.length) { var oo = directorSpot(22, 38, 'behind'); if (oo) D.origins.push(oo); }
+        var o = D.origins[D.spawned % Math.max(1, D.origins.length)];
+        var hs = o && nearSpot(o, 4);
+        // the origin scrolled on screen or became unreachable: find a new one
+        if (!hs) { D.origins = []; }
+        else if (spawnAt(commonMix(L), hs)) D.spawned++;
+        D.hordeCd = Math.max(0.18, 0.5 - 0.015 * L) * rand(0.6, 1.4);
+      }
+      if ((D.spawned >= D.budget && D.t > 8) || D.t > 45) setState('relax');
+    } else if (D.state === 'relax') {
+      D.calm = D.intensity < 0.15 ? D.calm + dt : 0;
+      if (D.calm > 4 || D.t > 40) setState('respite');
+    } else if (D.state === 'respite') {
+      var went = D.respiteFrom ? Math.hypot(player.x - D.respiteFrom.x, player.z - D.respiteFrom.z) : 0;
+      if (D.t > D.respiteLen || (D.t > 6 && went > 50)) setState('build');
+    }
+
+    /* ---- specials: own timer, own caps, never in the lulls */
+    if (D.state === 'build' || D.state === 'peak') {
+      D.specCd -= dt;
+      if (D.specCd <= 0) {
+        var pool = Object.keys(SPECIAL_CAP).filter(function (k) {
+          var capK = SPECIAL_CAP[k] + (k === 'brute' && L >= 13 ? 1 : 0);
+          return L >= SPECIAL_FROM[k] && aliveOf(k) < capK &&
+                 G.time - (D.lastSpec[k] || -99) > (k === 'brute' ? 40 : 15);
+        });
+        if (pool.length && alive < cap) {
+          var kind = pick(pool), ss = directorSpot(18, 32, null);
+          if (ss && spawnAt(kind, ss)) D.lastSpec[kind] = G.time;
+        }
+        D.specCd = Math.max(8, 24 - L) * rand(0.8, 1.2);
+      }
+    }
+  }
+
+  function resetDirector() {
+    D.state = 'build'; D.t = 0; D.intensity = 0; D.target = 0;
+    D.dmg = 0; D.kills = 0; D.calm = 0; D.trickleCd = 3; D.specCd = 14;
+    D.budget = 0; D.spawned = 0; D.origins = []; D.lastSpec = {}; D.recycled = 0;
+    D.travelX = 0; D.travelZ = -1;
+  }
+
+  function fmtTime(s) {
+    var m = Math.floor(s / 60), r = Math.floor(s % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  // The Director is invisible by design, which makes it impossible to tune by
+  // feel alone. With cheats on, a readout shows what it is thinking.
+  var dirDbgEl = null, dirDbgT = 0;
+  function syncDirectorDebug(dt) {
+    if (!dirDbgEl) dirDbgEl = $('dir-dbg');
+    var on = cheatsOn && (G.screen === 'playing' || G.screen === 'cheats' || G.screen === 'pause');
+    dirDbgEl.hidden = !on;
+    if (!on) return;
+    dirDbgT -= dt;
+    if (dirDbgT > 0) return;
+    dirDbgT = 0.15;
+    var extra = D.state === 'peak' ? ' · horde ' + D.spawned + '/' + D.budget
+              : D.state === 'relax' ? ' · calm ' + D.calm.toFixed(1) + '/4s'
+              : D.state === 'respite' ? ' · ' + (D.respiteLen - D.t).toFixed(0) + 's left' : '';
+    dirDbgEl.textContent = D.state.toUpperCase() + ' ' + D.t.toFixed(1) + 's' + extra +
+      ' · intensity ' + D.intensity.toFixed(2) + ' (→' + D.target.toFixed(2) + ')' +
+      ' · alive ' + zombies.length + ' · level ' + G.level.toFixed(1) +
+      ' · special ' + Math.max(0, D.specCd).toFixed(0) + 's';
   }
 
   function resetRun() {
@@ -4260,19 +4520,19 @@ function main(hotData) {
     player.add.pierce = player.add.shots = player.add.crit = player.add.spread = 0;
     equip('rifle', false);
     player.torch = false;
-    G.wave = 1; G.score = 0; G.kills = 0; G.time = 0;
-    G.betweenCd = 0; G.shake = 0; G.cheated = false;
+    G.hordes = 0; G.level = 1; G.score = 0; G.kills = 0; G.time = 0;
+    G.shake = 0; G.cheated = false;
     input.mx = input.mz = 0; input.aiming = false;
-    startWave(1);
+    resetDirector();
     updateHud();
   }
 
   function showUpgrades() {
     var offers = offerUpgrades();
-    $('up-title').textContent = 'Wave ' + G.wave + ' Cleared';
+    $('up-title').textContent = 'Horde ' + G.hordes + ' Survived';
     var host = $('up-cards');
     host.innerHTML = '';
-    if (!offers.length) { nextWave(); return; }
+    if (!offers.length) { endUpgrade(); return; }
     offers.forEach(function (u) {
       var lvl = upgradeLevels[u.id] || 0;
       var btn = document.createElement('button');
@@ -4291,22 +4551,22 @@ function main(hotData) {
         recalc();
         upgradeLevels[u.id] = lvl + 1;
         Audio_.pickup();
-        nextWave();
+        endUpgrade();
       });
       host.appendChild(btn);
     });
     show('upgrade');
   }
 
-  function nextWave() {
+  function endUpgrade() {
     show('playing');
-    startWave(G.wave + 1);
+    placeSupplies();
     updateHud();
   }
 
   function togglePause() {
     if (G.screen === 'playing') {
-      $('p-sub').textContent = 'Wave ' + G.wave + ' · ' + G.score.toLocaleString() + ' pts';
+      $('p-sub').textContent = fmtTime(G.time) + ' · ' + G.hordes + (G.hordes === 1 ? ' horde' : ' hordes') + ' · ' + G.score.toLocaleString() + ' pts';
       show('pause');
     } else if (G.screen === 'pause') {
       show('playing');
@@ -4370,25 +4630,10 @@ function main(hotData) {
     /* ----- shooting */
     fire(dt);
 
-    /* ----- spawning */
-    if (G.waveActive && G.toSpawn > 0) {
-      G.spawnCd -= dt;
-      if (G.spawnCd <= 0 && zombies.length < Math.min(MAXZ, Q.alive)) {
-        spawnZombie(waveMix(G.wave), G.wave);
-        G.toSpawn--;
-        G.spawnCd = Math.max(0.16, 0.95 - G.wave * 0.035) * rand(0.6, 1.4);
-      }
-    }
-    if (G.waveActive && G.toSpawn === 0 && zombies.length === 0) {
-      G.waveActive = false;
-      G.betweenCd = 1.0;
-      Audio_.fanfare();
-      announce('Cleared', String(G.wave));
-    }
-    if (!G.waveActive && G.betweenCd > 0) {
-      G.betweenCd -= dt;
-      if (G.betweenCd <= 0) showUpgrades();
-    }
+    /* ----- the Director decides what spawns, when and where */
+    directorStep(dt);
+    G.hudT = (G.hudT || 0) - dt;
+    if (G.hudT <= 0) { G.hudT = 0.25; updateHud(); }
 
     /* ----- zombies */
     for (var i = zombies.length - 1; i >= 0; i--) {
@@ -5435,6 +5680,7 @@ function main(hotData) {
 
     syncThreats();
     syncMinimap();
+    syncDirectorDebug(dt);
     syncZombies();
     syncBullets();
     syncParticles();
@@ -5532,11 +5778,11 @@ function main(hotData) {
   /* --------------------------------------- survive a republish mid-session */
   if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
     window.claude.hot.snapshot(function () {
-      return { bestWave: best.wave, bestScore: best.score };
+      return { bestTime: best.time, bestScore: best.score };
     });
   }
-  if (hotData && hotData.bestWave > best.wave) {
-    best.wave = hotData.bestWave;
+  if (hotData && hotData.bestTime > best.time) {
+    best.time = hotData.bestTime;
     best.score = Math.max(best.score, hotData.bestScore || 0);
     refreshBest();
   }
