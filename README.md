@@ -325,6 +325,43 @@ The ground plane is subdivided 64×64 for their benefit: `MeshLambertMaterial`
 lights per-vertex, so on the original two triangles a muzzle flash had nowhere
 to land.
 
+### Recoil
+
+Every shot kicks three things, each tuned per weapon in its `recoil` entry:
+
+- **The model.** The gun pivots about the grip, so the muzzle climbs while the
+  stock drives back, and the torso rocks back from the waist. It springs home
+  in about 0.3 s.
+- **The camera** is shoved back against the shot and springs home, instead of
+  a random shake — the view jolts the way the gun does.
+- **Accuracy.** Each shot adds a little spread (`bloom`) that bleeds off at the
+  weapon's `recover` rate. Tapping stays accurate; holding the trigger on the
+  SMG builds to about 2° extra and is gone within half a second of letting go.
+  The shotgun and launcher kick hardest but have no bloom — their spread is
+  already their character.
+
+### Walking
+
+The player's legs walk where the body is **going**, while the torso faces where
+it **aims** — so strafing and backpedalling while shooting no longer moonwalk:
+
+- Up to about 100° off the aim, the hips turn toward the movement (capped at
+  ~50°, since nobody strafes with hips square to their direction). Past that it
+  is a backpedal: the hips face the aim and the stride runs in reverse, a bit
+  shorter.
+- **Feet are planted.** The body's height each frame is whatever puts the lower
+  foot on the ground, computed from the hip and knee angles. That produces a
+  walk's natural bob — highest as the legs pass, lowest at full stride — with
+  feet staying within 2 cm of the ground; a run adds a short flight.
+- Walk and run blend by speed: a run folds the knee further through the swing,
+  carries the thighs forward, counter-rotates the shoulders and leans in. Weight
+  shifts over the stance leg; standing still, the body breathes and settles.
+
+Zombies walk the same way with more character. Some shamblers and bloaters drag
+a bad leg — it barely swings or bends, the body drops onto it each step, and the
+cadence is uneven, hurrying off it. Most carry one arm lower; heads loll, each
+at its own pace; brutes and bloaters stomp with a heavy roll; runners run.
+
 ### Weapons are base stats; upgrades are multipliers
 
 Upgrades used to mutate `player.damage` directly. That works until weapons can
