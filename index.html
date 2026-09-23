@@ -3386,9 +3386,7 @@ function main(hotData) {
     quadOut(b, b0, b1, b2, b3, _sc, hex, wb * 2 * k, db * 2 * k);
   }
   // an axis-aligned block, for small details (eyes, pouches, buckles)
-  var _cgNoDetail = false;           // set while building outline hulls
   function blk(b, cx, cy, cz, sx, sy, sz, hex) {
-    if (_cgNoDetail) return;         // details (eyes, blood, pouches) never outline
     seg(b, [cx, cy - sy / 2, cz], [cx, cy + sy / 2, cz], sx / 2, sz / 2, sx / 2, sz / 2, hex);
   }
   function shade(hex, f) {
@@ -3426,11 +3424,14 @@ function main(hotData) {
         '    p = instanceMatrix * p; n = mat3(instanceMatrix) * n;',
         '  #endif',
         '  vec4 mv = modelViewMatrix * p;',
-        // pushed back behind the body: anywhere the shell overlaps a zombie the
-        // body wins the depth test, so only the outer silhouette glows (no
-        // lines where an arm crosses the chest)
-        '  mv.z -= 0.6;',
+        // Pushed back behind the body — in depth only, so it stays where it is
+        // on screen (moving the point itself would slide it towards the view's
+        // centre). Anywhere the shell overlaps a zombie the body wins the depth
+        // test, so only the outer silhouette glows, not where an arm crosses
+        // the chest.
         '  vec4 clip = projectionMatrix * mv;',
+        '  vec4 back = projectionMatrix * vec4(mv.xy, mv.z - 0.6, 1.0);',
+        '  clip.z = back.z / back.w * clip.w;',
         '  vec2 d = (projectionMatrix * vec4(normalMatrix * n, 0.0)).xy;',
         '  float dl = length(d);',
         '  if (dl > 1e-5) clip.xy += (d / dl) * (uWidth * 2.0 / uRes) * clip.w;',
@@ -3634,173 +3635,228 @@ function main(hotData) {
      every limb still animates on its own. Limb geometry has its origin at the
      joint, so one rotation swings it; shins hang off the knee, so they bend.
 
-     Each type has its own look, and the common ones come in several outfits so
-     a crowd is not a row of twins. Skin keeps each type's signature colour, so
-     you can still tell a runner from a spitter at a glance.                  */
+     Every zombie is one voxel model (Character_Zombie.fbx, from the same pack
+     as the hero), baked back into 5 cm voxels by tools/bake-zombie.py and cut
+     into those eight parts, the T-pose arms swung down to hang. Types and
+     outfits are that one body edited voxel by voxel before it is meshed: its
+     skin, shirt, trousers and blood are recoloured (keeping the model's own
+     shading within each), and each type gets its features — a vest, boils, a
+     throat sac, ribs, hair — as painted or added voxels. Skin keeps each type's
+     signature colour, so you can still tell a runner from a spitter.        */
   var MAXZ = 48;
-  var THIGH = 0.34;
+  var THIGH = 0.35;
   var ZPARTS = ['torso', 'head', 'armL', 'armR', 'thighL', 'thighR', 'shinL', 'shinR'];
-  //   shirt/pants/shoe/hair; sleeve: 'long' | 'short' | 'none'; extras flag the type's features
+  // joint positions on the body, from the model: torso pivot mid-chest, the
+  // head on the neck, arms at the shoulders, legs at the hips
+  var ZV = 0.05;                     // voxel size
+  var ZRIG = { torso: 1.00, neck: 1.30, shX: 0.20, shY: 1.20, hipX: 0.10, hipY: 0.70 };
+  var ZVOX = {"pal":["421c1c","4e1515","3a3f2d","48523b","0a160f","131d16","193031","283d3e","364b4e","7e524c"],"parts":{"torso":{"d":[6,12,5],"o":[-0.15,-0.3,-0.125],"v":"AAgICAAACAgIAAAHBwcAAAYGBgAAAwYGAAUFBgYABgYDBAAGBgUFBQYGBgYGBgYGBgYGBgYGBgAGBgYACAgICAAICAgIAAcHBwcABgYGBgYEAwYGAwUFBgYFBgYEBAMGBgYFBQYGBgYCBgYGBgEGBgYGBgUFBQMABwcHBwAICAgHAAIHBwcABgYGBgYGAwYGAwYFBgYFBgYGBgUGBAQFBQIGBgYGBgYGBgUGBgYGAgUFAwMECAgIBwAICAgIAAcHBwcABgYGBgYGAwYGBAYFBgYFBgYGBgUCBAQFBQYGBgYDBgYGBgUGBgYGBgUGAwMECAgICAAICAgHAAcHBwcABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYDBgYGBgUGBgYGBgUFBQMAAAgICAAACAgIAAAHBwcAAAYGBgAABgYGAAYGBgYABgYGBgAGBgYGBgYGBgYEBgYGBgUGBgYGBgAGBgUA"},"head":{"d":[6,7,5],"o":[-0.15,0.0,-0.125],"v":"AAAAAAAAAAAAAAAEAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEBAQABAQDBAAEBAMDAAQEBAQABAQEBAAABAQAAAMDAwAABAQEBAAEBAMEAAQEAwMABAQEBAAECgECAAMBAgMAAwMDAAAEBAQBAAMEAgIABAQDAwoEAgQBCgIKAQoAAgAAAAAAAAAAAAQEBAQABAQCBAACBAoDAAMCCgEAAwEKAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAECgAAAAAKAAAAAAAAAAAAAAAA"},"armL":{"d":[2,13,5],"o":[-0.05,-0.6,-0.125],"v":"AAICAAAAAgQAAAAEAgAAAAQEAAAABAQAAAAEBAAAAAQEAAAAAwQAAAAEBAAAAAQEAAAABgYAAAAGBgAAAAYGAAAAAAAAAAADAgAAAAQEAAAABAQAAAAEBAAAAAQEAAAAAAQAAAAEAwAAAAQEAAAABAQAAAAEBAAAAAYGAAAABgYAAA=="},"armR":{"d":[2,13,5],"o":[-0.05,-0.6,-0.125],"v":"AAAAAAAAAwMAAAAEAgAAAAQEAAAABAQAAAAEBAAAAAAEAAAABAMAAAAEBAAAAAQEAAAABgQAAAAGBgAAAAYGAAAABAEAAAABAgAAAAQEAAAABAIAAAAEBAAAAAQEAAAABAQAAAADBAAAAAQEAAAABAQAAAAEBgAAAAYGAAAABgYAAA=="},"thighL":{"d":[2,7,5],"o":[-0.05,-0.35,-0.125],"v":"AAMAAAAABwMAAAAIBwAAAAkIAAAAAwgAAAADCAAAAAcHAAAABwAAAAAHAwAAAAgHAAAACAkAAAADAwAAAAMDAAAACAcAAA=="},"thighR":{"d":[2,7,5],"o":[-0.05,-0.35,-0.125],"v":"AAcAAAAABwEAAAAICQAAAAcDAAAACAcAAAAICAAAAAgIAAAACAAAAAAHCAAAAAgJAAAABwIAAAAIBwAAAAgIAAAACAgAAA=="},"shinL":{"d":[2,7,5],"o":[-0.05,-0.35,-0.125],"v":"AAMDAAAAAgAAAAAEAAAAAAMAAAAAAgAAAAAIAAAAAAkAAAAAAwQAAAAEAAAAAAQAAAAAAgAAAAAEAAAAAAMAAAAACQAAAA=="},"shinR":{"d":[2,7,5],"o":[-0.05,-0.35,-0.125],"v":"AAUEAAAABQAAAAAFAAAAAAkAAAAACAAAAAAIAAAAAAgAAAAAAwMAAAAFAAAAAAUAAAAACQAAAAAIAAAAAAgAAAAACAAAAA=="}}};
+  // what each of the model's colours is, so an outfit can recolour it by role
+  var ZROLE = [0, 'blood', 'blood', 'skin', 'skin', 'shirt', 'shirt', 'pants', 'pants', 'pants', 'flesh'];
+  //   orig: the model's own colours. sleeve: 'long' | 'short' | 'none'
   var ZLOOK = {
     shambler: [
-      { skin: 0x8FA86A, shirt: 0xB0ACA0, pants: 0x3E5170, shoe: 0x3A2E24, hair: 0x2E2620, sleeve: 'short' },
-      { skin: 0x87A062, shirt: 0x7A3A32, pants: 0x4A4436, shoe: 0x2A2622, hair: 0x6A5A40, sleeve: 'long', check: 0x4A2420 },
-      { skin: 0x94A870, shirt: 0x3E5A6E, pants: 0x2E3238, shoe: 0x1E1E20, hair: 0x1A1A1A, sleeve: 'long', tie: 0x6A2A2A }
+      { orig: true },
+      { skin: 0x5A6644, shirt: 0x6A2A24, check: 0x2E1614, pants: 0x423C30, shoe: 0x1E1A16, sleeve: 'long' },
+      { skin: 0x56623F, shirt: 0x3E5668, tie: 0x5A2020, pants: 0x262A30, shoe: 0x141416, hair: 0x1A1612, sleeve: 'long' }
     ],
     runner: [
-      { skin: 0xC8C0A2, shirt: 0x9A2E2A, pants: 0x3A3E48, shoe: 0xD8D4CC, hair: 0x4A3420, sleeve: 'none' },
-      { skin: 0xC4BC9C, shirt: 0xCEC6AE, pants: 0x2A2E36, shoe: 0x7A2A2A, hair: 0x1E1A16, sleeve: 'long', hood: true }
+      { skin: 0x8E8872, shirt: 0x7E2622, pants: 0x363A42, shoe: 0xB8B4AC, hair: 0x3A2A1A, sleeve: 'none' },
+      { skin: 0x8A846E, shirt: 0x9E9682, pants: 0x22262C, shoe: 0x5E2222, sleeve: 'long', hood: true }
     ],
     brute: [
-      { skin: 0x6E7C88, shirt: 0x6E7C88, pants: 0x34465A, shoe: 0x2A2420, hair: null, sleeve: 'none', vest: 0xC8641E, big: true }
+      { skin: 0x56606C, shirt: 0x56606C, pants: 0x2C3A4C, shoe: 0x201C18, sleeve: 'none', vest: 0xB4581A, band: 0xC8C8BA }
     ],
     spitter: [
-      { skin: 0xC49A40, shirt: 0xA8BCB6, pants: 0xA8BCB6, shoe: 0x9C9C94, hair: 0x3A2A18, sleeve: 'short', acid: 0x9BE06A }
+      { skin: 0x92742E, shirt: 0x8C9E9A, pants: 0x8C9E9A, shoe: 0x7A7A74, sleeve: 'short', acid: 0x86C656, sac: true }
     ],
     crawler: [
-      { skin: 0xAA9C66, shirt: 0x5A5448, pants: 0x4A4234, shoe: 0x2A241E, hair: 0x3A3026, sleeve: 'short', ribs: true },
-      { skin: 0xA49660, shirt: 0x3E4A3A, pants: 0x2E2A26, shoe: 0x1E1C1A, hair: 0x8A7A5A, sleeve: 'none', ribs: true }
+      { skin: 0x7E744A, shirt: 0x48443A, pants: 0x3A3428, shoe: 0x1E1A16, sleeve: 'short', ribs: true },
+      { skin: 0x7A7048, shirt: 0x30392C, pants: 0x26241E, shoe: 0x161412, hair: 0x5A4E36, sleeve: 'none', ribs: true }
     ],
     bloater: [
-      { skin: 0x9AAB63, shirt: 0x6A6A58, pants: 0x4A4A3E, shoe: 0x2E2A24, hair: 0x2A2620, sleeve: 'short', boils: 0xD2CC62 }
+      { skin: 0x707C48, shirt: 0x505044, pants: 0x3C3C32, shoe: 0x221E1A, sleeve: 'short', boils: 0xBCB452 }
     ],
     howler: [
-      { skin: 0xB86A5E, shirt: 0x2A2830, pants: 0x2A2830, shoe: 0x1A1A1E, hair: 0x1A1414, sleeve: 'long', longHair: true, scream: true }
+      { skin: 0x8E5046, shirt: 0x221F26, pants: 0x221F26, shoe: 0x141416, hair: 0x140F0F, sleeve: 'long', longHair: true, scream: true }
     ]
   };
-  var BLOOD = 0x5A1616, BLOOD2 = 0x3E1010;
 
-  function zTorso(L) {
-    var b = cgNew(), sk = L.skin, sh = L.shirt;
-    var W = L.big ? 1.18 : 1;
-    seg(b, [0, -0.37, 0], [0, -0.2, 0], 0.15 * W, 0.1, 0.15 * W, 0.1, L.pants);            // pelvis
-    seg(b, [0, -0.21, 0], [0, -0.17, 0], 0.158 * W, 0.106, 0.158 * W, 0.106, 0x2A241E);    // belt
-    seg(b, [0, -0.19, 0], [0, 0.03, 0.01], 0.145 * W, 0.095, 0.155 * W, 0.1, sh);          // belly
-    seg(b, [0, 0.03, 0.01], [0, 0.29, 0], 0.155 * W, 0.1, 0.2 * W, 0.11, sh);              // chest
-    seg(b, [0, 0.27, 0], [0, 0.37, -0.02], 0.2 * W, 0.105, 0.16 * W, 0.09, sh);            // shoulders
-    seg(b, [0, 0.35, 0.02], [0, 0.46, 0.04], 0.055 * W, 0.05, 0.05 * W, 0.05, sk);         // neck
-    // torn shirt: skin showing through, and blood down the front
-    blk(b, 0.05, -0.09, 0.1, 0.07, 0.1, 0.012, sk);
-    blk(b, -0.06, 0.16, 0.107, 0.08, 0.12, 0.012, BLOOD);
-    blk(b, -0.05, 0.05, 0.103, 0.035, 0.12, 0.012, BLOOD2);
-    blk(b, 0.1, 0.2, -0.105, 0.06, 0.1, 0.012, BLOOD2);
-    if (L.check) [-0.1, 0.1].forEach(function (x) { blk(b, x, 0.08, 0.104, 0.02, 0.36, 0.01, L.check); });
-    if (L.tie) blk(b, 0, 0.18, 0.108, 0.035, 0.22, 0.01, L.tie);
-    if (L.hood) seg(b, [0, 0.28, -0.1], [0, 0.4, -0.12], 0.12, 0.05, 0.11, 0.05, shade(sh, 0.85));
+  // A part as an editable voxel box, padded by one cell all round so features
+  // can grow past the model's surface. Coordinates are the model's own cells.
+  var _zvLum = [];
+  (function () {
+    var best = {};
+    ZVOX.pal.forEach(function (h, i) {
+      _col.set('#' + h); var l = _col.r + _col.g + _col.b; _zvLum[i + 1] = l;
+      var r = ZROLE[i + 1]; best[r] = Math.max(best[r] || 0, l);
+    });
+    for (var i = 1; i < _zvLum.length; i++) _zvLum[i] /= best[ZROLE[i]];   // shade within its role
+  })();
+  function zvPart(key) {
+    var P = ZVOX.parts[key], d = P.d, raw = atob(P.v);
+    var n = [d[0] + 2, d[1] + 2, d[2] + 2];
+    var q = { key: key, d: d, n: n, o: P.o, c: new Int32Array(n[0] * n[1] * n[2]).fill(-1),
+              r: new Uint8Array(n[0] * n[1] * n[2]) };
+    for (var x = 0; x < d[0]; x++) for (var y = 0; y < d[1]; y++) for (var z = 0; z < d[2]; z++) {
+      var v = raw.charCodeAt((x * d[1] + y) * d[2] + z);
+      if (v) { var i = zvI(q, x, y, z); q.c[i] = parseInt(ZVOX.pal[v - 1], 16); q.r[i] = v; }
+    }
+    return q;
+  }
+  function zvI(q, x, y, z) { return ((x + 1) * q.n[1] + (y + 1)) * q.n[2] + (z + 1); }
+  function zvIn(q, x, y, z) { return x >= -1 && y >= -1 && z >= -1 && x <= q.d[0] && y <= q.d[1] && z <= q.d[2]; }
+  function zvGet(q, x, y, z) { return zvIn(q, x, y, z) ? q.c[zvI(q, x, y, z)] : -1; }
+  function zvSet(q, x, y, z, hex) { if (zvIn(q, x, y, z)) { var i = zvI(q, x, y, z); q.c[i] = hex; if (!q.r[i]) q.r[i] = 255; } }
+  function zvRole(q, x, y, z) { var r = zvIn(q, x, y, z) ? q.r[zvI(q, x, y, z)] : 0; return r === 255 ? 'added' : ZROLE[r] || ''; }
+  function zvEach(q, fn) {
+    for (var x = -1; x <= q.d[0]; x++) for (var y = -1; y <= q.d[1]; y++) for (var z = -1; z <= q.d[2]; z++)
+      if (q.c[zvI(q, x, y, z)] >= 0) fn(x, y, z, zvRole(q, x, y, z), q.r[zvI(q, x, y, z)]);
+  }
+  // the outermost voxel along z at (x, y): front is +z
+  function zvFront(q, x, y) { for (var z = q.d[2]; z >= -1; z--) if (zvGet(q, x, y, z) >= 0) return z; return null; }
+  function zvBack(q, x, y) { for (var z = -1; z <= q.d[2]; z++) if (zvGet(q, x, y, z) >= 0) return z; return null; }
+  function zvHash(x, y, z, k) { var h = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + k * 4.581) * 43758.5453; return h - Math.floor(h); }
+
+  function zBody(L) {
+    var B = {};
+    ZPARTS.forEach(function (k) { B[k] = zvPart(k); });
+    if (L.orig) return B;
+    var arm = function (k) { return k === 'armL' || k === 'armR'; };
+    ZPARTS.forEach(function (k) {
+      var q = B[k], shin = k === 'shinL' || k === 'shinR';
+      zvEach(q, function (x, y, z, role, v) {
+        var f = _zvLum[v] || 1, hex = null;
+        if (role === 'skin') hex = shade(L.skin, f);
+        else if (role === 'pants') hex = shade(L.pants, f);
+        else if (role === 'shirt') hex = shade(shin ? L.shoe : arm(k) && L.sleeve === 'none' ? L.skin : L.shirt, f);
+        else if (role === 'blood' && L.acid && zvHash(x, y, z, 1) < 0.5) hex = shade(L.acid, f);
+        if (hex !== null) zvSet(q, x, y, z, hex);
+        // long sleeves reach the wrists; the hands (the bottom two rows) stay bare
+        if (arm(k) && L.sleeve === 'long' && role === 'skin' && y >= 2) zvSet(q, x, y, z, shade(L.shirt, f * 0.92));
+      });
+    });
+    var T = B.torso, H = B.head, x, y;
+    if (L.check) ['torso', 'armL', 'armR'].forEach(function (k) {       // flannel
+      zvEach(B[k], function (x, y, z, role) {
+        if ((role === 'shirt' || (arm(k) && role === 'skin' && y >= 2)) && (x % 3 === 0 || y % 3 === 0))
+          zvSet(B[k], x, y, z, shade(L.check, 0.9 + 0.2 * zvHash(x, y, z, 2)));
+      });
+    });
+    if (L.tie) for (y = 4; y <= 10; y++) for (x = 2; x <= 3; x++) zvSet(T, x, y, zvFront(T, x, y), shade(L.tie, y === 10 ? 0.8 : 1));
     if (L.vest) {
-      seg(b, [0, -0.12, 0], [0, 0.3, 0], 0.17 * W, 0.115, 0.2 * W, 0.12, L.vest);
-      blk(b, 0, 0.02, 0.121, 0.4 * W, 0.035, 0.01, 0xDCDCCC);                             // reflective band
-      blk(b, 0, 0.02, -0.121, 0.4 * W, 0.035, 0.01, 0xDCDCCC);
-      seg(b, [0, 0.3, 0], [0, 0.4, -0.02], 0.13, 0.1, 0.1, 0.08, shade(sk, 0.95));        // trapezius
+      zvEach(T, function (x, y, z, role) { if (role === 'shirt') zvSet(T, x, y, z, shade(L.vest, _zvLum[T.r[zvI(T, x, y, z)]])); });
+      for (x = 0; x < 6; x++) { zvSet(T, x, 7, zvFront(T, x, 7), L.band); zvSet(T, x, 7, zvBack(T, x, 7), L.band); }
     }
-    if (L.acid) {
-      seg(b, [0, 0.36, 0.05], [0, 0.46, 0.07], 0.085, 0.085, 0.07, 0.07, shade(sk, 1.1)); // throat sac
-      blk(b, 0.0, 0.2, 0.112, 0.05, 0.2, 0.01, L.acid);
-      blk(b, 0.03, 0.02, 0.108, 0.03, 0.16, 0.01, L.acid);
+    if (L.ribs) for (y = 5; y <= 9; y++) for (x = 3; x <= 4; x++)
+      zvSet(T, x, y, zvFront(T, x, y), y % 2 ? 0xC8BCA0 : 0x3A1414);
+    if (L.boils) {
+      ['torso', 'armL', 'armR', 'head'].forEach(function (k) {
+        zvEach(B[k], function (x, y, z, role) {
+          if ((role === 'skin' || role === 'shirt') && zvHash(x, y, z, k.length) < 0.12) zvSet(B[k], x, y, z, shade(L.boils, 0.85 + 0.3 * zvHash(x, y, z, 3)));
+        });
+      });
+      [[1, 6], [4, 8], [2, 3], [4, 4]].forEach(function (p) { zvSet(T, p[0], p[1], zvFront(T, p[0], p[1]) + 1, L.boils); });
+      [[3, 7], [1, 4]].forEach(function (p) { zvSet(T, p[0], p[1], zvBack(T, p[0], p[1]) - 1, shade(L.boils, 0.9)); });
+      zvSet(T, -1, 5, 2, L.boils); zvSet(T, 6, 8, 2, shade(L.boils, 0.9));
     }
-    if (L.ribs) {
-      for (var r = 0; r < 4; r++) {
-        blk(b, 0.1, 0.02 + r * 0.055, 0.102, 0.08, 0.016, 0.01, 0xD8CCB0);
-        blk(b, 0.1, 0.02 + r * 0.055 + 0.027, 0.101, 0.08, 0.012, 0.008, 0x4A1A1A);
+    if (L.hair || L.hood) {
+      var hc = L.hood ? shade(L.shirt, 0.85) : L.hair;
+      zvEach(H, function (x, y, z, role) {
+        if (role === 'skin' && (y >= 5 || (z <= 1 && y >= 2) || (L.hood && (x === 0 || x === 5 || z === 0) && y >= 1)))
+          zvSet(H, x, y, z, shade(hc, 0.85 + 0.25 * zvHash(x, y, z, 4)));
+      });
+      if (L.hood) for (x = 0; x < 6; x++) zvSet(T, x, 11, zvBack(T, x, 11), hc);
+    }
+    if (L.longHair) {                    // lank hair down the back of the head and onto the shoulders
+      for (x = 1; x <= 4; x++) {
+        for (y = 1; y <= 5; y++) zvSet(H, x, y, zvBack(H, x, y) - 1, shade(L.hair, 0.8 + 0.3 * zvHash(x, y, 0, 5)));
+        for (y = 8 + (x % 2); y <= 11; y++) zvSet(T, x, y, zvBack(T, x, y) - 1, shade(L.hair, 0.8 + 0.3 * zvHash(x, y, 1, 5)));
       }
     }
-    if (L.boils) {
-      [[0.08, -0.05, 0.1], [-0.07, 0.1, 0.105], [0.12, 0.18, 0.09], [-0.1, -0.12, 0.09],
-       [0.02, 0.22, -0.11], [-0.12, 0.05, -0.1], [0.15, 0.0, 0.0]].forEach(function (p) {
-        blk(b, p[0], p[1], p[2], 0.05, 0.05, 0.05, L.boils);
-      });
+    if (L.scream) {                      // the jaw hangs open
+      for (x = 2; x <= 3; x++) { zvSet(H, x, 1, 3, 0x2A0C0C); zvSet(H, x, 2, 3, 0x1A0808); zvSet(H, x, 0, 3, shade(L.skin, 0.8)); }
     }
-    return cgGeo(b);
-  }
-  function zHead(L) {
-    var b = cgNew(), sk = L.skin;
-    seg(b, [0, -0.15, 0.025], [0, -0.02, 0.02], 0.085, 0.1, 0.115, 0.125, shade(sk, 0.92));  // jaw
-    seg(b, [0, -0.02, 0.02], [0, 0.15, -0.01], 0.118, 0.128, 0.1, 0.11, sk);                // cranium
-    // sunken eye sockets with milky eyes, a slack mouth, ears
-    [-0.045, 0.045].forEach(function (x) {
-      blk(b, x, 0.02, 0.143, 0.042, 0.035, 0.012, 0x1A1212);
-      blk(b, x, 0.02, 0.149, 0.016, 0.014, 0.006, 0xC8C8A4);
-      blk(b, x * 2.7, 0.0, 0.02, 0.02, 0.05, 0.04, sk);
-    });
-    blk(b, 0, -0.02, 0.15, 0.025, 0.035, 0.02, shade(sk, 0.85));
-    var mh = L.scream ? 0.09 : 0.035;
-    blk(b, 0, -0.1, 0.132, 0.07, mh, 0.012, 0x2A0C0C);
-    blk(b, 0, -0.1 + mh / 2 - 0.006, 0.136, 0.06, 0.012, 0.01, 0xC8BC98);                   // teeth
-    blk(b, 0.05, -0.13, 0.12, 0.03, 0.05, 0.01, BLOOD);                                    // chin blood
-    if (L.hair) {
-      seg(b, [0, 0.08, -0.015], [0, 0.17, -0.025], 0.125, 0.135, 0.105, 0.115, L.hair);
-      blk(b, 0, 0.02, -0.11, 0.2, 0.14, 0.04, L.hair);
+    if (L.sac) {                         // the spitter's swollen throat
+      for (x = 2; x <= 3; x++) { zvSet(H, x, 0, 3, shade(L.skin, 1.15)); zvSet(H, x, 0, 4, shade(L.acid, 0.9)); zvSet(H, x, 1, 4, shade(L.skin, 1.1)); }
     }
-    if (L.longHair) seg(b, [0, 0.1, -0.1], [0, -0.3, -0.16], 0.11, 0.035, 0.12, 0.03, L.hair);
-    if (L.hood) seg(b, [0, -0.06, -0.02], [0, 0.19, -0.03], 0.14, 0.145, 0.12, 0.125, shade(L.shirt, 0.85));
-    if (!L.hair) blk(b, 0, 0.06, 0.125, 0.2, 0.025, 0.03, shade(sk, 0.85));                // brute's brow
-    blk(b, -0.06, 0.12, 0.06, 0.05, 0.02, 0.06, BLOOD2);                                    // scalp wound
-    return cgGeo(b);
-  }
-  // Arm from the shoulder, hanging along -Y, with a fixed bend at the elbow
-  // so reaching arms read as arms rather than planks.
-  function zArm(L) {
-    var b = cgNew(), sk = L.skin, W = L.big ? 1.3 : 1;
-    var up = L.sleeve === 'none' ? sk : L.shirt;
-    var fore = L.sleeve === 'long' ? L.shirt : sk;
-    var E = [0, -0.3, 0], bend = 0.38;
-    var Wr = [0, E[1] - 0.26 * Math.cos(bend), 0.26 * Math.sin(bend)];
-    var Hd = [0, Wr[1] - 0.1 * Math.cos(bend + 0.1), Wr[2] + 0.1 * Math.sin(bend + 0.1)];
-    seg(b, [0, 0.03, 0], E, 0.068 * W, 0.068 * W, 0.054 * W, 0.054 * W, up);
-    seg(b, E, Wr, 0.054 * W, 0.054 * W, 0.042 * W, 0.042 * W, fore);
-    if (L.sleeve === 'long') seg(b, [Wr[0], Wr[1] + 0.03, Wr[2] - 0.01], Wr, 0.046 * W, 0.046 * W, 0.046 * W, 0.046 * W, sk);
-    seg(b, Wr, Hd, 0.045 * W, 0.022 * W, 0.04 * W, 0.018 * W, sk);                           // hand
-    [-0.025, 0, 0.025].forEach(function (x) {                                              // grasping fingers
-      seg(b, [x * W, Hd[1] + 0.005, Hd[2] - 0.005], [x * W, Hd[1] - 0.06, Hd[2] + 0.02], 0.009 * W, 0.009 * W, 0.007 * W, 0.007 * W, shade(sk, 0.9));
-    });
-    blk(b, 0, (E[1] + Wr[1]) / 2, Wr[2] / 2 + 0.05 * W, 0.05 * W, 0.08, 0.01, BLOOD);
-    if (L.boils) blk(b, 0.05, -0.15, 0, 0.04, 0.04, 0.04, L.boils);
-    return cgGeo(b);
-  }
-  function zThigh(L) {
-    var b = cgNew(), W = L.big ? 1.25 : 1;
-    seg(b, [0, 0.03, 0], [0, -THIGH, 0], 0.085 * W, 0.088 * W, 0.064 * W, 0.068 * W, L.pants);
-    blk(b, 0.02, -0.28, 0.07 * W, 0.07 * W, 0.07, 0.01, L.skin);                              // torn at the knee
-    return cgGeo(b);
-  }
-  function zShin(L) {
-    var b = cgNew(), W = L.big ? 1.25 : 1;
-    seg(b, [0, 0.01, 0], [0, -0.27, 0], 0.064 * W, 0.068 * W, 0.05 * W, 0.054 * W, L.pants);
-    seg(b, [0, -0.27, 0], [0, -0.3, 0], 0.05 * W, 0.054 * W, 0.05 * W, 0.054 * W, L.skin);
-    seg(b, [0, -0.32, -0.07], [0, -0.32, 0.15], 0.056 * W, 0.022, 0.052 * W, 0.02, L.shoe, [1, 0, 0]);
-    blk(b, 0, -0.1, 0.066 * W, 0.05, 0.12, 0.01, BLOOD2);
-    return cgGeo(b);
+    return B;
   }
 
-  // One set of eight InstancedMeshes per (type, outfit). Solid geometry per
-  // group rather than per-instance colour: setColorAt depends on a shader
-  // recompile that is fragile across three.js versions, and when it silently
-  // fails every zombie renders white. Outfits with nobody on screen are hidden.
+  // Greedy mesh: each exposed face, merged with its same-coloured neighbours
+  // into the biggest rectangles the slice allows. Indexed, flat normals.
+  function zvMesh(q, plain) {
+    var n = q.n, pos = [], nor = [], col = [], idx = [];
+    var o = [q.o[0] - ZV, q.o[1] - ZV, q.o[2] - ZV];
+    var get = function (c) {
+      if (c[0] < 0 || c[1] < 0 || c[2] < 0 || c[0] >= n[0] || c[1] >= n[1] || c[2] >= n[2]) return -1;
+      return q.c[(c[0] * n[1] + c[1]) * n[2] + c[2]];
+    };
+    for (var ax = 0; ax < 3; ax++) {
+      var u = (ax + 1) % 3, v = (ax + 2) % 3, nu = n[u], nv = n[v];
+      var mask = new Int32Array(nu * nv);
+      for (var sg = -1; sg <= 1; sg += 2) for (var s = 0; s < n[ax]; s++) {
+        var c = [0, 0, 0], a, b;
+        for (b = 0; b < nv; b++) for (a = 0; a < nu; a++) {
+          c[ax] = s; c[u] = a; c[v] = b;
+          var h = get(c); c[ax] = s + sg;
+          mask[a + b * nu] = h >= 0 && get(c) < 0 ? (plain ? 1 : h + 1) : 0;
+        }
+        for (b = 0; b < nv; b++) for (a = 0; a < nu; ) {
+          var m = mask[a + b * nu];
+          if (!m) { a++; continue; }
+          var w = 1, hh = 1, ok = true;
+          while (a + w < nu && mask[a + w + b * nu] === m) w++;
+          while (b + hh < nv && ok) {
+            for (var k = 0; k < w; k++) if (mask[a + k + (b + hh) * nu] !== m) { ok = false; break; }
+            if (ok) hh++;
+          }
+          for (var j = 0; j < hh; j++) for (k = 0; k < w; k++) mask[a + k + (b + j) * nu] = 0;
+          var plane = s + (sg > 0 ? 1 : 0), base = pos.length / 3;
+          _col.setHex(m - 1);
+          [[a, b], [a + w, b], [a + w, b + hh], [a, b + hh]].forEach(function (p) {
+            var cc = [0, 0, 0]; cc[ax] = plane; cc[u] = p[0]; cc[v] = p[1];
+            pos.push(o[0] + cc[0] * ZV, o[1] + cc[1] * ZV, o[2] + cc[2] * ZV);
+            var nn = [0, 0, 0]; nn[ax] = sg; nor.push(nn[0], nn[1], nn[2]);
+            col.push(_col.r, _col.g, _col.b);
+          });
+          if (sg > 0) idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+          else idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+          a += w;
+        }
+      }
+    }
+    var g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+    g.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    g.computeBoundingSphere();
+    return g;
+  }
+  // One set of eight InstancedMeshes per (type, outfit), vertex coloured, so
+  // no per-instance colour: setColorAt depends on a shader recompile that is
+  // fragile across three.js versions. Outfits with nobody on screen are hidden.
   var ZNAMES = Object.keys(ZTYPE);
   var zGroups = {}, ZGKEYS = [];
   ZNAMES.forEach(function (name) {
     ZLOOK[name].forEach(function (L, vi) {
-      var key = name + '#' + vi;
-      var arm = zArm(L), thigh = zThigh(L), shin = zShin(L);
-      var geos = { torso: zTorso(L), head: zHead(L), armL: arm, armR: arm,
-                   thighL: thigh, thighR: thigh, shinL: shin, shinR: shin };
-      // outline hulls from the main shapes only: a small detail block would
-      // poke its own shell through the body surface as red speckle
-      _cgNoDetail = true;
-      var hArm = outlineGeo(zArm(L)), hThigh = outlineGeo(zThigh(L)), hShin = outlineGeo(zShin(L));
-      var hulls = { torso: outlineGeo(zTorso(L)), head: outlineGeo(zHead(L)), armL: hArm, armR: hArm,
-                    thighL: hThigh, thighR: hThigh, shinL: hShin, shinR: hShin };
-      _cgNoDetail = false;
+      var key = name + '#' + vi, B = zBody(L);
       var g = {};
       ZPARTS.forEach(function (k) {
-        var m = new T.InstancedMesh(geos[k], CHAR_MAT, MAXZ);
+        var geo = zvMesh(B[k]);
+        var m = new T.InstancedMesh(geo, HERO_MAT, MAXZ);
+        m.userData.tris = geo.index.count / 3;
         m.frustumCulled = false;
         m.count = 0;
         m.visible = false;
         scene.add(m);
         g[k] = m;
-        // its outline shares the part's instance matrices: no extra CPU work
-        var om = new T.InstancedMesh(hulls[k], LURKERS[name] ? OUT_MAT.lurker : OUT_MAT.normal, MAXZ);
+        // Its outline shares the part's instance matrices: no extra CPU work.
+        // The hull ignores colour, so it merges into far fewer, bigger faces.
+        var hull = outlineGeo(zvMesh(B[k], true));
+        var om = new T.InstancedMesh(hull, LURKERS[name] ? OUT_MAT.lurker : OUT_MAT.normal, MAXZ);
+        om.userData.tris = hull.index.count / 3;
         om.instanceMatrix = m.instanceMatrix;
         om.frustumCulled = false;
         om.count = 0;
@@ -5691,23 +5747,23 @@ function main(hotData) {
         _limb.rotation.set(1.30, 0, walk * 0.12);
         zPut(grp, 'torso', i);
 
-        _limb.position.set(0, 0.62 + crawlY, 0.44);
-        _limb.rotation.set(-0.55, walk * 0.18, 0);
+        _limb.position.set(0, 0.54 + crawlY, 0.29);
+        _limb.rotation.set(0.2, walk * 0.18, 0);
         zPut(grp, 'head', i);
 
         // hands claw at the ground ahead, alternating
-        _limb.position.set(-0.24, 0.56 + crawlY, 0.3);
+        _limb.position.set(-ZRIG.shX, 0.51 + crawlY, 0.19);
         _limb.rotation.set(-0.75 + claw + walk * 0.5 * (claw ? 0.2 : 1), 0, 0.22);
         zPut(grp, 'armL', i);
-        _limb.position.set(0.24, 0.56 + crawlY, 0.3);
+        _limb.position.set(ZRIG.shX, 0.51 + crawlY, 0.19);
         _limb.rotation.set(-0.75 + claw + walk2 * 0.5 * (claw ? 0.2 : 1), 0, -0.22);
         zPut(grp, 'armR', i);
 
         // knees tucked under, shins folded back along the ground
-        _limb.position.set(-0.15, 0.44, -0.3);
+        _limb.position.set(-ZRIG.hipX, 0.38, -0.29);
         _limb.rotation.set(-1.15 + walk2 * swing * 0.6, 0, 0.18);
         zLeg(grp, 'L', i, 2.0 + walk2 * 0.3);
-        _limb.position.set(0.15, 0.44, -0.3);
+        _limb.position.set(ZRIG.hipX, 0.38, -0.29);
         _limb.rotation.set(-1.15 + walk * swing * 0.6, 0, -0.18);
         zLeg(grp, 'R', i, 2.0 + walk * 0.3);
       } else {
@@ -5738,7 +5794,7 @@ function main(hotData) {
         // weight rolls over the stance leg, hard onto a bad one
         var roll = cs * (heavy ? 0.09 : 0.05) * amp + (badL ? 1 : -1) * dip * 1.6;
 
-        _limb.position.set(0, 1.03 + bob, 0);
+        _limb.position.set(0, ZRIG.torso + bob, 0);
         _limb.rotation.set(lean + rear + (runner ? 0.12 * amp : 0), 0, roll + sway);
         // a bloater is distended — read it at a glance before it reaches you
         if (t.explodes) _limb.scale.set(1.42, 1.12, 1.52);
@@ -5747,25 +5803,26 @@ function main(hotData) {
 
         // heads loll, slowly and each at their own rate, and follow the roll
         var loll = Math.sin(z.phase * 0.5 + z.loll) * (runner ? 0.05 : 0.16);
-        _limb.position.set(0, 1.55 + bob, 0.06 + lean * 0.3);
+        // the neck sits on a distended bloater's raised shoulders
+        _limb.position.set(0, ZRIG.neck + (t.explodes ? 0.04 : 0) + bob, lean * 0.3);
         _limb.rotation.set(lean * 1.3 + rear * 1.6, walk * 0.12, loll + roll * 0.8);
         zPut(grp, 'head', i);
 
         // arms reach forward — the classic silhouette — one often hanging lower
         var reach = z.atk === 'stun' ? 0.25 : z.atk === 'charge' ? 0.45 : t.reach + lunge + raise * 1.3;
-        var sx = t.explodes ? 0.42 : 0.33;
+        var sx = t.explodes ? 0.27 : ZRIG.shX;
         var drL = z.droopSide > 0 ? z.droop : 0, drR = z.droopSide < 0 ? z.droop : 0;
-        _limb.position.set(-sx, 1.34 + bob, 0);
+        _limb.position.set(-sx, ZRIG.shY + bob, 0);
         _limb.rotation.set(-reach * (1 - drL) + walk * 0.22 * amp, 0, 0.12 + roll);
         zPut(grp, 'armL', i);
-        _limb.position.set(sx, 1.34 + bob, 0);
+        _limb.position.set(sx, ZRIG.shY + bob, 0);
         _limb.rotation.set(-reach * (1 - drR) + walk2 * 0.22 * amp, 0, -0.12 + roll);
         zPut(grp, 'armR', i);
 
-        _limb.position.set(-0.12, 0.68 + bob * 0.5, 0);
+        _limb.position.set(-ZRIG.hipX, ZRIG.hipY + bob * 0.5, 0);
         _limb.rotation.set(walk * sL, 0, badL ? 0.08 * lp : 0);
         zLeg(grp, 'L', i, kL);
-        _limb.position.set(0.12, 0.68 + bob * 0.5, 0);
+        _limb.position.set(ZRIG.hipX, ZRIG.hipY + bob * 0.5, 0);
         _limb.rotation.set(walk2 * sR, 0, badR ? -0.08 * lp : 0);
         zLeg(grp, 'R', i, kR);
       }
