@@ -67,6 +67,41 @@ and best wave persist locally.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
+## The district
+
+The map is a 140×140 city district generated from a **seeded** layout — stable
+run to run, because a level you cannot design or test against is not a level.
+Streets sit on a 28-unit pitch; blocks are split into building footprints with
+alleys between them, and a few blocks are reserved as set pieces: an open lot,
+a fuel forecourt, cleared rubble fields.
+
+It holds 45 buildings, 42 light anchors, 26 wrecked cars, and several hundred
+pieces of street furniture and debris — skips, jersey barriers, hydrants,
+benches, cones, pallets, sacks, rubble, roof vents, traffic signals and burn
+barrels. Everything is instanced, and per-instance scale carries each building's
+footprint so all 45 share one geometry.
+
+Burn barrels are reused as light anchors alongside the streetlights, so they
+flicker orange on the same pooled point lights rather than needing their own.
+
+### Collision needed a broad phase
+
+`resolveProps` scanned every prop for every body, every step. At 22 props that
+was free; at 205 colliders and 40 bodies it is roughly 8,000 distance checks per
+step. A uniform grid, built once because nothing in the district moves, narrows
+it to the handful in the 3×3 cells around each body — **measured 5.3× faster**
+than the brute-force scan over the same set.
+
+Buildings are AABB colliders rather than circles, pushed out along the shallower
+axis, and the same broad phase stops bullets, so walls are real cover.
+
+### The city is cheaper than the lot was
+
+Frame time went **down**: 65ms against the small arena's 81ms under identical
+conditions. Buildings occlude the ground, and the ground is the expensive
+surface — it is per-fragment lit with several lights. Blocking the view of it
+saves more than the extra geometry costs.
+
 ## Landscape
 
 Landscape is the design target, and the camera frames by **width** there — about
