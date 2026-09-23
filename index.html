@@ -849,14 +849,13 @@ function main(hotData) {
      Base stats live here; upgrades are multipliers layered on top (see recalc).
      Keeping them separate is what lets you swap guns mid-run without your build
      evaporating or a +25% bonus silently becoming a flat number.
-     gun: [width, height, length] scale of the held model relative to the rifle.
      snd: [filter start Hz, filter end Hz, duration, gain] for the report.      */
   var WEAPONS = {
     rifle: {
       name: 'Field Rifle', short: 'RIFLE', order: 0,
       damage: 12, fireRate: 5.4, shots: 1, spread: 0.055,
       bulletSpeed: 34, range: 17, pierce: 0, crit: 0.05,
-      tracer: 0xFFD98A, bulletScale: [1, 1, 1], gun: [1, 1, 1],
+      tracer: 0xFFD98A, bulletScale: [1, 1, 1],
       snd: [2600, 420, 0.10, 0.50],
       blurb: 'Balanced. Nothing it does badly.'
     },
@@ -864,7 +863,7 @@ function main(hotData) {
       name: 'Scattergun', short: 'SCATTER', order: 1,
       damage: 7, fireRate: 1.55, shots: 7, spread: 0.155,
       bulletSpeed: 26, range: 9.5, pierce: 1, crit: 0.04,
-      tracer: 0xFFC08A, bulletScale: [0.9, 0.9, 0.62], gun: [1.5, 1.2, 0.8],
+      tracer: 0xFFC08A, bulletScale: [0.9, 0.9, 0.62],
       snd: [1800, 240, 0.22, 0.78],
       blurb: 'Seven pellets, short reach. Deletes a crowd at contact range.'
     },
@@ -872,7 +871,7 @@ function main(hotData) {
       name: 'Stutter SMG', short: 'SMG', order: 2,
       damage: 5.6, fireRate: 13.5, shots: 1, spread: 0.115,
       bulletSpeed: 38, range: 13.5, pierce: 0, crit: 0.05,
-      tracer: 0xFFE7A8, bulletScale: [0.8, 0.8, 0.8], gun: [0.85, 0.9, 0.62],
+      tracer: 0xFFE7A8, bulletScale: [0.8, 0.8, 0.8],
       snd: [3200, 780, 0.05, 0.24],
       blurb: 'Hoses everything. Sprays wide and runs out of reach early.'
     },
@@ -880,7 +879,7 @@ function main(hotData) {
       name: 'Marksman', short: 'DMR', order: 3,
       damage: 48, fireRate: 1.2, shots: 1, spread: 0.006,
       bulletSpeed: 72, range: 27, pierce: 3, crit: 0.24,
-      tracer: 0xBFE6FF, bulletScale: [1.1, 1.1, 2.2], gun: [0.9, 0.9, 1.55],
+      tracer: 0xBFE6FF, bulletScale: [1.1, 1.1, 2.2],
       snd: [5200, 480, 0.16, 0.62],
       blurb: 'Slow and heavy. Punches through a queue and drops brutes.'
     },
@@ -888,7 +887,7 @@ function main(hotData) {
       name: 'Thumper', short: 'GL', order: 4,
       damage: 16, fireRate: 1.05, shots: 1, spread: 0.028,
       bulletSpeed: 19, range: 16, pierce: 0, crit: 0,
-      tracer: 0x9BE06A, bulletScale: [1.9, 1.9, 1.1], gun: [1.35, 1.35, 0.78],
+      tracer: 0x9BE06A, bulletScale: [1.9, 1.9, 1.1],
       snd: [900, 110, 0.20, 0.62],
       explosive: true, blastRadius: 3.3, blastDamage: 44,
       blurb: 'Lobs a grenade. Huge against a pack, wasteful on one body.'
@@ -3024,103 +3023,401 @@ function main(hotData) {
     eff.blastDamage = w.blastDamage || 0;
   }
 
+  /* ============================================================ characters
+     Built from tapered segments — each one a box stretched between two joints
+     and narrowing along its length — so a forearm tapers to the wrist and a
+     chest is wider than a waist. Every part is one merged, vertex-coloured
+     mesh: skin, cloth, blood and eyes are baked in, so a whole body part of the
+     horde is still a single draw call.                                        */
+  function cgNew() { return { p: [], n: [], u: [], c: [] }; }
+  function cgGeo(b) {
+    var g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(b.p, 3));
+    g.setAttribute('normal', new T.Float32BufferAttribute(b.n, 3));
+    g.setAttribute('uv', new T.Float32BufferAttribute(b.u, 2));
+    g.setAttribute('color', new T.Float32BufferAttribute(b.c, 3));
+    g.computeBoundingSphere();
+    return g;
+  }
+  var _sa = new T.Vector3(), _sb = new T.Vector3(), _sd = new T.Vector3(), _su = new T.Vector3(),
+      _sv = new T.Vector3(), _sc = new T.Vector3(), _sq = new T.Vector3();
+  function vadd(o, u, su, v, sv) { return [o.x + u.x * su + v.x * sv, o.y + u.y * su + v.y * sv, o.z + u.z * su + v.z * sv]; }
+  // quad with its winding chosen so the normal faces away from `c`
+  function quadOut(b, P, Q, R, S, c, hex, uw, vh) {
+    var ex = Q[0] - P[0], ey = Q[1] - P[1], ez = Q[2] - P[2];
+    var fx = R[0] - P[0], fy = R[1] - P[1], fz = R[2] - P[2];
+    var nx = ey * fz - ez * fy, ny = ez * fx - ex * fz, nz = ex * fy - ey * fx;
+    var mx = (P[0] + R[0]) / 2 - c.x, my = (P[1] + R[1]) / 2 - c.y, mz = (P[2] + R[2]) / 2 - c.z;
+    if (nx * mx + ny * my + nz * mz < 0) quad(b, S, R, Q, P, hex, uw, vh);
+    else quad(b, P, Q, R, S, hex, uw, vh);
+  }
+  // Segment from A to B. wa/da: half width and half depth at A; wb/db at B.
+  // `side` picks which way "width" faces (default: the body's left-right).
+  function seg(b, A, B, wa, da, wb, db, hex, side) {
+    _sa.set(A[0], A[1], A[2]); _sb.set(B[0], B[1], B[2]);
+    _sd.subVectors(_sb, _sa);
+    var L = _sd.length() || 1e-4;
+    _sd.divideScalar(L);
+    _su.set(side ? side[0] : 1, side ? side[1] : 0, side ? side[2] : 0);
+    _su.addScaledVector(_sd, -_su.dot(_sd));
+    if (_su.lengthSq() < 1e-6) _su.set(0, 0, 1).addScaledVector(_sd, -_sd.z);
+    _su.normalize();
+    _sv.crossVectors(_sd, _su).normalize();
+    _sc.addVectors(_sa, _sb).multiplyScalar(0.5);
+    var a0 = vadd(_sa, _su, -wa, _sv, -da), a1 = vadd(_sa, _su, wa, _sv, -da);
+    var a2 = vadd(_sa, _su, wa, _sv, da), a3 = vadd(_sa, _su, -wa, _sv, da);
+    var b0 = vadd(_sb, _su, -wb, _sv, -db), b1 = vadd(_sb, _su, wb, _sv, -db);
+    var b2 = vadd(_sb, _su, wb, _sv, db), b3 = vadd(_sb, _su, -wb, _sv, db);
+    var k = 4;
+    quadOut(b, a0, a1, b1, b0, _sc, hex, wa * 2 * k, L * k);
+    quadOut(b, a1, a2, b2, b1, _sc, hex, da * 2 * k, L * k);
+    quadOut(b, a2, a3, b3, b2, _sc, hex, wa * 2 * k, L * k);
+    quadOut(b, a3, a0, b0, b3, _sc, hex, da * 2 * k, L * k);
+    quadOut(b, a0, a3, a2, a1, _sc, hex, wa * 2 * k, da * 2 * k);
+    quadOut(b, b0, b1, b2, b3, _sc, hex, wb * 2 * k, db * 2 * k);
+  }
+  // an axis-aligned block, for small details (eyes, pouches, buckles)
+  function blk(b, cx, cy, cz, sx, sy, sz, hex) {
+    seg(b, [cx, cy - sy / 2, cz], [cx, cy + sy / 2, cz], sx / 2, sz / 2, sx / 2, sz / 2, hex);
+  }
+  function shade(hex, f) {
+    _col.setHex(hex);
+    _col.r = Math.min(1, _col.r * f); _col.g = Math.min(1, _col.g * f); _col.b = Math.min(1, _col.b * f);
+    return _col.getHex();
+  }
+  var CHAR_MAT = new T.MeshLambertMaterial({ map: TX.fabric, vertexColors: true });
+
+  /* ------------------------------------------------------------- the player
+     A survivor, not a soldier: work jacket under a plate carrier, cargo
+     trousers, cap, and a pack with a bedroll strapped on top — the bedroll is
+     the pale shape that picks the player out of a crowd from above. Both hands
+     are on the gun. Forward is local +Z: rotation.y maps local +Z onto (sin a, cos a), the
+     same vector the bullets travel along.                                      */
+  var SURV = { skin: 0xB99372, jacket: 0x5E6B44, vest: 0x333D2E, pants: 0x75694E,
+               boot: 0x2C2520, glove: 0x1E1E1E, cap: 0x2F3B4C, pack: 0x5C4832, roll: 0x9C9270 };
+
+  function buildSurvivorUpper() {
+    var b = cgNew(), S = SURV;
+    // hips and belt
+    seg(b, [0, 0.62, 0], [0, 0.8, 0], 0.16, 0.1, 0.16, 0.1, S.pants);
+    seg(b, [0, 0.78, 0], [0, 0.84, 0], 0.168, 0.108, 0.168, 0.108, 0x2A2420);
+    blk(b, 0.1, 0.78, 0.1, 0.07, 0.08, 0.05, 0x3A3A2E);               // hip pouch
+    // jacket torso, widening to the shoulders
+    seg(b, [0, 0.82, 0], [0, 1.08, 0], 0.155, 0.1, 0.18, 0.11, S.jacket);
+    seg(b, [0, 1.08, 0], [0, 1.34, -0.01], 0.18, 0.11, 0.21, 0.1, S.jacket);
+    // plate carrier with three mag pouches and shoulder straps
+    seg(b, [0, 0.9, 0], [0, 1.28, 0], 0.17, 0.125, 0.18, 0.125, S.vest);
+    [-0.08, 0, 0.08].forEach(function (x) { blk(b, x, 1.0, 0.135, 0.065, 0.11, 0.04, 0x283024); });
+    blk(b, -0.1, 1.28, 0, 0.06, 0.08, 0.24, S.vest);
+    blk(b, 0.1, 1.28, 0, 0.06, 0.08, 0.24, S.vest);
+    // pack on the back, bedroll across the top
+    seg(b, [0, 0.9, -0.2], [0, 1.3, -0.2], 0.15, 0.08, 0.14, 0.075, S.pack);
+    blk(b, 0, 1.02, -0.29, 0.2, 0.12, 0.04, shade(S.pack, 0.8));
+    seg(b, [-0.19, 1.37, -0.19], [0.19, 1.37, -0.19], 0.07, 0.07, 0.07, 0.07, S.roll, [0, 1, 0]);
+    blk(b, -0.1, 1.37, -0.19, 0.025, 0.15, 0.15, 0x3A2E20);
+    blk(b, 0.1, 1.37, -0.19, 0.025, 0.15, 0.15, 0x3A2E20);
+    // scarf, neck, head
+    seg(b, [0, 1.33, 0], [0, 1.42, 0.01], 0.1, 0.09, 0.08, 0.08, 0x8A7A58);
+    seg(b, [0, 1.4, 0.01], [0, 1.47, 0.02], 0.055, 0.05, 0.055, 0.05, S.skin);
+    seg(b, [0, 1.45, 0.02], [0, 1.58, 0.03], 0.1, 0.11, 0.12, 0.125, S.skin);    // jaw to cheekbones
+    seg(b, [0, 1.58, 0.03], [0, 1.73, 0.0], 0.12, 0.125, 0.105, 0.11, S.skin);   // cranium
+    blk(b, -0.045, 1.6, 0.148, 0.03, 0.022, 0.012, 0x1C1712);                    // eyes
+    blk(b, 0.045, 1.6, 0.148, 0.03, 0.022, 0.012, 0x1C1712);
+    blk(b, 0, 1.56, 0.152, 0.025, 0.04, 0.02, shade(S.skin, 0.9));               // nose
+    blk(b, 0, 1.5, 0.13, 0.08, 0.04, 0.03, 0x4A3A2C);                            // stubble
+    blk(b, -0.125, 1.58, 0.02, 0.02, 0.05, 0.04, S.skin);                        // ears
+    blk(b, 0.125, 1.58, 0.02, 0.02, 0.05, 0.04, S.skin);
+    seg(b, [0, 1.66, 0.0], [0, 1.77, -0.01], 0.13, 0.135, 0.115, 0.12, S.cap);   // cap
+    seg(b, [0, 1.675, 0.1], [0, 1.675, 0.25], 0.11, 0.012, 0.1, 0.012, S.cap, [1, 0, 0]);  // brim, forward
+    // arms: right hand on the grip, left on the foregrip, elbows out
+    var shR = [0.22, 1.3, 0], elR = [0.29, 1.08, 0.08], haR = [0.18, 1.1, 0.27];
+    var shL = [-0.22, 1.3, 0], elL = [-0.2, 1.1, 0.27], haL = [0.13, 1.14, 0.58];
+    seg(b, shR, elR, 0.07, 0.065, 0.058, 0.055, S.jacket);
+    seg(b, elR, haR, 0.058, 0.055, 0.046, 0.046, S.jacket);
+    seg(b, haR, [haR[0] - 0.01, haR[1] - 0.02, haR[2] + 0.07], 0.045, 0.04, 0.04, 0.035, S.glove);
+    seg(b, shL, elL, 0.07, 0.065, 0.058, 0.055, S.jacket);
+    seg(b, elL, haL, 0.058, 0.055, 0.046, 0.046, S.jacket);
+    seg(b, haL, [haL[0] + 0.02, haL[1] - 0.01, haL[2] + 0.07], 0.045, 0.04, 0.04, 0.035, S.glove);
+    blk(b, 0.22, 1.22, 0.02, 0.1, 0.1, 0.12, shade(S.jacket, 0.85));             // shoulder pads
+    blk(b, -0.22, 1.22, 0.02, 0.1, 0.1, 0.12, shade(S.jacket, 0.85));
+    return cgGeo(b);
+  }
+  function buildSurvivorThigh() {
+    var b = cgNew();
+    seg(b, [0, 0.03, 0], [0, -0.34, 0], 0.085, 0.09, 0.066, 0.072, SURV.pants);
+    blk(b, 0.08, -0.16, 0.01, 0.03, 0.12, 0.1, shade(SURV.pants, 0.82));        // cargo pocket
+    return cgGeo(b);
+  }
+  function buildSurvivorShin() {
+    var b = cgNew();
+    seg(b, [0, 0.01, 0], [0, -0.24, 0], 0.066, 0.07, 0.055, 0.058, SURV.pants);
+    seg(b, [0, -0.2, 0], [0, -0.3, 0.0], 0.06, 0.064, 0.058, 0.062, SURV.boot);  // boot upper
+    seg(b, [0, -0.315, -0.08], [0, -0.315, 0.16], 0.058, 0.028, 0.055, 0.026, SURV.boot, [1, 0, 0]);
+    seg(b, [0, -0.338, -0.085], [0, -0.338, 0.165], 0.062, 0.006, 0.06, 0.006, 0x151210, [1, 0, 0]);  // sole
+    return cgGeo(b);
+  }
+
+  // Guns: built along +Z from the grip. muzzle is where the flash sits.
+  var GUNS = {};
+  (function buildGuns() {
+    var X = 0.175, Y = 1.15, dark = 0x2A2E32, black = 0x18191B;
+    function gz(z0, z1, w, h, hex, dy, dx) {
+      return function (b) { seg(b, [X + (dx || 0), Y + (dy || 0), z0], [X + (dx || 0), Y + (dy || 0), z1], w, h, w, h, hex, [1, 0, 0]); };
+    }
+    function make(parts, muzzle) {
+      var b = cgNew();
+      parts.forEach(function (p) { p(b); });
+      return { geo: cgGeo(b), muzzle: muzzle };
+    }
+    var torch = [gz(0.66, 0.8, 0.022, 0.022, black, -0.05), gz(0.79, 0.805, 0.018, 0.018, 0xE8EEF0, -0.05)];
+    GUNS.rifle = make([
+      gz(-0.24, 0.02, 0.03, 0.055, dark, 0.02),                 // stock
+      gz(0.0, 0.42, 0.036, 0.05, dark),                          // receiver
+      gz(0.4, 0.74, 0.034, 0.038, 0x3A3E34),                     // handguard
+      gz(0.74, 1.0, 0.012, 0.012, black),                        // barrel
+      gz(0.12, 0.34, 0.012, 0.014, black, 0.064),                // rail and sight
+      function (b) { seg(b, [X, Y - 0.04, 0.3], [X, Y - 0.19, 0.36], 0.018, 0.035, 0.018, 0.03, black, [1, 0, 0]); },
+      function (b) { seg(b, [X, Y - 0.04, 0.14], [X, Y - 0.14, 0.1], 0.016, 0.022, 0.016, 0.02, black, [1, 0, 0]); }
+    ].concat(torch), 1.0);
+    GUNS.scatter = make([
+      gz(-0.26, 0.02, 0.034, 0.06, 0x5E4230, 0.01),              // wood stock
+      gz(0.0, 0.3, 0.04, 0.052, dark),
+      gz(0.3, 0.95, 0.02, 0.02, black, 0.02),                    // barrel
+      gz(0.3, 0.86, 0.017, 0.017, 0x303438, -0.025),             // tube magazine
+      gz(0.46, 0.68, 0.034, 0.034, 0x6A4A30, -0.022),            // pump
+      function (b) { seg(b, [X, Y - 0.04, 0.12], [X, Y - 0.14, 0.08], 0.016, 0.022, 0.016, 0.02, black, [1, 0, 0]); }
+    ], 0.95);
+    GUNS.stutter = make([
+      gz(-0.18, 0.0, 0.012, 0.04, black, 0.02),                  // wire stock
+      gz(0.0, 0.3, 0.036, 0.048, dark),
+      gz(0.3, 0.46, 0.014, 0.014, black),
+      function (b) { seg(b, [X, Y - 0.03, 0.2], [X, Y - 0.26, 0.21], 0.016, 0.03, 0.016, 0.03, black, [1, 0, 0]); },
+      function (b) { seg(b, [X, Y - 0.04, 0.08], [X, Y - 0.13, 0.05], 0.016, 0.02, 0.016, 0.02, black, [1, 0, 0]); }
+    ].concat([gz(0.3, 0.42, 0.02, 0.02, black, -0.045)]), 0.48);
+    GUNS.marksman = make([
+      gz(-0.28, 0.04, 0.034, 0.06, 0x6E6040, 0.01),
+      gz(0.04, 0.46, 0.036, 0.048, 0x6E6040),
+      gz(0.46, 0.64, 0.03, 0.034, 0x6E6040),
+      gz(0.64, 1.36, 0.012, 0.012, black),
+      gz(0.08, 0.44, 0.03, 0.03, black, 0.085),                  // scope
+      gz(0.43, 0.45, 0.026, 0.026, 0x6FA8C8, 0.085),              // lens
+      function (b) { seg(b, [X, Y - 0.04, 0.26], [X, Y - 0.16, 0.3], 0.016, 0.026, 0.016, 0.024, black, [1, 0, 0]); }
+    ], 1.36);
+    GUNS.thumper = make([
+      gz(-0.24, 0.02, 0.034, 0.06, 0x4A5238, 0.01),
+      gz(0.02, 0.24, 0.085, 0.085, 0x3A3E34),                    // revolving drum
+      gz(0.24, 0.8, 0.052, 0.052, 0x4A5238),                     // fat tube
+      gz(0.78, 0.82, 0.058, 0.058, black),
+      function (b) { seg(b, [X, Y - 0.07, 0.4], [X, Y - 0.2, 0.4], 0.018, 0.024, 0.018, 0.024, black, [1, 0, 0]); }
+    ], 0.82);
+  })();
+
   var playerGroup = new T.Group();
   (function buildPlayer() {
-    var kit = new T.MeshLambertMaterial({ color: 0x3E4A3C });
-    var vest = new T.MeshLambertMaterial({ color: 0x2A3229 });
-    var skin = new T.MeshLambertMaterial({ color: 0xB99372 });
-    var gun = new T.MeshLambertMaterial({ color: 0x23282C });
+    var upper = new T.Mesh(buildSurvivorUpper(), CHAR_MAT);
+    playerGroup.add(upper);
+    var thighGeo = buildSurvivorThigh(), shinGeo = buildSurvivorShin();
+    var legs = [], shins = [];
+    [-0.11, 0.11].forEach(function (x) {
+      var thigh = new T.Mesh(thighGeo, CHAR_MAT);
+      thigh.position.set(x, 0.68, 0);
+      var shin = new T.Mesh(shinGeo, CHAR_MAT);
+      shin.position.set(0, -0.34, 0);
+      thigh.add(shin);
+      playerGroup.add(thigh);
+      legs.push(thigh); shins.push(shin);
+    });
+    playerGroup.userData.legs = legs;
+    playerGroup.userData.shins = shins;
 
-    var torso = new T.Mesh(new T.BoxGeometry(0.62, 0.78, 0.38), vest);
-    torso.position.y = 1.02;
-    playerGroup.add(torso);
-
-    var shoulders = new T.Mesh(new T.BoxGeometry(0.82, 0.22, 0.42), kit);
-    shoulders.position.y = 1.34;
-    playerGroup.add(shoulders);
-
-    var head = new T.Mesh(new T.BoxGeometry(0.31, 0.32, 0.31), skin);
-    head.position.y = 1.62;
-    playerGroup.add(head);
-
-    var helmet = new T.Mesh(new T.BoxGeometry(0.37, 0.16, 0.37), kit);
-    helmet.position.y = 1.78;
-    playerGroup.add(helmet);
-
-    var legGeo = new T.BoxGeometry(0.21, 0.66, 0.21);
-    legGeo.translate(0, -0.33, 0);
-    var legL = new T.Mesh(legGeo, kit); legL.position.set(-0.16, 0.66, 0);
-    var legR = new T.Mesh(legGeo, kit); legR.position.set(0.16, 0.66, 0);
-    playerGroup.add(legL); playerGroup.add(legR);
-    playerGroup.userData.legs = [legL, legR];
-
-    // Forward is local +Z. Aim uses atan2(dx, dz) and rotation.y, which maps
-    // local +Z onto (sin a, cos a) — the same vector the bullets travel along.
-    // (three.js lookAt treats -Z as forward; this convention is the opposite.)
-    var rifle = new T.Mesh(new T.BoxGeometry(0.15, 0.16, 1.05), gun);
-    rifle.position.set(0.19, 1.14, 0.5);
-    playerGroup.add(rifle);
-    var stock = new T.Mesh(new T.BoxGeometry(0.13, 0.2, 0.34), gun);
-    stock.position.set(0.19, 1.1, -0.12);
-    playerGroup.add(stock);
+    var gun = new T.Mesh(GUNS.rifle.geo, CHAR_MAT);
+    playerGroup.add(gun);
+    playerGroup.userData.gun = gun;
 
     var flash = new T.Mesh(
       new T.BoxGeometry(0.22, 0.22, 0.30),
       new T.MeshBasicMaterial({ color: 0xFFD79A, transparent: true, opacity: 0.95 })
     );
-    flash.position.set(0.19, 1.14, 1.08);
+    flash.position.set(0.175, 1.15, GUNS.rifle.muzzle + 0.1);
     flash.visible = false;
     playerGroup.add(flash);
     playerGroup.userData.flash = flash;
-    playerGroup.userData.rifle = rifle;
   })();
   scene.add(playerGroup);
 
-  /* ------------------------------------------------------- zombie instancing
-     Six InstancedMeshes — one per body part — so the horde costs six draw
-     calls no matter how many are on screen, while every limb still animates
-     independently. Limb geometries are translated so their origin sits at the
-     joint, which lets a single rotation swing them correctly.                */
-  var MAXZ = 48;
-  var zGeo = {
-    torso: new T.BoxGeometry(0.56, 0.74, 0.33),
-    head: new T.BoxGeometry(0.30, 0.32, 0.30),
-    arm: (function () { var g = new T.BoxGeometry(0.155, 0.62, 0.155); g.translate(0, -0.31, 0); return g; })(),
-    leg: (function () { var g = new T.BoxGeometry(0.185, 0.66, 0.185); g.translate(0, -0.33, 0); return g; })()
-  };
-  var ZKEYS = ['torso', 'head', 'armL', 'armR', 'legL', 'legR'];
+  /* ------------------------------------------------------------- the horde
+     Eight parts per body — torso, head, two arms, two thighs, two shins — each
+     an InstancedMesh, so a body part of the whole horde is one draw call and
+     every limb still animates on its own. Limb geometry has its origin at the
+     joint, so one rotation swings it; shins hang off the knee, so they bend.
 
-  // One instanced set PER ZOMBIE TYPE, each with a plain solid material.
-  // Per-instance tinting via setColorAt would be fewer draw calls, but it
-  // depends on the renderer recompiling the shader when instanceColor appears
-  // after first render, which is fragile across three.js versions — and when
-  // it silently fails every zombie renders pure white. 24 solid draw calls is
-  // cheap and cannot break.
-  var ZNAMES = Object.keys(ZTYPE);
-  var zGroups = {};
-  ZNAMES.forEach(function (name) {
-    var t = ZTYPE[name];
-    var bodyMat = new T.MeshLambertMaterial({ color: t.color });
-    var headMat = new T.MeshLambertMaterial({ color: t.headColor });
-    var g = {
-      torso: new T.InstancedMesh(zGeo.torso, bodyMat, MAXZ),
-      head: new T.InstancedMesh(zGeo.head, headMat, MAXZ),
-      armL: new T.InstancedMesh(zGeo.arm, bodyMat, MAXZ),
-      armR: new T.InstancedMesh(zGeo.arm, bodyMat, MAXZ),
-      legL: new T.InstancedMesh(zGeo.leg, bodyMat, MAXZ),
-      legR: new T.InstancedMesh(zGeo.leg, bodyMat, MAXZ)
-    };
-    ZKEYS.forEach(function (k) {
-      g[k].frustumCulled = false;
-      g[k].count = 0;
-      scene.add(g[k]);
+     Each type has its own look, and the common ones come in several outfits so
+     a crowd is not a row of twins. Skin keeps each type's signature colour, so
+     you can still tell a runner from a spitter at a glance.                  */
+  var MAXZ = 48;
+  var THIGH = 0.34;
+  var ZPARTS = ['torso', 'head', 'armL', 'armR', 'thighL', 'thighR', 'shinL', 'shinR'];
+  //   shirt/pants/shoe/hair; sleeve: 'long' | 'short' | 'none'; extras flag the type's features
+  var ZLOOK = {
+    shambler: [
+      { skin: 0x8FA86A, shirt: 0xB0ACA0, pants: 0x3E5170, shoe: 0x3A2E24, hair: 0x2E2620, sleeve: 'short' },
+      { skin: 0x87A062, shirt: 0x7A3A32, pants: 0x4A4436, shoe: 0x2A2622, hair: 0x6A5A40, sleeve: 'long', check: 0x4A2420 },
+      { skin: 0x94A870, shirt: 0x3E5A6E, pants: 0x2E3238, shoe: 0x1E1E20, hair: 0x1A1A1A, sleeve: 'long', tie: 0x6A2A2A }
+    ],
+    runner: [
+      { skin: 0xC8C0A2, shirt: 0x9A2E2A, pants: 0x3A3E48, shoe: 0xD8D4CC, hair: 0x4A3420, sleeve: 'none' },
+      { skin: 0xC4BC9C, shirt: 0xCEC6AE, pants: 0x2A2E36, shoe: 0x7A2A2A, hair: 0x1E1A16, sleeve: 'long', hood: true }
+    ],
+    brute: [
+      { skin: 0x6E7C88, shirt: 0x6E7C88, pants: 0x34465A, shoe: 0x2A2420, hair: null, sleeve: 'none', vest: 0xC8641E, big: true }
+    ],
+    spitter: [
+      { skin: 0xC49A40, shirt: 0xA8BCB6, pants: 0xA8BCB6, shoe: 0x9C9C94, hair: 0x3A2A18, sleeve: 'short', acid: 0x9BE06A }
+    ],
+    crawler: [
+      { skin: 0xAA9C66, shirt: 0x5A5448, pants: 0x4A4234, shoe: 0x2A241E, hair: 0x3A3026, sleeve: 'short', ribs: true },
+      { skin: 0xA49660, shirt: 0x3E4A3A, pants: 0x2E2A26, shoe: 0x1E1C1A, hair: 0x8A7A5A, sleeve: 'none', ribs: true }
+    ],
+    bloater: [
+      { skin: 0x9AAB63, shirt: 0x6A6A58, pants: 0x4A4A3E, shoe: 0x2E2A24, hair: 0x2A2620, sleeve: 'short', boils: 0xD2CC62 }
+    ],
+    howler: [
+      { skin: 0xB86A5E, shirt: 0x2A2830, pants: 0x2A2830, shoe: 0x1A1A1E, hair: 0x1A1414, sleeve: 'long', longHair: true, scream: true }
+    ]
+  };
+  var BLOOD = 0x5A1616, BLOOD2 = 0x3E1010;
+
+  function zTorso(L) {
+    var b = cgNew(), sk = L.skin, sh = L.shirt;
+    var W = L.big ? 1.18 : 1;
+    seg(b, [0, -0.37, 0], [0, -0.2, 0], 0.15 * W, 0.1, 0.15 * W, 0.1, L.pants);            // pelvis
+    seg(b, [0, -0.21, 0], [0, -0.17, 0], 0.158 * W, 0.106, 0.158 * W, 0.106, 0x2A241E);    // belt
+    seg(b, [0, -0.19, 0], [0, 0.03, 0.01], 0.145 * W, 0.095, 0.155 * W, 0.1, sh);          // belly
+    seg(b, [0, 0.03, 0.01], [0, 0.29, 0], 0.155 * W, 0.1, 0.2 * W, 0.11, sh);              // chest
+    seg(b, [0, 0.27, 0], [0, 0.37, -0.02], 0.2 * W, 0.105, 0.16 * W, 0.09, sh);            // shoulders
+    seg(b, [0, 0.35, 0.02], [0, 0.46, 0.04], 0.055 * W, 0.05, 0.05 * W, 0.05, sk);         // neck
+    // torn shirt: skin showing through, and blood down the front
+    blk(b, 0.05, -0.09, 0.1, 0.07, 0.1, 0.012, sk);
+    blk(b, -0.06, 0.16, 0.107, 0.08, 0.12, 0.012, BLOOD);
+    blk(b, -0.05, 0.05, 0.103, 0.035, 0.12, 0.012, BLOOD2);
+    blk(b, 0.1, 0.2, -0.105, 0.06, 0.1, 0.012, BLOOD2);
+    if (L.check) [-0.1, 0.1].forEach(function (x) { blk(b, x, 0.08, 0.104, 0.02, 0.36, 0.01, L.check); });
+    if (L.tie) blk(b, 0, 0.18, 0.108, 0.035, 0.22, 0.01, L.tie);
+    if (L.hood) seg(b, [0, 0.28, -0.1], [0, 0.4, -0.12], 0.12, 0.05, 0.11, 0.05, shade(sh, 0.85));
+    if (L.vest) {
+      seg(b, [0, -0.12, 0], [0, 0.3, 0], 0.17 * W, 0.115, 0.2 * W, 0.12, L.vest);
+      blk(b, 0, 0.02, 0.121, 0.4 * W, 0.035, 0.01, 0xDCDCCC);                             // reflective band
+      blk(b, 0, 0.02, -0.121, 0.4 * W, 0.035, 0.01, 0xDCDCCC);
+      seg(b, [0, 0.3, 0], [0, 0.4, -0.02], 0.13, 0.1, 0.1, 0.08, shade(sk, 0.95));        // trapezius
+    }
+    if (L.acid) {
+      seg(b, [0, 0.36, 0.05], [0, 0.46, 0.07], 0.085, 0.085, 0.07, 0.07, shade(sk, 1.1)); // throat sac
+      blk(b, 0.0, 0.2, 0.112, 0.05, 0.2, 0.01, L.acid);
+      blk(b, 0.03, 0.02, 0.108, 0.03, 0.16, 0.01, L.acid);
+    }
+    if (L.ribs) {
+      for (var r = 0; r < 4; r++) {
+        blk(b, 0.1, 0.02 + r * 0.055, 0.102, 0.08, 0.016, 0.01, 0xD8CCB0);
+        blk(b, 0.1, 0.02 + r * 0.055 + 0.027, 0.101, 0.08, 0.012, 0.008, 0x4A1A1A);
+      }
+    }
+    if (L.boils) {
+      [[0.08, -0.05, 0.1], [-0.07, 0.1, 0.105], [0.12, 0.18, 0.09], [-0.1, -0.12, 0.09],
+       [0.02, 0.22, -0.11], [-0.12, 0.05, -0.1], [0.15, 0.0, 0.0]].forEach(function (p) {
+        blk(b, p[0], p[1], p[2], 0.05, 0.05, 0.05, L.boils);
+      });
+    }
+    return cgGeo(b);
+  }
+  function zHead(L) {
+    var b = cgNew(), sk = L.skin;
+    seg(b, [0, -0.15, 0.025], [0, -0.02, 0.02], 0.085, 0.1, 0.115, 0.125, shade(sk, 0.92));  // jaw
+    seg(b, [0, -0.02, 0.02], [0, 0.15, -0.01], 0.118, 0.128, 0.1, 0.11, sk);                // cranium
+    // sunken eye sockets with milky eyes, a slack mouth, ears
+    [-0.045, 0.045].forEach(function (x) {
+      blk(b, x, 0.02, 0.143, 0.042, 0.035, 0.012, 0x1A1212);
+      blk(b, x, 0.02, 0.149, 0.016, 0.014, 0.006, 0xC8C8A4);
+      blk(b, x * 2.7, 0.0, 0.02, 0.02, 0.05, 0.04, sk);
     });
-    zGroups[name] = g;
+    blk(b, 0, -0.02, 0.15, 0.025, 0.035, 0.02, shade(sk, 0.85));
+    var mh = L.scream ? 0.09 : 0.035;
+    blk(b, 0, -0.1, 0.132, 0.07, mh, 0.012, 0x2A0C0C);
+    blk(b, 0, -0.1 + mh / 2 - 0.006, 0.136, 0.06, 0.012, 0.01, 0xC8BC98);                   // teeth
+    blk(b, 0.05, -0.13, 0.12, 0.03, 0.05, 0.01, BLOOD);                                    // chin blood
+    if (L.hair) {
+      seg(b, [0, 0.08, -0.015], [0, 0.17, -0.025], 0.125, 0.135, 0.105, 0.115, L.hair);
+      blk(b, 0, 0.02, -0.11, 0.2, 0.14, 0.04, L.hair);
+    }
+    if (L.longHair) seg(b, [0, 0.1, -0.1], [0, -0.3, -0.16], 0.11, 0.035, 0.12, 0.03, L.hair);
+    if (L.hood) seg(b, [0, -0.06, -0.02], [0, 0.19, -0.03], 0.14, 0.145, 0.12, 0.125, shade(L.shirt, 0.85));
+    if (!L.hair) blk(b, 0, 0.06, 0.125, 0.2, 0.025, 0.03, shade(sk, 0.85));                // brute's brow
+    blk(b, -0.06, 0.12, 0.06, 0.05, 0.02, 0.06, BLOOD2);                                    // scalp wound
+    return cgGeo(b);
+  }
+  // Arm from the shoulder, hanging along -Y, with a fixed bend at the elbow
+  // so reaching arms read as arms rather than planks.
+  function zArm(L) {
+    var b = cgNew(), sk = L.skin, W = L.big ? 1.3 : 1;
+    var up = L.sleeve === 'none' ? sk : L.shirt;
+    var fore = L.sleeve === 'long' ? L.shirt : sk;
+    var E = [0, -0.3, 0], bend = 0.38;
+    var Wr = [0, E[1] - 0.26 * Math.cos(bend), 0.26 * Math.sin(bend)];
+    var Hd = [0, Wr[1] - 0.1 * Math.cos(bend + 0.1), Wr[2] + 0.1 * Math.sin(bend + 0.1)];
+    seg(b, [0, 0.03, 0], E, 0.068 * W, 0.068 * W, 0.054 * W, 0.054 * W, up);
+    seg(b, E, Wr, 0.054 * W, 0.054 * W, 0.042 * W, 0.042 * W, fore);
+    if (L.sleeve === 'long') seg(b, [Wr[0], Wr[1] + 0.03, Wr[2] - 0.01], Wr, 0.046 * W, 0.046 * W, 0.046 * W, 0.046 * W, sk);
+    seg(b, Wr, Hd, 0.045 * W, 0.022 * W, 0.04 * W, 0.018 * W, sk);                           // hand
+    [-0.025, 0, 0.025].forEach(function (x) {                                              // grasping fingers
+      seg(b, [x * W, Hd[1] + 0.005, Hd[2] - 0.005], [x * W, Hd[1] - 0.06, Hd[2] + 0.02], 0.009 * W, 0.009 * W, 0.007 * W, 0.007 * W, shade(sk, 0.9));
+    });
+    blk(b, 0, (E[1] + Wr[1]) / 2, Wr[2] / 2 + 0.05 * W, 0.05 * W, 0.08, 0.01, BLOOD);
+    if (L.boils) blk(b, 0.05, -0.15, 0, 0.04, 0.04, 0.04, L.boils);
+    return cgGeo(b);
+  }
+  function zThigh(L) {
+    var b = cgNew(), W = L.big ? 1.25 : 1;
+    seg(b, [0, 0.03, 0], [0, -THIGH, 0], 0.085 * W, 0.088 * W, 0.064 * W, 0.068 * W, L.pants);
+    blk(b, 0.02, -0.28, 0.07 * W, 0.07 * W, 0.07, 0.01, L.skin);                              // torn at the knee
+    return cgGeo(b);
+  }
+  function zShin(L) {
+    var b = cgNew(), W = L.big ? 1.25 : 1;
+    seg(b, [0, 0.01, 0], [0, -0.27, 0], 0.064 * W, 0.068 * W, 0.05 * W, 0.054 * W, L.pants);
+    seg(b, [0, -0.27, 0], [0, -0.3, 0], 0.05 * W, 0.054 * W, 0.05 * W, 0.054 * W, L.skin);
+    seg(b, [0, -0.32, -0.07], [0, -0.32, 0.15], 0.056 * W, 0.022, 0.052 * W, 0.02, L.shoe, [1, 0, 0]);
+    blk(b, 0, -0.1, 0.066 * W, 0.05, 0.12, 0.01, BLOOD2);
+    return cgGeo(b);
+  }
+
+  // One set of eight InstancedMeshes per (type, outfit). Solid geometry per
+  // group rather than per-instance colour: setColorAt depends on a shader
+  // recompile that is fragile across three.js versions, and when it silently
+  // fails every zombie renders white. Groups absent from the wave are hidden.
+  var ZNAMES = Object.keys(ZTYPE);
+  var zGroups = {}, ZGKEYS = [];
+  ZNAMES.forEach(function (name) {
+    ZLOOK[name].forEach(function (L, vi) {
+      var key = name + '#' + vi;
+      var arm = zArm(L), thigh = zThigh(L), shin = zShin(L);
+      var geos = { torso: zTorso(L), head: zHead(L), armL: arm, armR: arm,
+                   thighL: thigh, thighR: thigh, shinL: shin, shinR: shin };
+      var g = {};
+      ZPARTS.forEach(function (k) {
+        var m = new T.InstancedMesh(geos[k], CHAR_MAT, MAXZ);
+        m.frustumCulled = false;
+        m.count = 0;
+        m.visible = false;
+        scene.add(m);
+        g[k] = m;
+      });
+      zGroups[key] = g;
+      ZGKEYS.push(key);
+    });
   });
 
   var _body = new T.Object3D();
   var _limb = new T.Object3D();
-  var _m = new T.Matrix4();
+  var _m = new T.Matrix4(), _m2 = new T.Matrix4(), _knee = new T.Matrix4();
 
   /* ------------------------------------------------------- projectiles & fx */
   var MAXB = 90;
@@ -3215,7 +3512,8 @@ function main(hotData) {
       radius: t.radius, scale: t.scale * rand(0.94, 1.07),
       phase: rand(0, TAU), flash: 0, atkCd: rand(0, 1),
       groanCd: rand(1, 9), lunge: 0,
-      rage: 0, pulse: 0, clawCd: 0, gaitAmp: 1
+      rage: 0, pulse: 0, clawCd: 0, gaitAmp: 1,
+      variant: Math.floor(Math.random() * ZLOOK[typeName].length)
     });
   }
 
@@ -3814,12 +4112,10 @@ function main(hotData) {
     var w = WEAPONS[id];
     bulletMesh.material.color.setHex(w.tracer);
 
-    // reshape the held model so each gun reads differently from above
-    var rifle = playerGroup.userData.rifle;
-    var flash = playerGroup.userData.flash;
-    rifle.scale.set(w.gun[0], w.gun[1], w.gun[2]);
-    rifle.position.z = 0.5 * w.gun[2];
-    flash.position.z = 1.08 * w.gun[2];
+    // each gun is its own model; the flash moves to that gun's muzzle
+    var G_ = GUNS[id] || GUNS.rifle;
+    playerGroup.userData.gun.geometry = G_.geo;
+    playerGroup.userData.flash.position.z = G_.muzzle + 0.1;
 
     if (announceIt) {
       showToast(w.name, w.blurb);
@@ -4298,17 +4594,33 @@ function main(hotData) {
 
   /* ------------------------------------------------------------ update: draw */
   var zCounts = {};
+  // write the current _limb transform (relative to the body) into a part
+  function zPut(grp, key, i) {
+    _limb.updateMatrix();
+    _m.multiplyMatrices(_body.matrix, _limb.matrix);
+    grp[key].setMatrixAt(i, _m);
+  }
+  // thigh from the current _limb transform, shin hung off its knee
+  function zLeg(grp, side, i, knee) {
+    zPut(grp, 'thigh' + side, i);
+    _knee.makeRotationX(knee);
+    _knee.setPosition(0, -THIGH, 0);
+    _m2.multiplyMatrices(_m, _knee);
+    grp['shin' + side].setMatrixAt(i, _m2);
+  }
+
   function syncZombies() {
     var gi;
-    for (gi = 0; gi < ZNAMES.length; gi++) zCounts[ZNAMES[gi]] = 0;
+    for (gi = 0; gi < ZGKEYS.length; gi++) zCounts[ZGKEYS[gi]] = 0;
 
     for (var zi = 0; zi < zombies.length; zi++) {
       var z = zombies[zi];
       var t = ZTYPE[z.type];
-      var grp = zGroups[z.type];
-      var i = zCounts[z.type];
+      var gkey = z.type + '#' + ((z.variant || 0) % ZLOOK[z.type].length);
+      var grp = zGroups[gkey];
+      var i = zCounts[gkey];
       if (i >= MAXZ) continue;
-      zCounts[z.type] = i + 1;
+      zCounts[gkey] = i + 1;
 
       // hit feedback is a brief scale pop — no per-instance colour needed
       var s = z.scale * (1 + Math.max(0, z.flash) * 0.16);
@@ -4317,111 +4629,88 @@ function main(hotData) {
       var amp = z.gaitAmp === undefined ? 1 : z.gaitAmp;
       var swing = t.legSwing * amp;
       var lunge = z.lunge > 0 ? 0.55 : 0;
+      // The knee folds while that leg swings forward and straightens to
+      // take the weight — which is what stops a walk reading as stilts.
+      var kneeL = 0.08 + Math.max(0, -Math.cos(z.phase)) * 1.15 * swing;
+      var kneeR = 0.08 + Math.max(0, Math.cos(z.phase)) * 1.15 * swing;
 
       _body.position.set(z.x, 0, z.z);
       _body.rotation.set(0, z.angle, 0);
       _body.scale.set(s, s, s);
       _body.updateMatrix();
+      _limb.scale.set(1, 1, 1);
 
       if (t.crawl) {
         /* ---- on all fours: body low and near-horizontal, limbs scrabbling ---- */
         _limb.position.set(0, 0.46 + Math.abs(walk) * 0.03, 0);
         _limb.rotation.set(1.30, 0, walk * 0.12);
-        _limb.scale.set(1, 1, 1);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.torso.setMatrixAt(i, _m);
+        zPut(grp, 'torso', i);
 
-        _limb.position.set(0, 0.60, 0.42);
-        _limb.rotation.set(-0.35, walk * 0.18, 0);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.head.setMatrixAt(i, _m);
+        _limb.position.set(0, 0.62, 0.44);
+        _limb.rotation.set(-0.55, walk * 0.18, 0);
+        zPut(grp, 'head', i);
 
-        // front limbs paw at the ground, alternating
-        _limb.position.set(-0.26, 0.56, 0.24);
-        _limb.rotation.set(-2.05 + walk * 0.55, 0, 0.30);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.armL.setMatrixAt(i, _m);
+        // hands claw at the ground ahead, alternating
+        _limb.position.set(-0.24, 0.56, 0.3);
+        _limb.rotation.set(-0.75 + walk * 0.5, 0, 0.22);
+        zPut(grp, 'armL', i);
+        _limb.position.set(0.24, 0.56, 0.3);
+        _limb.rotation.set(-0.75 + walk2 * 0.5, 0, -0.22);
+        zPut(grp, 'armR', i);
 
-        _limb.position.set(0.26, 0.56, 0.24);
-        _limb.rotation.set(-2.05 + walk2 * 0.55, 0, -0.30);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.armR.setMatrixAt(i, _m);
-
-        // hind legs kick out behind
-        _limb.position.set(-0.17, 0.44, -0.30);
-        _limb.rotation.set(-1.15 + walk2 * swing, 0, 0.18);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.legL.setMatrixAt(i, _m);
-
-        _limb.position.set(0.17, 0.44, -0.30);
-        _limb.rotation.set(-1.15 + walk * swing, 0, -0.18);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.legR.setMatrixAt(i, _m);
+        // knees tucked under, shins folded back along the ground
+        _limb.position.set(-0.15, 0.44, -0.3);
+        _limb.rotation.set(-1.15 + walk2 * swing * 0.6, 0, 0.18);
+        zLeg(grp, 'L', i, 2.0 + walk2 * 0.3);
+        _limb.position.set(0.15, 0.44, -0.3);
+        _limb.rotation.set(-1.15 + walk * swing * 0.6, 0, -0.18);
+        zLeg(grp, 'R', i, 2.0 + walk * 0.3);
       } else {
         /* ---- upright ---- */
-        var lean = t.explodes ? 0.04 : (z.type === 'brute' ? 0.06 : 0.16);
+        var lean = t.explodes ? 0.04 : (z.type === 'brute' ? 0.1 : 0.16);
         // a howler mid-shriek rears back; a bloater sways with its own weight
         var rear = (t.howls && z.pulse > 0) ? -0.42 : 0;
         var sway = t.explodes ? Math.sin(z.phase * 0.5) * 0.09 : 0;
+        var bob = Math.abs(walk) * 0.035 * amp;
 
-        _limb.position.set(0, 1.03 + Math.abs(walk) * 0.035 * amp, 0);
+        _limb.position.set(0, 1.03 + bob, 0);
         _limb.rotation.set(lean + rear, 0, walk * 0.05 + sway);
         // a bloater is distended — read it at a glance before it reaches you
         if (t.explodes) _limb.scale.set(1.42, 1.12, 1.52);
-        else _limb.scale.set(1, 1, 1);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.torso.setMatrixAt(i, _m);
+        zPut(grp, 'torso', i);
+        _limb.scale.set(1, 1, 1);
 
-        _limb.position.set(0, 1.55 + Math.abs(walk) * 0.03 * amp, 0.06);
+        _limb.position.set(0, 1.55 + bob, 0.06 + lean * 0.3);
         _limb.rotation.set(lean * 1.3 + rear * 1.6, walk * 0.12, walk * 0.07);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.head.setMatrixAt(i, _m);
+        zPut(grp, 'head', i);
 
         // arms reach forward — the classic silhouette
         var reach = t.reach + lunge;
-        _limb.position.set(-0.34, 1.32, 0);
-        _limb.rotation.set(-reach + walk * 0.22 * amp, 0, 0.14);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.armL.setMatrixAt(i, _m);
+        var sx = t.explodes ? 0.42 : 0.33;
+        _limb.position.set(-sx, 1.34 + bob, 0);
+        _limb.rotation.set(-reach + walk * 0.22 * amp, 0, 0.12);
+        zPut(grp, 'armL', i);
+        _limb.position.set(sx, 1.34 + bob, 0);
+        _limb.rotation.set(-reach + walk2 * 0.22 * amp, 0, -0.12);
+        zPut(grp, 'armR', i);
 
-        _limb.position.set(0.34, 1.32, 0);
-        _limb.rotation.set(-reach + walk2 * 0.22 * amp, 0, -0.14);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.armR.setMatrixAt(i, _m);
-
-        _limb.position.set(-0.15, 0.68, 0);
+        _limb.position.set(-0.12, 0.68 + bob * 0.5, 0);
         _limb.rotation.set(walk * swing, 0, 0);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.legL.setMatrixAt(i, _m);
-
-        _limb.position.set(0.15, 0.68, 0);
+        zLeg(grp, 'L', i, kneeL);
+        _limb.position.set(0.12, 0.68 + bob * 0.5, 0);
         _limb.rotation.set(walk2 * swing, 0, 0);
-        _limb.updateMatrix();
-        _m.multiplyMatrices(_body.matrix, _limb.matrix);
-        grp.legR.setMatrixAt(i, _m);
+        zLeg(grp, 'R', i, kneeR);
       }
     }
 
-    for (gi = 0; gi < ZNAMES.length; gi++) {
-      var name = ZNAMES[gi];
-      var group = zGroups[name];
-      var c = zCounts[name];
-      for (var ki = 0; ki < ZKEYS.length; ki++) {
-        var part = group[ZKEYS[ki]];
+    for (gi = 0; gi < ZGKEYS.length; gi++) {
+      var group = zGroups[ZGKEYS[gi]];
+      var c = zCounts[ZGKEYS[gi]];
+      for (var ki = 0; ki < ZPARTS.length; ki++) {
+        var part = group[ZPARTS[ki]];
         part.count = c;
-        part.visible = c > 0;          // skip types absent from this wave
-        part.instanceMatrix.needsUpdate = true;
+        part.visible = c > 0;          // skip outfits absent from this wave
+        if (c) part.instanceMatrix.needsUpdate = true;
       }
     }
   }
@@ -4535,17 +4824,22 @@ function main(hotData) {
   function syncPlayer(now) {
     playerGroup.position.set(player.x, playerGroup.position.y, player.z);
     playerGroup.rotation.y = player.angle;
-    var legs = playerGroup.userData.legs;
-    var sw = Math.sin(player.gait) * (player.gaitAmp || 0);
+    var legs = playerGroup.userData.legs, shins = playerGroup.userData.shins;
+    var ga = player.gaitAmp || 0;
+    var sw = Math.sin(player.gait) * ga;
     legs[0].rotation.x = sw;
     legs[1].rotation.x = -sw;
+    // knees fold on the forward swing, same rule as the horde
+    shins[0].rotation.x = 0.06 + Math.max(0, -Math.cos(player.gait)) * 1.1 * ga;
+    shins[1].rotation.x = 0.06 + Math.max(0, Math.cos(player.gait)) * 1.1 * ga;
     // a little vertical bounce on each footfall, for weight
     playerGroup.position.y = Math.abs(Math.sin(player.gait)) * (player.gaitAmp || 0) * 0.09;
     playerGroup.userData.flash.visible = player.muzzle > 0;
     muzzleLight.intensity = player.muzzle > 0 ? 3.4 * (player.muzzle / 0.055) : 0;
     if (player.muzzle > 0) {
-      muzzleLight.position.set(player.x + Math.sin(player.angle) * 1.1, 1.2,
-                               player.z + Math.cos(player.angle) * 1.1);
+      var mz = (GUNS[player.wep] || GUNS.rifle).muzzle + 0.1;
+      muzzleLight.position.set(player.x + Math.sin(player.angle) * mz, 1.2,
+                               player.z + Math.cos(player.angle) * mz);
     }
     if (player.muzzle > 0) {
       var f = playerGroup.userData.flash;
