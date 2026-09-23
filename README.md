@@ -24,8 +24,9 @@ source of truth, still no build step for development.
 
 ## What it is
 
-You hold a lamp-lit parking lot against escalating waves of the dead. Clear a
-wave, take one of three permanent upgrades, repeat until you're overrun. Score
+You hold Oakhaven — a small town at night — against escalating waves of the
+dead. Clear a wave, take one of three permanent upgrades, repeat until you're
+overrun. Score
 and best wave persist locally.
 
 - **Endless waves** with seven enemy types, each entering a few waves apart so
@@ -43,7 +44,7 @@ and best wave persist locally.
 
   Bloaters and Howlers exist to break the "hold the trigger" reflex: one
   punishes killing at arm's length, the other makes target priority matter.
-- **Five weapons**, found in crates that drop in the lot each wave rather than
+- **Five weapons**, found in crates that drop around town each wave rather than
   chosen from a menu — walking out to get one mid-fight is the decision:
 
   | Weapon | Shape of it |
@@ -67,40 +68,74 @@ and best wave persist locally.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
-## The district
+## Oakhaven
 
-The map is a 140×140 city district generated from a **seeded** layout — stable
-run to run, because a level you cannot design or test against is not a level.
-Streets sit on a 28-unit pitch; blocks are split into building footprints with
-alleys between them, and a few blocks are reserved as set pieces: an open lot,
-a fuel forecourt, cleared rubble fields.
+The map is **transcribed from a blueprint**, not generated: Oakhaven Village, a
+176 × 104 m town — a department store and gas-station diner on the central
+block, a ring of Main Street, Oak Avenue and Church Road around it, twelve
+houses, a café, a church, three school buildings, a park and a forest edge.
 
-It holds 45 buildings, 42 light anchors, 26 wrecked cars, and several hundred
-pieces of street furniture and debris — skips, jersey barriers, hydrants,
-benches, cones, pallets, sacks, rubble, roof vents, traffic signals and burn
-barrels. Everything is instanced, and per-instance scale carries each building's
-footprint so all 45 share one geometry.
+Every coordinate in the `OAK` table is kept in **blueprint pixels** (10 px =
+1 m), so any wall, door or tree can be checked against the drawing directly;
+`wx()` / `wz()` convert to world metres. The table holds:
 
-Burn barrels are reused as light anchors alongside the streetlights, so they
-flicker orange on the same pooled point lights rather than needing their own.
+- **Buildings** as closed outlines, with doors cut from whichever wall they sit
+  on, interior partitions, and the furniture drawn in each room — beds, sofas,
+  kitchens, tubs, toilets, stairs, store shelving, checkout counters, pews, an
+  altar. Furniture is sized to real objects inside the rectangle the blueprint
+  gives it and pushed against the side it backs onto.
+- **Ground**: roads, centre dashes, crosswalks, sidewalks, the store plaza, the
+  gas forecourt, driveways and paths.
+- **Everything else drawn**: 71 trees, 5 shrubs, 38 fence runs, 16 vehicles,
+  30 lights, signs, debris, the barricade, the playground and the park.
 
-### Collision needed a broad phase
+Nothing is added that the blueprint does not show. Two readings are judgement
+calls: the fuel pumps sit on the forecourt just outside the shop's thin west
+wall (they are drawn right against it), and a few pieces of furniture that
+landed in a doorway were nudged aside so every room can be reached.
 
-`resolveProps` scanned every prop for every body, every step. At 22 props that
-was free; at 205 colliders and 40 bodies it is roughly 8,000 distance checks per
-step. A uniform grid, built once because nothing in the district moves, narrows
-it to the handful in the 3×3 cells around each body — **measured 5.3× faster**
-than the brute-force scan over the same set.
+The trees were located with a Hough-circle pass over the drawing's green
+outlines and then corrected by hand; the overgrown ground is the drawing's own
+stipple, extracted as a density mask and run-length encoded into the page.
 
-Buildings are AABB colliders rather than circles, pushed out along the shallower
-axis, and the same broad phase stops bullets, so walls are real cover.
+### How it is built
 
-### The city is cheaper than the lot was
+- **Pixel textures.** Walls, roofs, wood, fabric, leaves and bark each use a
+  16×16 canvas texture, nearest-filtered and repeated at a fixed density in
+  world space, near-white so vertex colours carry the hue. The ground is one
+  painted 1408×832 texture at 8 texels per metre: asphalt with cracks, worn
+  paint, slab-jointed sidewalks, paving, oil-stained concrete, plank and tile
+  floors, lawn and tall grass.
+- **Merged geometry.** Every static object is baked into one mesh per material
+  per 32 m chunk — about 118k vertices in all, drawn in **40–70 calls and
+  8–9k triangles a frame** because chunks off screen are culled with their real
+  bounding spheres.
+- **Roofs lift off** the building you walk into, so its rooms read from above.
+- **See-through.** Walls, roofs and canopies between the camera and the player
+  dither away in a small screen-space circle around the player instead of hiding them.
+- **Trees** come in five species — oak, maple, birch, pine, spruce. The forest
+  strip along the west edge is mostly conifer; yards and the park are
+  broadleaf.
 
-Frame time went **down**: 65ms against the small arena's 81ms under identical
-conditions. Buildings occlude the ground, and the ground is the expensive
-surface — it is per-fragment lit with several lights. Blocking the view of it
-saves more than the extra geometry costs.
+### Zombies path-find
+
+Walls and furniture made straight-line chasing useless, so the horde follows a
+**flow field**: a breadth-first distance map from the player over a 0.5 m grid,
+rebuilt when the player changes cell (**0.8 ms**). Each zombie walks downhill on it,
+looking a few cells ahead so paths are straight rather than stair-stepped.
+Spitters walk it until they have line of sight, then hold and spit.
+
+Zombies spawn **outdoors, 18–34 m away by path**, so nothing materialises beside
+you or inside a room it cannot leave. From the spawn, 99.9% of walkable ground
+is reachable; the unreachable remainder is a couple of closets behind stairs.
+
+### Collision
+
+A uniform grid broad phase keeps several hundred colliders cheap. Walls and
+furniture are AABBs, trees, cars and posts are circles. Low things — beds,
+counters, pews, fences — block bodies but not bullets. Bullets are sub-stepped,
+because a fast round covers more than a wall's thickness in one physics step
+and would otherwise tunnel through it.
 
 ## Landscape
 
@@ -119,7 +154,7 @@ way to play.
 
 ## Darkness and the flashlight
 
-The lot is dark, and light comes from actual light sources. Streetlamps
+The town is dark, and light comes from actual light sources. Streetlamps
 illuminate the ground and everything standing near them; the **flashlight** is a
 found item, guaranteed to drop from wave 2, and it is a real spotlight that
 lights the ground, the props and the bodies it falls on. It is not a toggle —
@@ -131,13 +166,16 @@ in shadow under that model, which is backwards. The lamp *is* the light.
 
 ## Lighting
 
-Ambient is deliberately near-useless — enough to read a silhouette and no more.
-Everything else comes from real lights, on a fixed budget:
+The baseline is moonlight — enough to read the streets and rooftops, not enough
+to see into a dark room. Everything else comes from real lights, on a fixed
+budget:
 
 - **Streetlamps.** Only the nearest few can ever be on screen, so a small pool
-  of point lights is reassigned to the closest posts each frame rather than
-  lighting all seven at once. The pool size is a quality tier: 1 light on
-  battery, 2 on balanced, 3 on high.
+  of point lights is reassigned to the closest of the town's thirty posts. The
+  pool size is a quality tier: 2 lights on battery, 3 on balanced, 4 on high. A
+  light keeps its post while that post is still wanted, and a light that has to
+  move fades out, moves while dark, and fades back in — so walking a street
+  hands light from post to post instead of snapping it.
 - **The flashlight** is a `SpotLight` whose height is a balance rather than a
   preference. Too low and the beam meets the floor at grazing incidence
   (`N·L ≈ 0.1`) and lights nothing; too high and the cone touches down several
@@ -162,7 +200,8 @@ The ground texture carries no baked light any more. It is pure surface.
 
 ## Minimap
 
-A 34-unit-radius radar sits under the HUD buttons: arena bounds, zombies
+A 34-unit-radius radar sits under the HUD buttons: the town's streets and
+rooftops, drawn from the ground texture, then zombies
 coloured by type, weapon crates, health drops, and your own facing. When you
 carry the flashlight it also draws the cone, so the map shows what you can
 actually see rather than what exists.
@@ -314,8 +353,8 @@ correct.
 
 Other deliberate choices:
 
-- **No dynamic lights for the streetlamps.** Light pools are painted into the
-  ground texture, so they cost nothing per frame.
+- **A fixed light count.** Four lamp lights, the torch, the muzzle flash and
+  the blast light exist from the first frame, so nothing recompiles mid-fight.
 - **No shadow maps.** Expensive on mobile GPUs for very little here.
 - **`MeshLambertMaterial` over `MeshStandardMaterial`** — much cheaper, and the
   art direction is flat enough not to miss PBR.
