@@ -791,14 +791,13 @@ function main(hotData) {
   var PI = Math.PI, TAU = Math.PI * 2;
 
   /* ---------------------------------------------------------------- config */
-  var ARENA = 26;              // half-extent of the playable area
   var STEP = 1 / 60;           // fixed simulation timestep
   var MAX_STEPS = 5;
 
   var QUALITY = {
-    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20, lamps: 1 },
-    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26, lamps: 2 },
-    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40, lamps: 3 }
+    battery:  { dpr: 1.0, alive: 16, parts: 140, tex: 512,  bloom: 0.20, lamps: 2 },
+    balanced: { dpr: 1.5, alive: 26, parts: 240, tex: 1024, bloom: 0.26, lamps: 3 },
+    high:     { dpr: 2.0, alive: 40, parts: 380, tex: 1024, bloom: 0.40, lamps: 4 }
   };
   var QORDER = ['battery', 'balanced', 'high'];
 
@@ -1115,140 +1114,554 @@ function main(hotData) {
   var CAM_TILT = 64 * PI / 180;
   var camDist = 34;
 
-  /* ------------------------------------------------------- generated ground
-     The streetlight pools are baked straight into the ground texture, which is
-     how we get warm lamp-light without paying for a single dynamic light.     */
-  /* ========================================================== the district
-     A seeded generator, not random-per-run: the layout has to be stable so it
-     can be designed against and tested against. Streets on a 28-unit pitch,
-     blocks filled with buildings and alleys, a few blocks reserved as set
-     pieces. Everything it produces is data — meshes are built from it later.  */
-  function mulberry32(a) {
-    return function () {
-      a |= 0; a = (a + 0x6D2B79F5) | 0;
-      var t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
+  /* ============================================================ OAKHAVEN
+     The map is transcribed from a blueprint rather than generated. Every
+     coordinate in OAK is in BLUEPRINT PIXELS (10 px = 1 m) so it can be
+     checked against the drawing directly; wx/wz convert to world metres.   */
+  // OAKHAVEN VILLAGE — transcribed from the blueprint. Units are BLUEPRINT PIXELS
+  // (10 px = 1 m); world X = (px - 910) / 10, world Z = (py - 545) / 10.
+  var OAK = {
+    bounds: [30, 26, 1789, 1064],
+    roads: [[405,276,1577,352],[405,734,1577,812],[405,276,481,812],[1503,26,1577,1064]],
+    dashes: [[525,315,1459,315],[527,773,1457,773],[443,390,443,700],
+             [1539,26,1539,244],[1539,388,1539,700],[1539,852,1539,1064]],
+    // 'h' = bars run east-west (crossing an east-west road)
+    crosswalks: [[497,280,525,350,'h'],[409,362,477,388,'v'],[409,700,477,728,'v'],
+      [501,738,527,808,'h'],[1459,280,1485,340,'h'],[1507,244,1571,270,'v'],
+      [1507,362,1571,388,'v'],[1457,738,1485,808,'h'],[1507,700,1571,728,'v'],
+      [1507,825,1571,852,'v']],
+    sidewalks: [[385,258,1503,276],[385,258,405,830],[385,812,1503,830],
+      [1483,26,1503,258],[1483,830,1503,1064],[1577,26,1599,1064],
+      [481,352,1503,372],[481,716,1503,734],[481,352,499,734],[1483,352,1503,734]],
+    plaza: [[499,372,1483,716]],
+    // painted over the plaza, in order
+    blockGrass: [[499,372,715,422],[499,422,534,548],[684,372,715,716],[635,651,715,716],
+      [1255,375,1482,700]],
+    forecourt: [[499,538,617,626],[584,626,635,716],[499,548,534,626]],
+    island: [499,626,584,716, 46],          // grass island, rounded NE corner (radius)
+    paths: [[333,225,350,307],[350,292,385,307],[319,424,385,488],[332,520,367,567],
+      [317,782,385,832],[749,176,799,258],[665,209,682,258],[1050,198,1133,258],
+      [1350,208,1367,258],[1367,372,1417,405],[1449,608,1483,636],
+      [551,830,601,898],[601,830,651,864],[817,830,869,898],[1051,830,1099,898],
+      [1351,830,1383,864],[1599,505,1631,535],[1599,615,1632,650],
+      [1599,258,1657,307],[1630,215,1657,258],[1599,862,1662,897],[1681,600,1701,614]],
+    slabs: [[1167,527,1217,582,0.9],[1664,430,1716,482,0.3]],   // loading dock, altar dais
 
-  var LAMPS = [];                 // point-light anchors: streetlights and fires
-  var CITY = {
-    buildings: [],                // { x, z, w, d, h, tone }
-    walls: [],                    // AABB colliders for buildings
-    sidewalks: [], marks: [], kerbs: [],
-    cars: [], skips: [], barriers: [], crates: [], barrels: [],
-    hydrants: [], lights: [], benches: [], cones: [], pallets: [],
-    rubble: [], sacks: [], vents: [], fires: []
+    // outline: closed axis-aligned polygon. doors: [x, y, width] cut from any wall
+    // they sit on. inner: interior partitions [x0,y0,x1,y1]. f: furniture
+    // [type, x0, y0, x1, y1, facing] — facing is where the head/front points.
+    buildings: [
+      { id: 'hab', kind: 'house', tone: 0, floor: 'wood',
+        outline: [[217,173],[333,173],[333,307],[217,307]],
+        doors: [[333,235,14],[267,225,14]],
+        inner: [[217,225,252,225],[283,225,333,225],[267,175,267,220],[217,242,250,242],[290,242,290,307]],
+        f: [['tub',250,179,265,209],['toilet',224,180,236,192,'E'],['vanity',219,200,233,216],
+            ['counter',292,176,330,185],['counter',320,185,330,220],['table',304,192,314,204],
+            ['bed',240,265,268,300,'S'],['nightstand',226,290,234,298],['nightstand',272,290,280,298],
+            ['stairs',315,244,330,272,'N'],['stairs',295,290,317,305,'E']] },
+      { id: 'houseA', kind: 'house', tone: 1, floor: 'wood',
+        outline: [[602,96],[800,96],[800,176],[737,176],[737,209],[602,209]],
+        doors: [[673,209,16],[737,193,14],[694,155,14],[657,150,14],[737,166,12]],
+        inner: [[665,96,665,155],[665,155,687,155],[702,155,737,155],[737,96,737,160],
+                [602,150,650,150],[662,178,662,209]],
+        f: [['bed',617,102,647,137,'N'],['nightstand',606,100,614,108],['nightstand',650,100,658,108],
+            ['counter',680,100,705,110],['counter',667,115,675,140],['counter',722,112,735,145],
+            ['tv',615,156,645,164],['sofa',615,192,642,202,'N'],['table',622,175,637,182],
+            ['armchair',605,167,613,182,'E'],['stairs',690,177,720,205,'E'],['bed',762,115,795,142,'E']] },
+      { id: 'houseB', kind: 'cafe', tone: 2, floor: 'check',
+        outline: [[1000,98],[1183,98],[1183,198],[1000,198]],
+        doors: [[1124,198,18]],
+        inner: [],
+        f: [['dtable',1014,128,1030,146],['dtable',1054,128,1070,146],['dtable',1014,166,1030,184],['dtable',1054,166,1070,184],
+            ['chair',1007,131,1012,136,'E'],['chair',1007,139,1012,144,'E'],['chair',1032,131,1037,136,'W'],['chair',1032,139,1037,144,'W'],
+            ['chair',1047,131,1052,136,'E'],['chair',1047,139,1052,144,'E'],['chair',1072,131,1077,136,'W'],['chair',1072,139,1077,144,'W'],
+            ['chair',1007,169,1012,174,'E'],['chair',1007,177,1012,182,'E'],['chair',1032,169,1037,174,'W'],['chair',1032,177,1037,182,'W'],
+            ['chair',1047,169,1052,174,'E'],['chair',1047,177,1052,182,'E'],['chair',1072,169,1077,174,'W'],['chair',1072,177,1077,182,'W'],
+            ['bar',1093,140,1165,154],['stool',1108,133,1114,139],['stool',1118,133,1124,139],['stool',1128,133,1134,139],
+            ['stove',1083,100,1119,112],['counter',1119,100,1137,112],['sink',1137,100,1151,112],
+            ['counter',1167,110,1177,156],['counter',1135,182,1181,196]] },
+      { id: 'houseC', kind: 'house', tone: 3, floor: 'wood',
+        outline: [[1283,113],[1415,113],[1415,207],[1283,207]],
+        doors: [[1359,207,16],[1331,146,12]],
+        inner: [[1283,158,1331,158],[1331,113,1331,158],[1349,172,1349,207]],
+        f: [['island',1365,139,1393,158],['counter',1399,130,1411,198],['counter',1335,116,1369,127],
+            ['toilet',1303,116,1315,128,'S'],['shower',1285,132,1305,156],['vanity',1285,116,1297,128],
+            ['fridge',1318,120,1328,136],['bed',1301,172,1325,198,'W'],['dresser',1289,172,1297,198]] },
+      { id: 'hal', kind: 'house', tone: 4, floor: 'wood',
+        outline: [[217,418],[316,418],[316,485],[332,485],[332,650],[217,650]],
+        doors: [[332,540,16],[316,455,14]],
+        inner: [[217,488,282,488],[217,522,282,522],[299,488,299,532],[217,582,262,582],[297,582,332,582],[281,582,281,650]],
+        f: [['bed',230,450,257,485,'N'],['desk',240,422,275,434],['chair',277,423,283,430,'W'],
+            ['tub',222,492,235,520],['toilet',241,491,253,503,'S'],['vanity',257,490,280,505],
+            ['stairs',300,492,315,530,'N'],['sofa',235,530,270,540,'S'],['armchair',223,550,233,562,'E'],['table',250,551,262,561],
+            ['bed',230,610,255,645,'S'],['wardrobe',318,598,328,630],['dresser',318,634,328,646]] },
+      { id: 'has', kind: 'house', tone: 5, floor: 'wood',
+        outline: [[233,780],[317,780],[317,848],[335,848],[335,907],[233,907]],
+        doors: [[317,807,14],[292,850,14]],
+        inner: [[235,850,285,850],[300,850,335,850]],
+        f: [['bed',240,792,275,822,'W'],['sofa',255,832,275,844,'N'],['bed',251,866,275,890,'N'],
+            ['nightstand',319,870,327,882],['dresser',251,892,277,902],['dresser',291,892,311,902]] },
+      { id: 's1', kind: 'house', tone: 0, floor: 'wood',
+        outline: [[535,898],[617,898],[617,864],[733,864],[733,983],[535,983]],
+        doors: [[632,864,16],[578,898,14],[659,916,14],[628,932,12],[601,909,14]],
+        inner: [[601,920,601,983],[667,916,733,916],[651,916,651,983],[601,932,621,932],[635,932,651,932]],
+        f: [['bed',543,905,569,934,'N'],['dresser',541,968,567,978],['dresser',575,968,599,978],
+            ['tub',603,936,617,978],['toilet',621,966,633,978,'N'],['vanity',637,934,649,946],
+            ['bed',695,944,727,966,'E'],['wardrobe',653,940,665,978],
+            ['counter',687,866,719,877],['counter',719,884,731,898],['fridge',621,880,631,898]] },
+      { id: 's2', kind: 'house', tone: 2, floor: 'wood',
+        outline: [[801,898],[899,898],[899,864],[985,864],[985,983],[801,983]],
+        doors: [[862,898,14],[926,916,14],[891,930,12],[867,906,14]],
+        inner: [[867,915,867,983],[933,916,985,916],[919,916,919,983],[867,930,885,930],[897,930,919,930]],
+        f: [['bed',807,904,835,934,'N'],['dresser',807,966,831,978],['dresser',841,966,865,978],
+            ['tub',869,932,883,976],['toilet',887,966,899,978,'N'],['vanity',905,936,917,948],
+            ['bed',945,946,977,966,'E'],['counter',937,866,971,877],['fridge',971,884,983,898]] },
+      { id: 's3', kind: 'house', tone: 4, floor: 'wood',
+        outline: [[1051,900],[1115,900],[1115,864],[1199,864],[1199,982],[1051,982]],
+        doors: [[1085,900,14],[1141,916,12],[1133,923,12]],
+        inner: [[1115,916,1135,916],[1147,916,1199,916],[1133,930,1133,982]],
+        f: [['counter',1157,866,1197,877],['fridge',1187,884,1197,898],['island',1149,902,1183,914],
+            ['bed',1057,944,1089,966,'W'],['dresser',1095,966,1125,978],['wardrobe',1137,946,1149,976],
+            ['wardrobe',1187,946,1197,966],['vanity',1165,970,1181,980]] },
+      { id: 's4', kind: 'house', tone: 1, floor: 'wood',
+        outline: [[1283,864],[1449,864],[1449,983],[1283,983]],
+        doors: [[1367,864,16],[1383,918,12],[1391,916,14],[1327,942,14],[1377,928,12]],
+        inner: [[1383,864,1383,912],[1383,924,1383,983],[1399,916,1449,916],[1283,942,1351,942],
+                [1351,928,1351,983],[1351,928,1370,928]],
+        f: [['sofa',1287,882,1299,914,'E'],['tv',1305,868,1329,876],['table',1314,892,1327,906],
+            ['cabinet',1373,884,1381,900],['counter',1401,866,1437,877],['fridge',1437,884,1447,898],['island',1401,902,1437,914],
+            ['tub',1289,950,1301,978],['toilet',1305,968,1317,980,'N'],['vanity',1337,946,1349,958],
+            ['vanity',1355,960,1369,976],['bed',1411,946,1443,966,'E']] },
+      { id: 'hr1', kind: 'house', tone: 3, floor: 'wood',
+        outline: [[1315,405],[1449,405],[1449,486],[1315,486]],
+        doors: [[1391,405,16],[1367,442,12],[1411,440,12]],
+        inner: [[1367,408,1367,436],[1367,448,1367,486],[1391,440,1405,440],[1417,440,1449,440],[1381,458,1381,486]],
+        f: [['counter',1321,408,1351,417],['bed',1325,448,1351,480,'S'],['stairs',1407,408,1431,438,'S'],
+            ['shower',1423,446,1445,470],['toilet',1427,472,1439,484,'N']] },
+      { id: 'hr2', kind: 'house', tone: 5, floor: 'wood',
+        outline: [[1315,552],[1449,552],[1449,668],[1315,668]],
+        doors: [[1449,622,18],[1347,600,14],[1367,599,14]],
+        inner: [[1367,552,1367,588],[1367,610,1367,668],[1315,600,1340,600],[1355,600,1367,600]],
+        f: [['tub',1321,562,1335,590],['toilet',1337,556,1349,568,'S'],['vanity',1351,556,1365,576],
+            ['stairs',1381,556,1431,568,'E'],['counter',1397,570,1447,580],['counter',1437,580,1447,596],
+            ['bed',1325,630,1351,652,'S'],['dresser',1371,620,1379,648],['sofa',1399,614,1425,626,'S'],['tv',1401,654,1431,662]] },
+      { id: 'diner', kind: 'diner', tone: 6, floor: 'check', flat: true,
+        outline: [[534,422],[684,422],[684,651],[617,651],[617,538],[534,538]],
+        doors: [[600,538,15],[617,588,16],[637,538,14],[657,506,12]],
+        inner: [[617,538,684,538],[657,485,684,485],[657,485,657,500],[657,512,657,538]],
+        f: [['counter',549,426,571,436],['stool',557,440,563,446],['counter',586,426,610,436],['stool',595,440,601,446],
+            ['counter',627,424,662,434],['counter',666,436,682,480],['bar',550,459,624,473],['stool',585,475,591,481],
+            ['dtable',555,502,567,514],['toilet',668,516,680,528,'W'],
+            ['shelf',647,541,657,563],['shelf',647,594,657,610],['counter',654,580,677,598],['counter',654,615,677,633]] },
+      { id: 'store', kind: 'store', tone: 7, floor: 'tile', flat: true,
+        outline: [[732,402],[1167,402],[1167,668],[995,668],[995,648],[922,648],[922,668],[732,668]],
+        doors: [[959,648,44],[1032,402,25],[1167,556,44],
+                [1082,456,20],[1082,510,18],[1082,570,18],[1082,620,18]],
+        inner: [[1082,402,1082,668],[1082,472,1167,472],[1082,532,1167,532],[1082,600,1167,600]],
+        f: [['shelf',777,460,796,610],['shelf',845,460,863,610],['checkout',952,460,967,610],
+            ['checkout',971,525,978,582],['shelf',1012,510,1028,577],['shelf',1067,507,1078,562],
+            ['wallshelf',745,406,1000,416],['wallshelf',745,654,915,664]] },
+      { id: 'church', kind: 'church', tone: 8, floor: 'stone', wall: 0.6,
+        outline: [[1631,420],[1748,420],[1748,602],[1631,602]],
+        doors: [[1691,602,20],[1631,520,22]],
+        inner: [],
+        f: [['altar',1675,437,1705,447],['lectern',1686,458,1694,466],
+            ['pew',1641,512,1680,518],['pew',1699,512,1737,518],['pew',1641,526,1680,532],['pew',1699,526,1737,532],
+            ['pew',1641,543,1680,549],['pew',1699,543,1737,549],['pew',1641,559,1680,565],['pew',1699,559,1737,565],
+            ['pew',1641,576,1680,582],['pew',1699,576,1737,582]] },
+      { id: 'schoolMid', kind: 'school', tone: 9, floor: 'tile', flat: true,
+        outline: [[1631,606],[1777,606],[1777,684],[1631,684]],
+        doors: [[1631,632,20],[1691,606,20]], inner: [], f: [] },
+      { id: 'schoolN', kind: 'school', tone: 9, floor: 'tile', ridge: 'NS',
+        outline: [[1657,160],[1736,160],[1736,311],[1657,311]],
+        doors: [[1657,195,20]], inner: [], f: [] },
+      { id: 'schoolPark', kind: 'school', tone: 9, floor: 'tile', ridge: 'NS',
+        outline: [[1632,785],[1739,785],[1739,940],[1662,940],[1662,855],[1632,855]],
+        doors: [[1662,880,20]], inner: [], f: [] }
+    ],
+    canopies: [[1015,378,1067,402],[1629,174,1657,216],[1662,777,1732,785]],
+    roofVents: [[1712,831,1722,840],[1712,843,1722,852],[1712,855,1722,864],[1712,867,1722,876],[1712,879,1722,888]],
+
+    fences: [[170,127,369,127],[369,127,369,236],[170,127,170,355],[170,355,385,355],
+      [369,236,552,236],
+      [552,42,552,236],[552,42,847,42],[847,42,847,238],[811,238,847,238],
+      [167,373,381,373],[167,373,167,714],[167,714,385,714],
+      [351,842,511,842],
+      [511,842,511,1062],[777,832,777,1062],[1013,832,1013,1062],[1227,832,1227,1062],
+      [1231,844,1351,844],[1383,844,1475,844],[1475,844,1475,1062],
+      [1255,375,1255,700],[1255,700,1482,700],[1255,375,1367,375],[1417,375,1482,375],
+      [1255,515,1482,515],[1482,375,1482,608],[1482,636,1482,700],
+      [1601,370,1777,370],[1601,370,1601,505],[1601,535,1601,615],[1601,650,1601,700],
+      [1777,370,1777,606],[1777,684,1777,700],[1601,700,1777,700],
+      [1601,716,1787,716],[1601,716,1601,862],[1601,897,1601,1062]],
+
+    bushes: [[340,667,15],[755,856,10],[891,849,7],[1033,855,11],[1440,688,12]],
+
+    // [kind, x, y, angleDeg] — angle in image space (0 = nose east, +90 = nose south)
+    cars: [['sedan',923,108,0],['hatch',923,140,180],['sedan',923,171,0],
+      ['sedan',590,293,12],['sedan',1227,341,180],['pickupWreck',1086,338,10],
+      ['sedan',1564,72,-71],['hatch',1559,312,-62],['sedan',1558,507,70],['hatch',1557,958,-60],
+      ['sedan',753,796,180],['hatch',1199,751,0],['sedan',1187,797,15],['wreck',1432,752,15],
+      ['boxtruck',692,747,-15],['moto',421,292,45]],
+    debris: [[1430,305,4.5,1.2],[609,741,2,1],[591,678,1.4,0.8],[828,802,1.4,1.2],[474,687,1.4,0.8],[1563,608,1.2,0.8],[1560,995,2,0.8]],
+    barricades: [[917,808,953,788],[953,788,999,806]],
+    signs: [['diamond',899,238],['street',925,250]],
+    lamps: [[560,267],[725,267],[955,267],[1241,267],[1425,267],
+      [549,362],[715,362],[899,362],[1101,362],[1315,362],[1437,362],
+      [545,725],[1191,725],[1429,725],
+      [433,821],[627,821],[885,821],[1108,821],[1309,821]],
+    // [x, y, arm direction]
+    armLights: [[393,345,'E'],[393,562,'E'],[393,688,'E'],
+      [1493,95,'E'],[1493,223,'E'],[1493,410,'E'],[1493,682,'E'],
+      [1589,133,'W'],[1589,345,'W'],[1589,551,'W'],[1589,750,'W']],
+    play: [['swings',397,126,440,140],['slide',455,107,507,140,'W'],['slide',1668,985,1692,1020,'SW'],
+      ['bench',1627,1022,1665,1034],['bench',1685,70,1713,84,-20],['bench',1665,106,1705,118,25]]
   };
+  OAK.trees = [[1650,732,22],[1742,1002,21],[94,154,25],[286,1032,21],[58,1012,21],[72,580,18],[54,828,19],
+    [824,56,22],[478,186,19],[1750,116,18],[100,272,21],[64,622,18],[106,1012,21],[198,76,16],[1764,770,19],
+    [172,1012,21],[66,476,21],[130,40,12],[1226,408,16],[404,56,21],[1744,72,20],[90,316,13],[110,124,12],
+    [64,374,12],[356,1038,18],[1662,48,16],[446,1036,15],[58,872,16],[92,424,23],[1724,1038,17],[106,84,26],
+    [60,778,16],[1750,730,16],[58,912,17],[1042,1046,22],[64,966,25],[108,944,21],[1270,538,23],[84,742,20],
+    [142,1036,22],[200,1044,17],[1618,742,12],[228,48,14],[138,976,11],[72,356,21],[1768,712,14],
+    [476,1016,18],[524,84,22],[462,42,14],[98,116,18],[552,680,20],[40,288,19],[250,1022,21],[1770,746,21],
+    [458,930,17],[48,682,13],[982,1042,18],[54,530,12],[254,1040,10],[48,378,16],[48,512,12],[1195,1047,20],
+    [62,138,10],[57,45,28],[172,41,22],[278,36,25],[64,114,16],[67,204,26],[104,903,20],[209,1006,14],
+    [471,1058,18]];
+  // Overgrowth, lifted from the blueprint's stipple: 0.5 m cells, row-major,
+  // alternating run lengths (base 36) starting with 'bare'.
+  OAK.stipple = '0.h.4.d.6.u.a.9.k.3.3y.c.d.c.w.9.j.h.4.d.6.u.a.9.k.3.3y.c.d.c.w.9.j.z.3.1g.j.4.16.7.2h.15.u.i.b.2j.h.6.15.9.2c.18.s.n.8.2j.g.7.14.a.29.1b.q.r.6.2j.g.7.14.b.26.1d.p.v.3.2j.9.3.3.8.14.b.25.1e.p.v.3.2j.6.h.14.b.25.1e.o.w.3.m.5.f.5.16.7.i.14.b.24.1f.o.x.2.m.8.a.e.s.d.i.15.b.24.1e.n.z.2.m.8.9.f.r.e.i.15.b.24.1e.n.z.2.m.8.9.g.d.3.9.f.h.17.9.25.1e.n.z.2.m.8.9.h.b.r.i.1c.2.27.c.3.y.o.z.2.m.8.9.i.8.t.i.3l.b.6.u.q.z.2.m.a.6.l.4.w.h.3m.9.e.j.u.z.2.m.21.h.3o.5.k.e.v.z.2.m.21.g.4i.a.w.1m.24.d.4l.6.z.1j.75.2.11.1j.88.1i.8a.x.3.h.8b.g.6.8.5.h.5.3.10.4.77.3.c.7.5.h.3.6.y.5.7v.t.y.6.7u.u.w.8.13.2.6o.u.w.a.m.5.9.4.6n.u.w.a.h.c.6.5.6n.u.w.b.d.g.5.6.6m.u.w.b.d.g.4.9.38.4.38.u.w.b.c.h.4.9.38.4.38.u.w.b.a.k.3.a.14.3.20.4.38.t.x.b.8.m.3.a.13.6.v.3.10.4.38.t.x.c.5.o.3.a.13.7.t.4.10.4.38.s.y.1i.12.9.s.5.z.4.38.r.z.1i.12.a.r.b.m.b.38.p.11.1i.12.a.r.c.j.d.z.2.27.n.14.1h.3.4.a.a.b.a.r.d.i.d.i.b.5.8.b.2.1p.m.15.1s.5.c.a.b.q.d.h.e.h.d.4.a.7.5.1o.l.17.12.4.m.3.e.9.b.8.5.f.b.h.d.i.d.4.a.6.6.1o.l.18.11.4.13.9.b.8.5.h.8.i.c.j.d.4.a.6.5.1p.k.1c.x.5.13.9.a.9.5.i.6.k.b.k.b.7.8.6.4.1s.i.1e.u.6.m.4.c.a.a.9.5.j.4.l.b.5.2.1a.2.10.4.q.h.2e.m.6.9.c.9.1n.9.5.3.2c.4.y.9.2f.l.6.7.e.8.1p.2.b.2.3f.9.2g.j.t.6.5k.a.2g.i.u.5.5j.b.2i.e.6k.b.1a.2.7w.3.5.b.1a.2.7u.7.3.b.1a.2.7u.7.3.b.1a.2.7u.k.12.4.81.k.12.4.81.k.13.3.81.k.13.3.81.j.g.4.k.3.81.j.f.k.4.d.6w.8.q.h.f.12.6u.a.p.h.e.14.6s.b.p.c.j.14.6s.b.p.c.j.14.6s.b.p.c.j.14.6s.a.q.c.p.x.6t.a.q.c.q.w.6t.9.r.d.17.d.6v.7.s.d.1a.8.6z.3.s.f.1e.3.7v.f.9c.f.2f.5.6s.c.j.d.1k.a.4p.8.1f.9.4.b.g.j.6.2.5.5.y.e.g.3.43.b.1b.c.3.b.g.j.5.3.5.6.x.e.5.f.2z.2.a.2.p.c.1a.c.3.b.e.m.4.e.x.e.5.g.2v.7.6.5.o.c.1a.c.3.f.a.m.8.b.w.e.5.h.2u.8.5.5.p.c.19.d.2.i.6.m.d.7.w.e.5.h.2u.9.4.5.r.a.1a.c.2.i.6.k.g.8.v.d.6.g.2t.a.4.5.t.7.1b.c.2.j.6.j.j.5.w.b.9.f.2s.a.4.5.t.6.1e.v.6.h.n.3.13.2.g.a.2t.9.12.2.1j.u.6.f.2f.9.2s.9.10.4.w.3.m.t.5.e.2j.6.2s.8.11.4.w.4.n.7.3.h.5.e.2k.5.2v.2.14.4.v.6.m.7.8.c.5.d.2m.4.41.4.v.6.m.7.8.b.6.d.2m.3.2c.2.2n.5.n.7.8.b.f.2.2o.3.2c.2.1s.4.r.5.n.7.7.b.7f.5.r.4.n.7.5.9.7d.b.r.4.n.7.4.a.7d.b.r.4.n.7.4.a.7d.a.r.6.m.7.3.b.7d.a.r.6.m.7.3.b.3a.3.40.2.4.4.r.6.m.7.3.b.1c.7.1r.4.46.3.r.6.m.7.3.a.1d.8.1q.4.46.3.r.6.m.7.3.a.18.d.1q.4.46.3.r.6.m.7.3.9.18.e.1q.4.46.3.r.5.n.7.2.9.19.e.1q.4.2e.4.1o.3.s.3.o.h.1a.e.1q.4.2e.4.1o.3.1j.h.1a.e.1q.4.2e.4.l.4.z.3.1j.h.1c.a.1s.4.2g.2.j.8.y.2.1j.j.1a.4.1y.4.30.9.y.2.1j.k.19.4.1x.5.30.a.2j.j.3a.5.2z.c.2i.j.3a.5.m.3.c.3.1v.c.2i.j.3b.4.m.3.c.3.1v.c.2i.k.3a.4.m.3.2a.c.2i.l.39.3.n.3.2b.b.1q.4.o.m.38.3.32.a.1q.4.o.n.6d.9.1q.4.n.o.6e.8.1q.3.o.n.6f.8.1q.3.o.m.6g.9.1p.3.o.7.2.c.6h.9.u.5.q.3.o.7.2.c.6h.9.t.7.p.4.n.7.3.b.6h.9.s.8.p.4.n.7.3.b.6h.8.t.8.p.5.m.5.5.a.6i.8.u.7.p.7.c.d.5.9.6j.8.v.6.p.8.b.d.5.9.6j.7.x.4.q.8.b.d.5.9.6i.8.1s.7.b.d.5.9.6i.8.1u.3.e.c.5.a.6h.8.2f.8.5.a.6h.8.2f.8.4.b.2h.4.3x.7.2f.7.5.a.2h.6.3x.4.2i.5.6.a.2h.8.m.5.61.8.1e.5.11.7.i.9.61.5.1g.8.z.8.f.b.a.2.b.5.57.7.1g.8.z.8.f.c.9.2.b.5.52.c.1f.a.y.8.e.d.9.2.b.5.48.4.h.m.1e.a.y.8.d.e.9.2.b.5.47.5.5.2.6.q.1e.9.y.9.c.f.40.2.v.7.4.2.6.r.1e.8.x.a.c.f.3z.6.s.e.3.t.1e.7.x.b.c.f.3z.7.r.1b.1e.5.y.b.c.f.3z.8.q.1c.2g.a.d.f.3z.8.q.11.2.9.2j.5.f.f.40.7.q.11.2.7.2l.4.g.e.41.6.r.11.2.7.37.c.43.3.s.11.2.7.38.8.46.3.t.1f.8.h.2h.2.48.3.t.1f.6.l.j.8.6v.25.h.b.6u.25.h.b.6u.23.k.a.6u.23.k.2.4.4.6v.1w.w.4.6v.1t.z.4.6v.c.3.6.4.12.10.4.6x.b.e.11.10.3.6y.a.f.11.10.3.6y.a.f.11.80.b.e.11.81.b.e.11.81.a.f.11.81.8.h.10.82.6.j.10.82.5.k.10.82.5.k.z.83.5.k.y.84.5.k.v.86.6.k.t.88.6.6.4.a.s.89.6.6.4.a.r.16.3.1v.7.11.6.i.5.t.5.27.6.5.5.a.o.19.4.1r.d.c.4.g.w.p.b.24.6.5.4.b.l.1c.4.r.b.o.f.a.7.e.w.d.7.4.q.1r.5.k.k.1d.3.i.m.n.f.9.9.d.w.c.13.1q.5.l.8.2.9.1s.2.3.n.n.f.9.9.d.w.b.14.1q.5.l.8.2.9.1r.s.o.e.a.9.d.w.b.14.1r.4.l.8.2.9.1r.r.r.b.b.9.f.n.3.3.c.b.3.p.2h.8.2.a.1v.m.w.5.c.8.r.2.4.6.3.3.c.7.8.m.2j.8.2.a.1v.m.1d.8.y.5.h.5.b.m.2j.8.2.a.1v.m.1d.8.z.3.i.5.b.l.2k.8.2.h.1o.m.19.b.c.5.14.5.b.2.3.g.2k.8.2.i.1n.m.17.d.c.5.15.3.h.g.2k.8.2.i.1n.m.17.c.d.5.1p.g.2j.9.2.j.1m.m.17.b.f.3.1q.g.21.2.g.9.2.j.1m.m.17.b.28.g.1z.5.f.9.2.j.1m.l.18.b.28.g.1z.5.f.9.2.j.1m.j.1a.b.29.f.1z.6.e.9.2.j.x.4.l.j.1a.b.29.e.20.6.e.9.2.j.x.4.m.i.1a.b.29.e.20.6.e.9.2.j.x.4.o.g.1a.b.29.d.21.6.e.9.2.j.x.4.o.f.1b.b.29.d.21.6.e.v.1o.f.1a.c.29.c.22.7.d.v.1o.f.1a.b.2a.b.23.8.c.v.1p.e.1b.a.2a.b.23.8.a.x.1w.7.1b.a.2b.9.24.a.7.z.1x.4.1c.8.2d.4.3.2.23.b.5.13.3c.6.2l.2.22.c.5.14.3c.3.2n.5.1y.d.4.16.60.6.1x.e.4.16.5z.8.1w.d.5.16.5z.8.1v.e.5.1i.5n.8.1v.d.6.1j.5m.7.1w.d.6.11.3.f.7.2.12.6.45.6.1x.d.6.11.3.f.6.5.z.8.45.5.1x.d.6.11.3.u.v.8.45.5.1y.b.7.20.s.a.1m.2.4j.a.8.20.6.7.c.d.1k.7.4.6.47.8.8.21.5.9.4.2.4.e.1j.o.q.7.35.5.a.21.5.w.1j.q.6.3.4.7.4.9.n.2.2u.g.2.1j.5.w.5.4.1a.1n.m.7.2q.g.2.1j.5.u.6.6.16.1q.l.a.2o.d.6.1i.5.u.5.g.7.e.7.1w.6.3.a.c.2n.9.a.1i.5.u.5.3f.7.d.2n.9.a.1i.5.u.5.3f.6.e.2n.9.7';
 
-  var BLOCK = 28, ROAD = 11;
+  var OX = 910, OY = 545;                      // blueprint pixel at world origin
+  function wx(px) { return (px - OX) / 10; }
+  function wz(py) { return (py - OY) / 10; }
+  var BX0 = wx(OAK.bounds[0]), BX1 = wx(OAK.bounds[2]);
+  var BZ0 = wz(OAK.bounds[1]), BZ1 = wz(OAK.bounds[3]);
+  function inX(x, m) { return clamp(x, BX0 + m, BX1 - m); }
+  function inZ(z, m) { return clamp(z, BZ0 + m, BZ1 - m); }
 
-  // Cleared, awaiting a layout. The generator, the collider broad phase, the
-  // AABB walls and the light pooling all stay — only the content is gone, so a
-  // layout can be dropped straight in.
-  function planCity() {
-    [{ x: -13, z: -13 }, { x: 13, z: -13 }, { x: -13, z: 13 },
-     { x: 13, z: 13 }, { x: 0, z: -9 }, { x: -19, z: 3 }, { x: 19, z: -3 }]
-      .forEach(function (l) { LAMPS.push(l); });
+  // Start on the plaza outside the store's front doors; the menu camera
+  // circles the street just south of it.
+  var SPAWN = { x: wx(958), z: wz(698) };
+  var MENU_C = { x: wx(958), z: wz(773) };
+
+  function hash2(x, y, s) {
+    var h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) +
+             Math.imul(s | 0, 1442695041)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
   }
-  planCity();
+  // smooth value noise, for patches rather than grain
+  function vnoise(x, y, s) {
+    var xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    var a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s);
+    var c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  }
 
+  // Decompose an axis-aligned outline into rectangles. Tries both slicing
+  // directions and keeps the one whose biggest piece is biggest, so an L-shaped
+  // house becomes a main block plus a wing rather than two thin strips.
+  function rectsOf(poly) {
+    function slice(P, swap) {
+      var pts = P.map(function (p) { return swap ? [p[1], p[0]] : [p[0], p[1]]; });
+      var ys = [];
+      pts.forEach(function (p) { if (ys.indexOf(p[1]) < 0) ys.push(p[1]); });
+      ys.sort(function (a, b) { return a - b; });
+      var out = [];
+      for (var i = 0; i < ys.length - 1; i++) {
+        var ym = (ys[i] + ys[i + 1]) / 2, xs = [];
+        for (var k = 0; k < pts.length; k++) {
+          var a = pts[k], b = pts[(k + 1) % pts.length];
+          if (a[0] === b[0] && (a[1] - ym) * (b[1] - ym) < 0) xs.push(a[0]);
+        }
+        xs.sort(function (a, b) { return a - b; });
+        for (var j = 0; j + 1 < xs.length; j += 2) out.push([xs[j], ys[i], xs[j + 1], ys[i + 1]]);
+      }
+      var merged = true;
+      while (merged) {
+        merged = false;
+        for (var m = 0; m < out.length && !merged; m++) {
+          for (var n = 0; n < out.length && !merged; n++) {
+            var A = out[m], B = out[n];
+            if (m !== n && A[0] === B[0] && A[2] === B[2] && A[3] === B[1]) {
+              A[3] = B[3]; out.splice(n, 1); merged = true;
+            }
+          }
+        }
+      }
+      return out.map(function (r) { return swap ? [r[1], r[0], r[3], r[2]] : r; });
+    }
+    function biggest(rs) {
+      return rs.reduce(function (m, r) { return Math.max(m, (r[2] - r[0]) * (r[3] - r[1])); }, 0);
+    }
+    var h = slice(poly, false), v = slice(poly, true);
+    return biggest(v) > biggest(h) ? v : h;
+  }
 
-  function makeGroundTexture(size) {
-    var c = document.createElement('canvas');
-    c.width = c.height = size;
-    var g = c.getContext('2d');
-    var W = ARENA * 2;
+  // Every building's footprint in world units, for roofs, floors, the minimap
+  // and "is the player indoors".
+  var BUILDINGS = OAK.buildings.map(function (B) {
+    return {
+      spec: B,
+      parts: rectsOf(B.outline).map(function (r) { return [wx(r[0]), wz(r[1]), wx(r[2]), wz(r[3])]; }),
+      roofs: [], shown: true
+    };
+  });
+  function buildingAt(x, z, pad) {
+    pad = pad || 0;
+    for (var i = 0; i < BUILDINGS.length; i++) {
+      var P = BUILDINGS[i].parts;
+      for (var k = 0; k < P.length; k++) {
+        if (x > P[k][0] - pad && x < P[k][2] + pad && z > P[k][1] - pad && z < P[k][3] + pad) return BUILDINGS[i];
+      }
+    }
+    return null;
+  }
 
-    g.fillStyle = '#1A2027';
-    g.fillRect(0, 0, size, size);
+  var LAMPS = [];                 // point-light anchors
+  OAK.lamps.forEach(function (l) { LAMPS.push({ x: wx(l[0]), z: wz(l[1]), h: 5.9 }); });
+  OAK.armLights.forEach(function (l) {
+    var dir = l[2] === 'E' ? 1 : -1;
+    LAMPS.push({ x: wx(l[0]) + dir * 2.2, z: wz(l[1]), h: 6.5, arm: dir, postX: wx(l[0]) });
+  });
 
-    // asphalt grain
-    var img = g.getImageData(0, 0, size, size);
-    var d = img.data;
-    for (var i = 0; i < d.length; i += 4) {
-      var n = (Math.random() - 0.5) * 13;
-      d[i] = clamp(d[i] + n, 0, 255);
-      d[i + 1] = clamp(d[i + 1] + n, 0, 255);
-      d[i + 2] = clamp(d[i + 2] + n * 1.1, 0, 255);
+  /* ------------------------------------------------------------ the ground
+     One painted texture for the whole town at 8 texels per metre, nearest-
+     filtered so it reads as pixel art up close. Painted in two passes: first a
+     surface id per texel (grass, asphalt, sidewalk...), then a colour pass that
+     turns each id into a pattern using world-space texel coordinates, so slab
+     joints and planks line up across neighbouring regions.                    */
+  var TPX = 0.8;                                         // texels per blueprint px
+  var GW = Math.ceil((OAK.bounds[2] - OAK.bounds[0]) * TPX);
+  var GH = Math.ceil((OAK.bounds[3] - OAK.bounds[1]) * TPX);
+  var S_ = { GRASS: 1, OVER: 2, ASPH: 3, WALK: 4, PLAZA: 5, CONC: 6, FORE: 7,
+             WOOD: 8, CHECK: 9, TILE: 10, STONE: 11, DASH: 12, ZEBH: 13, ZEBV: 14, CRACK: 15 };
+
+  function paintGround() {
+    var id = new Uint8Array(GW * GH);
+    var over = new Uint8Array(GW * GH);
+    function span(x0, y0, x1, y1) {
+      return [
+        Math.max(0, Math.floor((x0 - OAK.bounds[0]) * TPX)),
+        Math.max(0, Math.floor((y0 - OAK.bounds[1]) * TPX)),
+        Math.min(GW, Math.ceil((x1 - OAK.bounds[0]) * TPX)),
+        Math.min(GH, Math.ceil((y1 - OAK.bounds[1]) * TPX))
+      ];
+    }
+    function fill(r, v) {
+      var s = span(r[0], r[1], r[2], r[3]);
+      for (var j = s[1]; j < s[3]; j++) for (var i = s[0]; i < s[2]; i++) id[j * GW + i] = v;
+    }
+
+    // overgrowth mask from the RLE
+    var MW = Math.floor((OAK.bounds[2] - OAK.bounds[0]) / 5);
+    var bits = new Uint8Array(MW * Math.floor((OAK.bounds[3] - OAK.bounds[1]) / 5));
+    var runs = OAK.stipple.split('.'), pos = 0, on = 0;
+    for (var ri = 0; ri < runs.length; ri++) {
+      var n = parseInt(runs[ri], 36);
+      if (on) for (var q = 0; q < n && pos + q < bits.length; q++) bits[pos + q] = 1;
+      pos += n; on ^= 1;
+    }
+    for (var j0 = 0; j0 < GH; j0++) {
+      for (var i0 = 0; i0 < GW; i0++) {
+        var mi = Math.floor(i0 / TPX / 5), mj = Math.floor(j0 / TPX / 5);
+        if (mi < MW && bits[mj * MW + mi]) over[j0 * GW + i0] = 1;
+      }
+    }
+    function grassy(r) {
+      var s = span(r[0], r[1], r[2], r[3]);
+      for (var j = s[1]; j < s[3]; j++) for (var i = s[0]; i < s[2]; i++) {
+        id[j * GW + i] = over[j * GW + i] ? S_.OVER : S_.GRASS;
+      }
+    }
+
+    grassy([OAK.bounds[0], OAK.bounds[1], OAK.bounds[2], OAK.bounds[3]]);
+    OAK.paths.forEach(function (r) { fill(r, S_.CONC); });
+    OAK.roads.forEach(function (r) { fill(r, S_.ASPH); });
+    OAK.sidewalks.forEach(function (r) { fill(r, S_.WALK); });
+    OAK.plaza.forEach(function (r) { fill(r, S_.PLAZA); });
+    OAK.blockGrass.forEach(grassy);
+    OAK.forecourt.forEach(function (r) { fill(r, S_.FORE); });
+    (function island(r) {
+      grassy(r);
+      var R = r[4], cx = r[2] - R, cy = r[1] + R;
+      var s = span(r[2] - R, r[1], r[2], r[1] + R);
+      for (var j = s[1]; j < s[3]; j++) for (var i = s[0]; i < s[2]; i++) {
+        var px = OAK.bounds[0] + (i + 0.5) / TPX, py = OAK.bounds[1] + (j + 0.5) / TPX;
+        if (Math.hypot(px - cx, py - cy) > R) id[j * GW + i] = S_.FORE;
+      }
+    })(OAK.island);
+
+    // cracks wander across the asphalt
+    for (var c = 0; c < 420; c++) {
+      var ci = Math.floor(hash2(c, 1, 77) * GW), cj = Math.floor(hash2(c, 2, 77) * GH);
+      if (id[cj * GW + ci] !== S_.ASPH) continue;
+      var len = 6 + Math.floor(hash2(c, 3, 77) * 22);
+      for (var st = 0; st < len; st++) {
+        ci += Math.round(hash2(c, st * 2 + 4, 78) * 2 - 1);
+        cj += Math.round(hash2(c, st * 2 + 5, 78) * 2 - 1);
+        if (ci < 0 || cj < 0 || ci >= GW || cj >= GH) break;
+        if (id[cj * GW + ci] === S_.ASPH) id[cj * GW + ci] = S_.CRACK;
+      }
+    }
+
+    OAK.dashes.forEach(function (d) {
+      var horiz = d[1] === d[3];
+      var s = horiz ? span(d[0], d[1] - 1.2, d[2], d[1] + 1.2) : span(d[0] - 1.2, d[1], d[0] + 1.2, d[3]);
+      for (var j = s[1]; j < s[3]; j++) for (var i = s[0]; i < s[2]; i++) {
+        var along = horiz ? i : j;
+        if (along % 24 < 12) id[j * GW + i] = S_.DASH;      // 1.5 m dash, 1.5 m gap
+      }
+    });
+    OAK.crosswalks.forEach(function (r) { fill(r, r[4] === 'h' ? S_.ZEBH : S_.ZEBV); });
+
+    var floorId = { wood: S_.WOOD, check: S_.CHECK, tile: S_.TILE, stone: S_.STONE };
+    OAK.buildings.forEach(function (B) {
+      rectsOf(B.outline).forEach(function (r) { fill(r, floorId[B.floor] || S_.WOOD); });
+    });
+
+    /* ---- colour pass */
+    var cv = document.createElement('canvas');
+    cv.width = GW; cv.height = GH;
+    var g = cv.getContext('2d');
+    var img = g.createImageData(GW, GH), px = img.data;
+    var rgb = [0, 0, 0];
+    function set(r, gg, b) { rgb[0] = r; rgb[1] = gg; rgb[2] = b; }
+    function isRoad(v) { return v === S_.ASPH || v === S_.CRACK || v === S_.DASH || v === S_.ZEBH || v === S_.ZEBV; }
+
+    for (var j = 0; j < GH; j++) {
+      for (var i = 0; i < GW; i++) {
+        var k = j * GW + i, v = id[k];
+        var h = hash2(i, j, 1), n = h - 0.5;
+        var lf = vnoise(i / 26, j / 26, 3) - 0.5;
+        switch (v) {
+          case S_.GRASS:
+            set(50 + lf * 18 + n * 9, 69 + lf * 22 + n * 11, 35 + lf * 8 + n * 6);
+            if (h < 0.11) set(rgb[0] + 16, rgb[1] + 20, rgb[2] + 8);
+            else if (h > 0.9) set(rgb[0] - 12, rgb[1] - 14, rgb[2] - 8);
+            break;
+          case S_.OVER: {
+            // tall, uneven, going to seed
+            var tuft = vnoise(i / 5, j / 5, 9);
+            set(56 + lf * 14 + n * 9, 66 + lf * 14 + n * 9, 33 + n * 6);
+            if (tuft > 0.64) set(rgb[0] + 14, rgb[1] + 12, rgb[2] + 6);
+            if (h < 0.09) set(78, 78, 44);
+            else if (h > 0.91) set(38, 48, 28);
+            break;
+          }
+          case S_.ASPH:
+            set(46 + n * 12 + lf * 8, 48 + n * 12 + lf * 8, 52 + n * 12 + lf * 8);
+            if (hash2(i, j, 5) < 0.05) set(rgb[0] + 20, rgb[1] + 20, rgb[2] + 20);
+            break;
+          case S_.CRACK: set(27, 28, 31); break;
+          case S_.DASH:
+            if (hash2(i, j, 6) < 0.07) set(62, 63, 66); else set(172 + n * 12, 168 + n * 12, 148 + n * 10);
+            break;
+          case S_.ZEBH: case S_.ZEBV: {
+            var a = v === S_.ZEBH ? j : i;
+            if (a % 7 < 4 && hash2(i, j, 7) > 0.05) set(180 + n * 14, 178 + n * 14, 168 + n * 12);
+            else set(46 + n * 12, 48 + n * 12, 52 + n * 12);
+            break;
+          }
+          case S_.WALK:
+            set(116 + n * 10 + lf * 8, 114 + n * 10 + lf * 8, 108 + n * 10 + lf * 8);
+            if (i % 16 === 0 || j % 16 === 0) set(rgb[0] - 30, rgb[1] - 30, rgb[2] - 30);
+            break;
+          case S_.PLAZA: {
+            var tt = hash2(Math.floor(i / 20), Math.floor(j / 20), 11) - 0.5;
+            set(102 + tt * 12 + n * 8, 98 + tt * 12 + n * 8, 92 + tt * 10 + n * 8);
+            if (i % 20 === 0 || j % 20 === 0) set(70, 68, 64);
+            break;
+          }
+          case S_.CONC:
+            set(126 + n * 9 + lf * 6, 122 + n * 9 + lf * 6, 114 + n * 9 + lf * 6);
+            if (i % 12 === 0 || j % 12 === 0) set(rgb[0] - 22, rgb[1] - 22, rgb[2] - 22);
+            break;
+          case S_.FORE: {
+            var oil = vnoise(i / 9, j / 9, 13);
+            set(90 + n * 10, 90 + n * 10, 92 + n * 10);
+            if (oil < 0.26) set(rgb[0] - 22, rgb[1] - 21, rgb[2] - 18);
+            if (i % 24 === 0 || j % 24 === 0) set(rgb[0] - 16, rgb[1] - 16, rgb[2] - 16);
+            break;
+          }
+          case S_.WOOD: {
+            var plank = Math.floor(j / 3), pt = hash2(plank, 0, 21) - 0.5;
+            set(116 + pt * 22 + n * 10, 82 + pt * 16 + n * 8, 50 + pt * 10 + n * 6);
+            if (j % 3 === 0 || (i + plank * 7) % 18 === 0) set(rgb[0] - 22, rgb[1] - 18, rgb[2] - 12);
+            break;
+          }
+          case S_.CHECK:
+            if ((Math.floor(i / 4) + Math.floor(j / 4)) % 2) set(190 + n * 10, 186 + n * 10, 176 + n * 10);
+            else set(42 + n * 8, 44 + n * 8, 50 + n * 8);
+            break;
+          case S_.TILE:
+            set(146 + n * 8, 146 + n * 8, 142 + n * 8);
+            if (i % 5 === 0 || j % 5 === 0) set(116, 116, 112);
+            break;
+          case S_.STONE: {
+            var row = Math.floor(j / 6), col = Math.floor((i + (row % 2) * 4) / 8);
+            var sv = hash2(col, row, 31) - 0.5;
+            set(104 + sv * 20 + n * 8, 98 + sv * 18 + n * 8, 90 + sv * 16 + n * 8);
+            if (j % 6 === 0 || (i + (row % 2) * 4) % 8 === 0) set(62, 58, 54);
+            break;
+          }
+          default: set(50, 69, 35);
+        }
+        // kerbs: a pale lip where sidewalk meets road
+        if (v === S_.WALK) {
+          var up = j > 0 ? id[k - GW] : 0, dn = j < GH - 1 ? id[k + GW] : 0;
+          var lt = i > 0 ? id[k - 1] : 0, rt = i < GW - 1 ? id[k + 1] : 0;
+          if (isRoad(up) || isRoad(dn) || isRoad(lt) || isRoad(rt)) set(152 + n * 8, 150 + n * 8, 142 + n * 8);
+        }
+        px[k * 4] = clamp(rgb[0], 0, 255);
+        px[k * 4 + 1] = clamp(rgb[1], 0, 255);
+        px[k * 4 + 2] = clamp(rgb[2], 0, 255);
+        px[k * 4 + 3] = 255;
+      }
     }
     g.putImageData(img, 0, 0);
-
-    // cracks
-    g.strokeStyle = 'rgba(6,9,11,.30)';
-    g.lineWidth = Math.max(1, size / 512);
-    for (var k = 0; k < 46; k++) {
-      var x = Math.random() * size, y = Math.random() * size;
-      g.beginPath(); g.moveTo(x, y);
-      var segs = randInt(2, 5);
-      for (var s = 0; s < segs; s++) {
-        x += rand(-size * 0.055, size * 0.055);
-        y += rand(-size * 0.055, size * 0.055);
-        g.lineTo(x, y);
-      }
-      g.stroke();
-    }
-
-    // faded parking bays
-    g.strokeStyle = 'rgba(206,198,178,.055)';
-    g.lineWidth = Math.max(2, size / 340);
-    for (var b = 0; b < 4; b++) {
-      var by = size * (0.14 + b * 0.24);
-      for (var bx = 0; bx < 10; bx++) {
-        var px = size * (0.06 + bx * 0.098);
-        g.beginPath();
-        g.moveTo(px, by);
-        g.lineTo(px, by + size * 0.15);
-        g.stroke();
-      }
-    }
-
-    // No baked light here any more. Light pools used to be painted into this
-    // texture, which looked like light but did not behave like it — a lamp
-    // could not brighten a zombie standing under it. Real lights do that now,
-    // so the texture is pure surface: albedo only.
-
-    var tex = new T.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = T.RepeatWrapping;
-    tex.repeat.set(ARENA / 7, ARENA / 7);   // ~14 units per tile across the district
-    tex.anisotropy = 1;
-    return tex;
+    return cv;
   }
 
-  var groundTex = makeGroundTexture(Q.tex);
-  // Subdivided because MeshLambertMaterial lights per-vertex: on two triangles
-  // a muzzle flash would have nowhere to land.
+  var groundCanvas = paintGround();
+  var groundTex = new T.CanvasTexture(groundCanvas);
+  groundTex.magFilter = T.NearestFilter;
+  groundTex.minFilter = T.NearestFilter;
+  groundTex.generateMipmaps = false;
+  groundTex.wrapS = groundTex.wrapT = T.ClampToEdgeWrapping;
+
   var ground = new T.Mesh(
-    new T.PlaneGeometry(ARENA * 2, ARENA * 2, 12, 12),
+    new T.PlaneGeometry(BX1 - BX0, BZ1 - BZ0),
     new T.MeshPhongMaterial({ map: groundTex, shininess: 6, specular: 0x171C21 })
   );
   ground.rotation.x = -PI / 2;
+  ground.position.set((BX0 + BX1) / 2, 0, (BZ0 + BZ1) / 2);
   scene.add(ground);
 
-  // beyond the lot: a darker skirt so the world does not just end
+  // beyond the town: a dark skirt so the world does not just end
   var skirt = new T.Mesh(
-    new T.PlaneGeometry(ARENA * 6, ARENA * 6),
-    new T.MeshBasicMaterial({ color: 0x070A0D })
+    new T.PlaneGeometry((BX1 - BX0) * 3, (BZ1 - BZ0) * 3),
+    new T.MeshBasicMaterial({ color: 0x0A0E0B })
   );
   skirt.rotation.x = -PI / 2;
-  skirt.position.y = -0.04;
+  skirt.position.set((BX0 + BX1) / 2, -0.04, (BZ0 + BZ1) / 2);
   scene.add(skirt);
 
   /* ----------------------------------------------------------------- lights */
   // Night baseline: just enough to read a silhouette. Everything else has to
   // come from an actual light in the world.
-  scene.add(new T.AmbientLight(0x1A2430, 0.5));
-  var hemi = new T.HemisphereLight(0x2A3A4E, 0x0E0A06, 0.3);
+  scene.add(new T.AmbientLight(0x1A2430, 0.62));
+  var hemi = new T.HemisphereLight(0x2A3A4E, 0x0E0A06, 0.42);
   scene.add(hemi);
-  var moon = new T.DirectionalLight(0x8FA6C4, 0.22);
+  var moon = new T.DirectionalLight(0x8FA6C4, 0.44);
   moon.position.set(-14, 26, -10);
   scene.add(moon);
 
-  // Only the closest lamps can ever be on screen, so three real point lights
-  // get reassigned to the nearest posts instead of lighting all seven at once.
+  // Only the closest lamps can ever be on screen, so four real point lights
+  // get reassigned to the nearest of the town's thirty posts.
   // Fixed light count, so no shader recompiles while you walk around.
-  var LAMP_LIGHTS = 3;
+  var LAMP_LIGHTS = 4;
   var lampLights = [];
   for (var li = 0; li < LAMP_LIGHTS; li++) {
     var pl = new T.PointLight(0xFFB042, 0, 19, 1.7);
@@ -1273,7 +1686,7 @@ function main(hotData) {
   }
 
   var lampSortAt = -9;
-  var _wanted = [];
+  var _wanted = [], _kept = [];
   function updateLampLights(dt) {
     if (G.time - lampSortAt > 0.3) {
       lampSortAt = G.time;
@@ -1289,17 +1702,27 @@ function main(hotData) {
       _wanted.length = 0;
       for (var w = 0; w < lampsActive; w++) _wanted.push(lampOrder[w]);
 
-      var k, lt;
+      // Three passes: keep a slot on a post that is still wanted; let a slot
+      // already fading toward a wanted post finish that move; hand whatever
+      // posts are left to the slots that are free.
+      var k, lt, held;
+      for (k = 0; k < lampsActive; k++) _kept[k] = false;
       for (k = 0; k < lampsActive; k++) {
         lt = lampLights[k];
-        var held = _wanted.indexOf(lt.userData.anchor);
-        if (held !== -1) { _wanted[held] = -1; lt.userData.want = lt.userData.anchor; }
+        held = _wanted.indexOf(lt.userData.anchor);
+        if (lt.userData.anchor !== undefined && held !== -1) {
+          _wanted[held] = -1; lt.userData.want = lt.userData.anchor; _kept[k] = true;
+        }
       }
       for (k = 0; k < lampsActive; k++) {
+        if (_kept[k]) continue;
         lt = lampLights[k];
-        if (_wanted.indexOf(lt.userData.anchor) !== -1) continue;   // already kept
-        if (lt.userData.want === lt.userData.anchor &&
-            lt.userData.anchor !== undefined) continue;
+        held = _wanted.indexOf(lt.userData.want);
+        if (lt.userData.want !== undefined && held !== -1) { _wanted[held] = -1; _kept[k] = true; }
+      }
+      for (k = 0; k < lampsActive; k++) {
+        if (_kept[k]) continue;
+        lt = lampLights[k];
         for (var q = 0; q < _wanted.length; q++) {
           if (_wanted[q] === -1) continue;
           lt.userData.want = _wanted[q];
@@ -1322,7 +1745,7 @@ function main(hotData) {
           lj.intensity = 0;
           var N = LAMPS[lj.userData.want];
           lj.userData.anchor = lj.userData.want;
-          lj.position.set(N.x, N.fire ? 1.3 : 6.4, N.z);
+          lj.position.set(N.x, N.fire ? 1.3 : N.h, N.z);
           lj.color.setHex(N.fire ? 0xFF7A26 : 0xFFB042);
           lj.distance = N.fire ? 13 : 19;
         }
@@ -1375,9 +1798,10 @@ function main(hotData) {
 
   function cellKey(cx, cz) { return cx * 4096 + cz; }
 
-  function gridInsert(entry, x, z, ext) {
+  function gridInsert(entry, x, z, ext, extZ) {
+    var ez = extZ === undefined ? ext : extZ;
     var x0 = Math.floor((x - ext) / CELL), x1 = Math.floor((x + ext) / CELL);
-    var z0 = Math.floor((z - ext) / CELL), z1 = Math.floor((z + ext) / CELL);
+    var z0 = Math.floor((z - ez) / CELL), z1 = Math.floor((z + ez) / CELL);
     for (var cx = x0; cx <= x1; cx++) {
       for (var cz = z0; cz <= z1; cz++) {
         var k = cellKey(cx, cz);
@@ -1391,7 +1815,7 @@ function main(hotData) {
     for (var i = 0; i < props.length; i++) gridInsert(props[i], props[i].x, props[i].z, props[i].r);
     for (var j = 0; j < rects.length; j++) {
       rects[j].isRect = true;
-      gridInsert(rects[j], rects[j].x, rects[j].z, Math.max(rects[j].w, rects[j].d) / 2);
+      gridInsert(rects[j], rects[j].x, rects[j].z, rects[j].w / 2, rects[j].d / 2);
     }
   }
 
@@ -1410,192 +1834,1161 @@ function main(hotData) {
     return _near;
   }
 
-  /* ------------------------------------------------------- district meshes */
-  function buildCityMeshes() {
-    var dm = new T.Object3D();
-    function place(mesh, list, fn) {
-      var n = 0;
-      list.forEach(function (o) { if (n < mesh.count) { fn(o); dm.updateMatrix(); mesh.setMatrixAt(n++, dm.matrix); } });
-      mesh.count = n;
-      mesh.instanceMatrix.needsUpdate = true;
-      // NEVER true for these. InstancedMesh derives its bounding sphere from
-      // the base geometry, not the instance transforms, so every instance
-      // shares one small sphere at the origin — walk away from the middle of
-      // the map and the whole batch culls at once. Measured: 20 of 20 city
-      // meshes vanished at a far corner. Every other instanced mesh in this
-      // file is false for exactly this reason.
-      mesh.frustumCulled = false;
-      if (n) scene.add(mesh);
-      return mesh;
+  /* ================================================================= town
+     Everything static is built here from OAK: walls, roofs, furniture, trees,
+     cars, fences, lamps. It is all merged — one mesh per material per 32 m
+     chunk — so the whole town costs a few dozen draw calls, and each chunk has
+     a true bounding sphere, so frustum culling works on it.                  */
+
+  // ---- pixel textures: tiny, nearest-filtered, repeated in world space. Most
+  // are near-white so vertex colours carry the hue.
+  function pixTex(w, h, fn) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d'), img = g.createImageData(w, h), d = img.data;
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var v = fn(x, y), k = (y * w + x) * 4;
+      d[k] = v[0]; d[k + 1] = v[1]; d[k + 2] = v[2]; d[k + 3] = v.length > 3 ? v[3] : 255;
     }
-    function M(color, opts) {
-      var o = { color: color };
-      if (opts) for (var k in opts) o[k] = opts[k];
-      return new T.MeshLambertMaterial(o);
-    }
-    function inst(geo, mat, n) { return new T.InstancedMesh(geo, mat, Math.max(1, n)); }
-
-    // --- buildings: one instanced box, per-instance scale carries the footprint
-    var bGeo = new T.BoxGeometry(1, 1, 1);
-    var bMesh = inst(bGeo, M(0x333940), CITY.buildings.length);
-    place(bMesh, CITY.buildings, function (b) {
-      dm.position.set(b.x, b.h / 2, b.z);
-      dm.rotation.set(0, 0, 0);
-      dm.scale.set(b.w, b.h, b.d);
-    });
-    // parapet caps read as roof edges from above
-    var capMesh = inst(bGeo, M(0x232830), CITY.buildings.length);
-    place(capMesh, CITY.buildings, function (b) {
-      dm.position.set(b.x, b.h + 0.18, b.z);
-      dm.rotation.set(0, 0, 0);
-      dm.scale.set(b.w + 0.5, 0.36, b.d + 0.5);
-    });
-    CITY.buildings.forEach(function (b) { rects.push({ x: b.x, z: b.z, w: b.w, d: b.d }); });
-
-    // --- kerbs and lane markings, flat on the road
-    var flat = new T.BoxGeometry(1, 0.12, 1);
-    var kerbMesh = inst(flat, M(0x3B4048), CITY.kerbs.length * 4);
-    var kn = 0;
-    CITY.kerbs.forEach(function (k) {
-      [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (s2) {
-        if (kn >= kerbMesh.count) return;
-        dm.position.set(k.x + s2[0] * k.w / 2, 0.06, k.z + s2[1] * k.d / 2);
-        dm.rotation.set(0, 0, 0);
-        dm.scale.set(s2[0] ? 0.9 : k.w, 1, s2[1] ? 0.9 : k.d);
-        dm.updateMatrix(); kerbMesh.setMatrixAt(kn++, dm.matrix);
-      });
-    });
-    kerbMesh.count = kn; kerbMesh.instanceMatrix.needsUpdate = true; scene.add(kerbMesh);
-
-    var markMesh = inst(new T.BoxGeometry(1, 0.06, 1), M(0xB9B29A), CITY.marks.length);
-    place(markMesh, CITY.marks, function (m) {
-      dm.position.set(m.x, 0.04, m.z);
-      dm.rotation.set(0, 0, 0);
-      dm.scale.set(m.w, 1, m.d);
-    });
-
-    // --- wrecked cars: body + cabin, and they block movement
-    var carBody = inst(new T.BoxGeometry(2.0, 0.78, 4.3), M(0x4A4A4A), CITY.cars.length);
-    var carTop  = inst(new T.BoxGeometry(1.78, 0.62, 2.0), M(0x1C2026), CITY.cars.length);
-    var ci = 0;
-    CITY.cars.forEach(function (c) {
-      var mat = new T.Color(c.tone);
-      dm.position.set(c.x, 0.5, c.z); dm.rotation.set(0, c.r, 0); dm.scale.set(1, 1, 1);
-      dm.updateMatrix(); carBody.setMatrixAt(ci, dm.matrix);
-      dm.position.set(c.x, 1.16, c.z - 0.2); dm.updateMatrix(); carTop.setMatrixAt(ci, dm.matrix);
-      ci++;
-      props.push({ x: c.x, z: c.z, r: 1.7 });
-      void mat;
-    });
-    carBody.count = carTop.count = ci;
-    carBody.instanceMatrix.needsUpdate = carTop.instanceMatrix.needsUpdate = true;
-    scene.add(carBody); scene.add(carTop);
-
-    // --- the rest of the street furniture
-    place(inst(new T.BoxGeometry(2.1, 1.5, 3.4), M(0x3E5A46), CITY.skips.length),
-      CITY.skips, function (o) {
-        dm.position.set(o.x, 0.75, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 1.6 });
-      });
-    place(inst(new T.BoxGeometry(2.4, 0.95, 0.66), M(0x8E9298), CITY.barriers.length),
-      CITY.barriers, function (o) {
-        dm.position.set(o.x, 0.47, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 1.05 });
-      });
-    place(inst(new T.BoxGeometry(1.5, 1.5, 1.5), M(0x5A4A33), CITY.crates.length),
-      CITY.crates, function (o) {
-        dm.position.set(o.x, 0.75 * (o.s || 1), o.z); dm.rotation.set(0, o.r, 0);
-        dm.scale.set(o.s || 1, o.s || 1, o.s || 1);
-        props.push({ x: o.x, z: o.z, r: 1.0 * (o.s || 1) });
-      });
-    place(inst(new T.CylinderGeometry(0.58, 0.58, 1.5, 10), M(0x6B4429), CITY.barrels.length),
-      CITY.barrels, function (o) {
-        dm.position.set(o.x, 0.75, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 0.78 });
-      });
-    place(inst(new T.CylinderGeometry(0.2, 0.24, 0.9, 8), M(0x9C3B2E), CITY.hydrants.length),
-      CITY.hydrants, function (o) {
-        dm.position.set(o.x, 0.45, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 0.4 });
-      });
-    place(inst(new T.BoxGeometry(2.0, 0.42, 0.66), M(0x4A3B2A), CITY.benches.length),
-      CITY.benches, function (o) {
-        dm.position.set(o.x, 0.42, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 0.95 });
-      });
-    // doodads: seen, not collided with
-    place(inst(new T.ConeGeometry(0.3, 0.72, 6), M(0xD4632A), CITY.cones.length),
-      CITY.cones, function (o) {
-        dm.position.set(o.x, 0.36, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-      });
-    place(inst(new T.BoxGeometry(1.2, 0.16, 1.0), M(0x6E5A3C), CITY.pallets.length),
-      CITY.pallets, function (o) {
-        dm.position.set(o.x, 0.08, o.z); dm.rotation.set(0, o.r, 0); dm.scale.set(1, 1, 1);
-      });
-    place(inst(new T.SphereGeometry(0.42, 6, 5), M(0x22262B), CITY.sacks.length),
-      CITY.sacks, function (o) {
-        dm.position.set(o.x, 0.3, o.z); dm.rotation.set(0, o.r, 0.3);
-        dm.scale.set(o.s, o.s * 0.8, o.s);
-      });
-    place(inst(new T.BoxGeometry(0.7, 0.28, 0.7), M(0x41464C), CITY.rubble.length),
-      CITY.rubble, function (o) {
-        dm.position.set(o.x, 0.13, o.z); dm.rotation.set(0.1, o.r, 0.08);
-        dm.scale.set(o.s, o.s, o.s);
-      });
-    place(inst(new T.BoxGeometry(1.4, 0.9, 1.1), M(0x4B5057), CITY.vents.length),
-      CITY.vents, function (o) {
-        dm.position.set(o.x, o.y + 0.45, o.z); dm.rotation.set(0, 0, 0);
-        dm.scale.set(o.s, o.s, o.s);
-      });
-    // traffic signals
-    place(inst(new T.CylinderGeometry(0.1, 0.12, 5.2, 6), M(0x2B333A), CITY.lights.length),
-      CITY.lights, function (o) {
-        dm.position.set(o.x, 2.6, o.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: o.x, z: o.z, r: 0.35 });
-      });
-    place(inst(new T.BoxGeometry(0.4, 1.0, 0.34),
-      new T.MeshBasicMaterial({ color: 0x8E2C22 }), CITY.lights.length),
-      CITY.lights, function (o) {
-        dm.position.set(o.x, 5.0, o.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
-      });
-
-    // --- streetlights and burn barrels, at the anchors the lights use
-    var poleGeo = new T.CylinderGeometry(0.1, 0.14, 7, 6);
-    var headGeo = new T.BoxGeometry(1.15, 0.26, 0.6);
-    var posts = LAMPS.filter(function (l) { return !l.fire; });
-    place(inst(poleGeo, M(0x2B333A), posts.length), posts, function (l) {
-      dm.position.set(l.x, 3.5, l.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
-      props.push({ x: l.x, z: l.z, r: 0.42 });
-    });
-    place(inst(headGeo, new T.MeshBasicMaterial({ color: 0xFFE7B0 }), posts.length),
-      posts, function (l) {
-        dm.position.set(l.x, 6.9, l.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
-      });
-    place(inst(new T.CylinderGeometry(0.5, 0.42, 1.0, 8), M(0x33261C), CITY.fires.length),
-      CITY.fires, function (f) {
-        dm.position.set(f.x, 0.5, f.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1);
-        props.push({ x: f.x, z: f.z, r: 0.66 });
-      });
-    place(inst(new T.SphereGeometry(0.46, 7, 6),
-      new T.MeshBasicMaterial({ color: 0xFF8A2A }), CITY.fires.length),
-      CITY.fires, function (f) {
-        dm.position.set(f.x, 1.15, f.z); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1.35, 1);
-      });
-
-    // perimeter wall so the district has an edge
-    var wallGeo = new T.BoxGeometry(1, 3.4, 1);
-    var wallMesh = inst(wallGeo, M(0x272C32), 4);
-    [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (sgn, i) {
-      dm.position.set(sgn[0] * ARENA, 1.7, sgn[1] * ARENA);
-      dm.rotation.set(0, 0, 0);
-      dm.scale.set(sgn[0] ? 1.4 : ARENA * 2, 1, sgn[1] ? 1.4 : ARENA * 2);
-      dm.updateMatrix(); wallMesh.setMatrixAt(i, dm.matrix);
-    });
-    wallMesh.count = 4; wallMesh.instanceMatrix.needsUpdate = true; scene.add(wallMesh);
-
-    buildGrid();
+    g.putImageData(img, 0, 0);
+    var t = new T.CanvasTexture(c);
+    t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.generateMipmaps = false;
+    t.wrapS = t.wrapT = T.RepeatWrapping;
+    return t;
   }
-  buildCityMeshes();
+  function g1(v) { v = clamp(Math.round(v), 0, 255); return [v, v, v]; }
+  var TX = {
+    // lap siding: 25 cm boards with a shadow line under each
+    siding: pixTex(16, 16, function (x, y) {
+      return g1(y % 4 === 3 ? 168 : 236 - (y % 4) * 5 + (hash2(x, y, 41) - 0.5) * 12);
+    }),
+    brick: pixTex(16, 16, function (x, y) {
+      var row = y >> 2, off = (row & 1) * 4;
+      if (y % 4 === 3 || (x + off) % 8 === 7) return g1(196);
+      return g1(226 + (hash2((x + off) >> 3, row, 42) - 0.5) * 34 + (hash2(x, y, 43) - 0.5) * 10);
+    }),
+    stone: pixTex(16, 16, function (x, y) {
+      var row = y >> 2, off = (row & 1) * 5;
+      if (y % 4 === 3 || (x + off) % 10 === 9) return g1(160);
+      return g1(222 + (hash2((x + off) / 10 | 0, row, 44) - 0.5) * 30 + (hash2(x, y, 45) - 0.5) * 14);
+    }),
+    plaster: pixTex(16, 16, function (x, y) { return g1(232 + (hash2(x, y, 46) - 0.5) * 10); }),
+    shingle: pixTex(16, 16, function (x, y) {
+      var row = y >> 2, off = (row & 1) * 3;
+      if (y % 4 === 3) return g1(128);
+      if ((x + off) % 6 === 5) return g1(170);
+      return g1(214 + (hash2((x + off) / 6 | 0, row, 47) - 0.5) * 50 + (hash2(x, y, 48) - 0.5) * 14);
+    }),
+    gravel: pixTex(16, 16, function (x, y) { var h = hash2(x, y, 49); return g1(h < 0.2 ? 150 : h > 0.85 ? 250 : 206 + h * 20); }),
+    wood: pixTex(16, 16, function (x, y) {
+      if (x % 4 === 0) return g1(160);
+      return g1(214 + (hash2(x >> 2, 0, 50) - 0.5) * 30 + (hash2(x, y >> 1, 51) - 0.5) * 18);
+    }),
+    fabric: pixTex(16, 16, function (x, y) { return g1(224 + ((x + y) & 1 ? 8 : -8) + (hash2(x, y, 52) - 0.5) * 8); }),
+    metal: pixTex(16, 16, function (x, y) { return g1((y === 0 ? 206 : 232) + (hash2(x, y, 53) - 0.5) * 8); }),
+    leaf: pixTex(16, 16, function (x, y) {
+      var c = vnoise(x / 3, y / 3, 54), h = hash2(x, y, 55);
+      return g1(c > 0.62 ? 255 : c < 0.3 ? 128 : 196 + (h - 0.5) * 36);
+    }),
+    bark: pixTex(16, 16, function (x, y) {
+      return g1(190 + (hash2(x, 0, 56) - 0.5) * 60 + (hash2(x, y >> 2, 57) - 0.5) * 30);
+    }),
+    birch: pixTex(16, 16, function (x, y) {
+      var mark = hash2(x >> 2, y, 58) < 0.12 && hash2(0, y, 59) < 0.5;
+      return g1(mark ? 40 : 238 + (hash2(x, y, 60) - 0.5) * 12);
+    }),
+    // alpha-tested fences: 1 texture tile = 1 m wide, 1 m tall
+    picket: pixTex(16, 16, function (x, y) {
+      var rail = y === 4 || y === 12;
+      var slat = x % 4 < 2 && (y > 1 || (y === 1 && x % 4 === 0) || (y === 0 && false));
+      if (!(rail || slat)) return [0, 0, 0, 0];
+      return g1(222 + (hash2(x >> 2, y, 61) - 0.5) * 30);
+    }),
+    iron: pixTex(16, 16, function (x, y) {
+      var rail = y === 1 || y === 14;
+      var bar = x % 3 === 0;
+      var spike = y === 0 && x % 3 === 0;
+      if (!(rail || bar || spike)) return [0, 0, 0, 0];
+      return g1(200);
+    }),
+    // store stock: one tile = 2 m of shelving, 1.5 m tall, four shelves
+    products: pixTex(32, 16, function (x, y) {
+      if (y % 4 === 3) return [120, 118, 112];
+      var shelf = y >> 2, item = Math.floor((x + shelf * 3) / 3);
+      if ((x + shelf * 3) % 3 === 2 && hash2(item, shelf, 62) < 0.5) return [34, 34, 38];
+      if (hash2(item, shelf, 63) < 0.12) return [30, 32, 34];          // gap: already looted
+      var p = [[180, 58, 48], [214, 176, 72], [64, 104, 158], [226, 222, 208], [82, 136, 76],
+               [196, 120, 52], [150, 70, 120], [96, 176, 182]][Math.floor(hash2(item, shelf, 64) * 8)];
+      var s = y % 4 === 0 ? 1.15 : 1;
+      return [p[0] * s, p[1] * s, p[2] * s];
+    }),
+    stripe: pixTex(16, 4, function (x, y) { return ((x + y) >> 2) & 1 ? [214, 206, 196] : [196, 84, 40]; })
+  };
+
+  // ---- see-through: anything between the camera and the player dithers away
+  // in a small circle around the player instead of hiding them. Screen-space, so it
+  // works the same for a roof, a wall or a tree canopy.
+  var FADE = {
+    uFadePx: { value: new T.Vector2(-1e4, -1e4) },
+    uFadeR: { value: 120 },
+    uFadeDepth: { value: 0 }
+  };
+  function fadeable(m) {
+    m.onBeforeCompile = function (sh) {
+      sh.uniforms.uFadePx = FADE.uFadePx;
+      sh.uniforms.uFadeR = FADE.uFadeR;
+      sh.uniforms.uFadeDepth = FADE.uFadeDepth;
+      sh.vertexShader = 'varying float vFadeZ;\n' + sh.vertexShader.replace(
+        '#include <project_vertex>', '#include <project_vertex>\n  vFadeZ = -mvPosition.z;');
+      sh.fragmentShader =
+        'uniform vec2 uFadePx; uniform float uFadeR; uniform float uFadeDepth; varying float vFadeZ;\n' +
+        sh.fragmentShader.replace('void main() {', 'void main() {\n' +
+        '  vec2 fdv = gl_FragCoord.xy - uFadePx;\n' +
+        '  float fr = dot(fdv, fdv) / (uFadeR * uFadeR);\n' +
+        '  if (fr < 1.0 && vFadeZ < uFadeDepth - 0.8) {\n' +
+        '    vec2 cell = floor(gl_FragCoord.xy / 3.0);\n' +
+        '    if (fr < 0.45 || mod(cell.x + cell.y, 2.0) > 0.5) discard;\n' +
+        '  }');
+    };
+    return m;
+  }
+  function lam(tex, o) {
+    var p = { vertexColors: true };
+    if (tex) p.map = tex;
+    if (o) for (var k in o) p[k] = o[k];
+    return new T.MeshLambertMaterial(p);
+  }
+  var MAT = {
+    siding: fadeable(lam(TX.siding)), brick: fadeable(lam(TX.brick)), stone: fadeable(lam(TX.stone)),
+    plaster: fadeable(lam(TX.plaster)),
+    shingle: fadeable(lam(TX.shingle, { side: T.DoubleSide })),
+    gravel: fadeable(lam(TX.gravel)),
+    wood: lam(TX.wood), fabric: lam(TX.fabric), metal: lam(TX.metal), plain: lam(null),
+    woodF: fadeable(lam(TX.wood)), metalF: fadeable(lam(TX.metal)),
+    leaf: fadeable(lam(TX.leaf)), bark: fadeable(lam(TX.bark)), birch: fadeable(lam(TX.birch)),
+    picket: lam(TX.picket, { alphaTest: 0.5, side: T.DoubleSide }),
+    iron: lam(TX.iron, { alphaTest: 0.5, side: T.DoubleSide }),
+    products: lam(TX.products), stripe: lam(TX.stripe),
+    glass: fadeable(new T.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x5A6878 })),
+    lens: new T.MeshBasicMaterial({ vertexColors: true })
+  };
+
+  // ---- geometry bins: one per (material, chunk), or per roof
+  var CH = 32;
+  var CHX = Math.ceil((BX1 - BX0) / CH), CHZ = Math.ceil((BZ1 - BZ0) / CH);
+  var BINS = {};
+  function binFor(mat, x, z) {
+    var cx = clamp(Math.floor((x - BX0) / CH), 0, CHX - 1);
+    var cz = clamp(Math.floor((z - BZ0) / CH), 0, CHZ - 1);
+    var key = mat + '@' + cx + ',' + cz;
+    return BINS[key] || (BINS[key] = { mat: mat, p: [], n: [], u: [], c: [] });
+  }
+  var _col = new T.Color();
+  function pushTri(b, ax, ay, az, bx, by, bz, cx, cy, cz, ua, va, ub, vb, uc, vc, hex) {
+    var ex = bx - ax, ey = by - ay, ez = bz - az, fx = cx - ax, fy = cy - ay, fz = cz - az;
+    var nx = ey * fz - ez * fy, ny = ez * fx - ex * fz, nz = ex * fy - ey * fx;
+    var nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl; ny /= nl; nz /= nl;
+    _col.setHex(hex);
+    b.p.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    b.n.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+    b.u.push(ua, va, ub, vb, uc, vc);
+    b.c.push(_col.r, _col.g, _col.b, _col.r, _col.g, _col.b, _col.r, _col.g, _col.b);
+  }
+  // quad a-b-c-d counter-clockwise seen from the front; uv in metres
+  function quad(b, A, B, C, D, hex, uw, vh, u0, v0) {
+    u0 = u0 || 0; v0 = v0 || 0;
+    pushTri(b, A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2], u0, v0, u0 + uw, v0, u0 + uw, v0 + vh, hex);
+    pushTri(b, A[0], A[1], A[2], C[0], C[1], C[2], D[0], D[1], D[2], u0, v0, u0 + uw, v0 + vh, u0, v0 + vh, hex);
+  }
+  function triangle(b, A, B, C, hex, uvs) {
+    pushTri(b, A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2],
+      uvs[0], uvs[1], uvs[2], uvs[3], uvs[4], uvs[5], hex);
+  }
+
+  // Box centred at (cx, cz), from y0 to y1, sx by sz, rotated ry about Y.
+  // UVs are world metres (times uvs), so every texture keeps one texel density.
+  // o.noBottom skips the underside nobody can see.
+  function box(mat, cx, cz, sx, sz, y0, y1, hex, ry, o) {
+    o = o || {};
+    var b = o.bin || binFor(mat, cx, cz);
+    var c = Math.cos(ry || 0), s = Math.sin(ry || 0), hx = sx / 2, hz = sz / 2;
+    function P(lx, y, lz) { return [cx + lx * c + lz * s, y, cz - lx * s + lz * c]; }
+    var k = o.uvs || 1, sh = o.shade === undefined ? 1 : o.shade;
+    var hexTop = o.top !== undefined ? o.top : hex;
+    var h = y1 - y0, u0 = (o.uoff || 0);
+    var v0 = y0 * k;
+    // sides: +z, -z, +x, -x
+    quad(b, P(-hx, y0, hz), P(hx, y0, hz), P(hx, y1, hz), P(-hx, y1, hz), hex, sx * k, h * k, u0, v0);
+    quad(b, P(hx, y0, -hz), P(-hx, y0, -hz), P(-hx, y1, -hz), P(hx, y1, -hz), hex, sx * k, h * k, u0, v0);
+    quad(b, P(hx, y0, hz), P(hx, y0, -hz), P(hx, y1, -hz), P(hx, y1, hz), hex, sz * k, h * k, u0, v0);
+    quad(b, P(-hx, y0, -hz), P(-hx, y0, hz), P(-hx, y1, hz), P(-hx, y1, -hz), hex, sz * k, h * k, u0, v0);
+    quad(b, P(-hx, y1, hz), P(hx, y1, hz), P(hx, y1, -hz), P(-hx, y1, -hz), hexTop, sx * k, sz * k, u0, 0);
+    if (!o.noBottom) quad(b, P(-hx, y0, -hz), P(hx, y0, -hz), P(hx, y0, hz), P(-hx, y0, hz), hex, sx * k, sz * k);
+    void sh;
+  }
+  // axis-aligned box from world corners
+  function aabb(mat, x0, z0, x1, z1, y0, y1, hex, o) {
+    box(mat, (x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), Math.abs(z1 - z0), y0, y1, hex, 0, o);
+  }
+
+  // Append any three.js geometry through a matrix (used for round things).
+  var _m4 = new T.Matrix4(), _v3 = new T.Vector3(), _q = new T.Quaternion(), _e = new T.Euler();
+  var PROTO = {
+    cyl6: new T.CylinderGeometry(1, 1, 1, 6, 1).toNonIndexed(),
+    cyl8: new T.CylinderGeometry(1, 1, 1, 8, 1).toNonIndexed(),
+    cone7: new T.ConeGeometry(1, 1, 7, 1).toNonIndexed(),
+    ico0: new T.IcosahedronGeometry(1, 0),
+    ico1: new T.IcosahedronGeometry(1, 1),
+    box: new T.BoxGeometry(1, 1, 1).toNonIndexed()
+  };
+  function addGeo(mat, geo, x, y, z, sx, sy, sz, rx, ry, rz, hex, o) {
+    o = o || {};
+    var b = o.bin || binFor(mat, x, z);
+    _e.set(rx || 0, ry || 0, rz || 0, o.order || 'XYZ');
+    _q.setFromEuler(_e);
+    _m4.compose(_v3.set(x, y, z), _q, new T.Vector3(sx, sy, sz));
+    var pa = geo.attributes.position.array, ua = geo.attributes.uv.array;
+    var k = o.uvs || 1, jit = o.jitter || 0;
+    var tmp = [];
+    for (var i = 0; i < pa.length; i += 3) {
+      _v3.set(pa[i], pa[i + 1], pa[i + 2]).applyMatrix4(_m4);
+      tmp.push(_v3.x, _v3.y, _v3.z);
+    }
+    for (var t = 0; t < tmp.length; t += 9) {
+      var tint = hex;
+      if (jit) {
+        _col.setHex(hex);
+        var f = 1 + (hash2(t, (x * 10) | 0, 71) - 0.5) * jit;
+        _col.r = Math.min(1, _col.r * f); _col.g = Math.min(1, _col.g * f); _col.b = Math.min(1, _col.b * f);
+        tint = _col.getHex();
+      }
+      var q = (t / 9) * 6;
+      pushTri(b, tmp[t], tmp[t + 1], tmp[t + 2], tmp[t + 3], tmp[t + 4], tmp[t + 5],
+        tmp[t + 6], tmp[t + 7], tmp[t + 8],
+        ua[q] * sx * k, ua[q + 1] * sy * k, ua[q + 2] * sx * k, ua[q + 3] * sy * k,
+        ua[q + 4] * sx * k, ua[q + 5] * sy * k, tint);
+    }
+  }
+
+  function flushBins(list, target) {
+    var made = [];
+    Object.keys(list).forEach(function (key) {
+      var b = list[key];
+      if (!b.p.length) return;
+      var geo = new T.BufferGeometry();
+      geo.setAttribute('position', new T.Float32BufferAttribute(b.p, 3));
+      geo.setAttribute('normal', new T.Float32BufferAttribute(b.n, 3));
+      geo.setAttribute('uv', new T.Float32BufferAttribute(b.u, 2));
+      geo.setAttribute('color', new T.Float32BufferAttribute(b.c, 3));
+      geo.computeBoundingSphere();
+      var mesh = new T.Mesh(geo, MAT[b.mat]);
+      mesh.matrixAutoUpdate = false;
+      (target || scene).add(mesh);
+      made.push(mesh);
+    });
+    return made;
+  }
+
+  // ---- colliders. low: bodies bump into it, bullets fly over it.
+  function colRect(x0, z0, x1, z1, low) {
+    rects.push({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, w: Math.abs(x1 - x0), d: Math.abs(z1 - z0), low: !!low });
+  }
+  function colCircle(x, z, r, low) { props.push({ x: x, z: z, r: r, low: !!low }); }
+  /* ------------------------------------------------------------ buildings */
+  var KIND = {
+    //        wall height, thickness, outer material, roof
+    house:  { h: 2.8, t: 0.26, mat: 'siding', roof: 'gable', pitch: 0.5 },
+    cafe:   { h: 3.0, t: 0.26, mat: 'siding', roof: 'gable', pitch: 0.42 },
+    diner:  { h: 3.4, t: 0.3,  mat: 'brick',  roof: 'flat' },
+    store:  { h: 4.4, t: 0.34, mat: 'brick',  roof: 'flat' },
+    church: { h: 5.2, t: 0.6,  mat: 'stone',  roof: 'gable', pitch: 0.95 },
+    school: { h: 3.6, t: 0.32, mat: 'brick',  roof: 'gable', pitch: 0.45 }
+  };
+  // tone -> [outer wall, roof, trim, kitchen cabinets]
+  var TONES = [
+    [0xCFC6B2, 0x5A4A42, 0xE8E2D4, 0xD8D2C6], [0x9DB0BC, 0x46505A, 0xE4E6E4, 0x8C9C8E],
+    [0xB7C9B4, 0x4E4640, 0xEDEAE0, 0xDCD6C8], [0xC4A887, 0x5E3C34, 0xEAE2D2, 0x6E5B49],
+    [0xA9B39A, 0x3F4A40, 0xE6E2D6, 0xCFC8B8], [0xD5CEC0, 0x52565C, 0xF0ECE2, 0x8A7560],
+    [0xC9B79A, 0x3C3F44, 0xD8D0C0, 0xB8B0A4], [0xA36A52, 0x3A3D42, 0xCFC4B0, 0x9A9A96],
+    [0xB9B3A6, 0x3E4046, 0xD6D0C4, 0x6E5B49], [0x9E5B46, 0x4A4E54, 0xD8CFBF, 0x8A8A86]
+  ];
+
+  // Cut door gaps out of an axis-aligned segment. Returns pieces as
+  // [a, b, capA, capB]: cap = that end is a real corner, so the wall should be
+  // lengthened by half its thickness to close the corner.
+  function cutDoors(x0, y0, x1, y1, doors) {
+    var vert = x0 === x1, a = vert ? Math.min(y0, y1) : Math.min(x0, x1), b = vert ? Math.max(y0, y1) : Math.max(x0, x1);
+    var gaps = [];
+    doors.forEach(function (d) {
+      var on = vert ? Math.abs(d[0] - x0) <= 4 : Math.abs(d[1] - y0) <= 4;
+      var c = vert ? d[1] : d[0];
+      if (on && c > a - 1 && c < b + 1) gaps.push([c - d[2] / 2, c + d[2] / 2]);
+    });
+    gaps.sort(function (p, q) { return p[0] - q[0]; });
+    var out = [], cur = a, capCur = true;
+    gaps.forEach(function (g) {
+      if (g[0] > cur + 0.5) out.push([cur, g[0], capCur, false]);
+      cur = Math.max(cur, g[1]); capCur = false;
+    });
+    if (b > cur + 0.5) out.push([cur, b, capCur, true]);
+    return { vert: vert, fixed: vert ? x0 : y0, pieces: out, gaps: gaps };
+  }
+
+  function buildBuilding(BI) {
+    var B = BI.spec, K = KIND[B.kind], tone = TONES[B.tone % TONES.length];
+    var H = K.h, TH = B.wall || K.t, outer = K.mat;
+    var wallHex = B.kind === 'store' ? 0xA86E54 : B.kind === 'church' ? 0xB8B2A6 :
+                  B.kind === 'school' ? 0xA0604A : B.kind === 'diner' ? 0xD2C4A8 : tone[0];
+
+    function wallRun(seg, doors, mat, hex, th, exterior) {
+      var cd = cutDoors(seg[0], seg[1], seg[2], seg[3], doors);
+      cd.pieces.forEach(function (p) {
+        var lo = p[0], hi = p[1];
+        var ext = th / 2;
+        var A = (cd.vert ? wz(lo) : wx(lo)) - (p[2] ? ext : 0);
+        var Bn = (cd.vert ? wz(hi) : wx(hi)) + (p[3] ? ext : 0);
+        var f = cd.vert ? wx(cd.fixed) : wz(cd.fixed);
+        if (cd.vert) {
+          aabb(mat, f - th / 2, A, f + th / 2, Bn, 0, H, hex, { uoff: A });
+          colRect(f - th / 2, A, f + th / 2, Bn, false);
+        } else {
+          aabb(mat, A, f - th / 2, Bn, f + th / 2, 0, H, hex, { uoff: A });
+          colRect(A, f - th / 2, Bn, f + th / 2, false);
+        }
+        // windows on long exterior runs: glass set into the wall, with a sill
+        if (exterior && B.kind !== 'store') {
+          var len = Bn - A, n = Math.floor((len - 1.4) / 3.1);
+          for (var w = 0; w < n; w++) {
+            var c = A + (len - (n - 1) * 3.1) / 2 + w * 3.1;
+            var ww = B.kind === 'church' ? 0.9 : 1.15;
+            var wy0 = B.kind === 'church' ? 1.4 : 0.95, wy1 = B.kind === 'church' ? 4.1 : 2.05;
+            if (cd.vert) {
+              aabb('glass', f - th / 2 - 0.03, c - ww / 2, f + th / 2 + 0.03, c + ww / 2, wy0, wy1, 0x1C2630);
+              aabb(mat, f - th / 2 - 0.08, c - ww / 2 - 0.1, f + th / 2 + 0.08, c + ww / 2 + 0.1, wy0 - 0.1, wy0, tone[2]);
+            } else {
+              aabb('glass', c - ww / 2, f - th / 2 - 0.03, c + ww / 2, f + th / 2 + 0.03, wy0, wy1, 0x1C2630);
+              aabb(mat, c - ww / 2 - 0.1, f - th / 2 - 0.08, c + ww / 2 + 0.1, f + th / 2 + 0.08, wy0 - 0.1, wy0, tone[2]);
+            }
+          }
+        }
+      });
+      // lintels over the doorways
+      cd.gaps.forEach(function (g) {
+        var A = cd.vert ? wz(g[0]) : wx(g[0]), Bn = cd.vert ? wz(g[1]) : wx(g[1]);
+        var f = cd.vert ? wx(cd.fixed) : wz(cd.fixed), top = Math.min(H, 2.25);
+        if (H - top < 0.05) return;
+        if (cd.vert) aabb(mat, f - th / 2, A, f + th / 2, Bn, top, H, hex);
+        else aabb(mat, A, f - th / 2, Bn, f + th / 2, top, H, hex);
+      });
+    }
+
+    var O = B.outline;
+    for (var i = 0; i < O.length; i++) {
+      var a = O[i], b = O[(i + 1) % O.length];
+      wallRun([a[0], a[1], b[0], b[1]], B.doors, outer, wallHex, TH, true);
+    }
+    B.inner.forEach(function (s) { wallRun(s, B.doors, 'plaster', 0xE2DBCC, 0.13, false); });
+
+    buildRoof(BI, K, tone, H, TH);
+    B.f.forEach(function (f) { furniture(f, tone, B); });
+  }
+
+  /* ---- roofs: one mesh group per building so it can lift off when you walk in */
+  function buildRoof(BI, K, tone, H, TH) {
+    var B = BI.spec, bins = {};
+    function rb(mat) { return bins[mat] || (bins[mat] = { mat: mat, p: [], n: [], u: [], c: [] }); }
+    var roofHex = B.kind === 'store' || B.kind === 'diner' || B.flat ? 0x6E6C68 : tone[1];
+    var gable = K.roof === 'gable' && !B.flat;
+    var wallHex = B.kind === 'church' ? 0xB8B2A6 : B.kind === 'school' ? 0xA0604A : tone[0];
+
+    BI.parts.forEach(function (r) {
+      var x0 = r[0], z0 = r[1], x1 = r[2], z1 = r[3];
+      if (!gable) {
+        aabb('gravel', x0 - TH / 2, z0 - TH / 2, x1 + TH / 2, z1 + TH / 2, H, H + 0.16, roofHex, { bin: rb('gravel'), noBottom: true });
+        return;
+      }
+      var alongX = B.ridge ? B.ridge === 'EW' : (x1 - x0) >= (z1 - z0);
+      var o = 0.45;
+      var X0 = x0 - o, X1 = x1 + o, Z0 = z0 - o, Z1 = z1 + o;
+      var half = alongX ? (z1 - z0) / 2 : (x1 - x0) / 2;
+      var rise = Math.min(K.pitch * half, 3.6);
+      var top = H + rise, eave = H - o * K.pitch;
+      var bS = rb('shingle'), bW = rb(K.mat === 'brick' ? 'brick' : K.mat === 'stone' ? 'stone' : 'siding');
+      var slope = Math.hypot(half + o, rise + o * K.pitch);
+      if (alongX) {
+        var zm = (z0 + z1) / 2;
+        quad(bS, [X0, eave, Z1], [X1, eave, Z1], [X1, top, zm], [X0, top, zm], roofHex, X1 - X0, slope);
+        quad(bS, [X1, eave, Z0], [X0, eave, Z0], [X0, top, zm], [X1, top, zm], roofHex, X1 - X0, slope);
+        // gable ends, flush with the walls
+        triangle(bW, [x0, H, z0], [x0, H, z1], [x0, top, zm], wallHex, [0, H, z1 - z0, H, half, top]);
+        triangle(bW, [x1, H, z1], [x1, H, z0], [x1, top, zm], wallHex, [0, H, z1 - z0, H, half, top]);
+        // fascia and ridge cap
+        aabb('woodF', X0, Z1 - 0.06, X1, Z1 + 0.06, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
+        aabb('woodF', X0, Z0 - 0.06, X1, Z0 + 0.06, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
+        aabb('woodF', X0, zm - 0.12, X1, zm + 0.12, top - 0.04, top + 0.1, 0x3A3430, { bin: rb('woodF') });
+      } else {
+        var xm = (x0 + x1) / 2;
+        quad(bS, [X1, eave, Z1], [X1, eave, Z0], [xm, top, Z0], [xm, top, Z1], roofHex, Z1 - Z0, slope);
+        quad(bS, [X0, eave, Z0], [X0, eave, Z1], [xm, top, Z1], [xm, top, Z0], roofHex, Z1 - Z0, slope);
+        triangle(bW, [x1, H, z0], [x0, H, z0], [xm, top, z0], wallHex, [0, H, x1 - x0, H, half, top]);
+        triangle(bW, [x0, H, z1], [x1, H, z1], [xm, top, z1], wallHex, [0, H, x1 - x0, H, half, top]);
+        aabb('woodF', X1 - 0.06, Z0, X1 + 0.06, Z1, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
+        aabb('woodF', X0 - 0.06, Z0, X0 + 0.06, Z1, eave - 0.18, eave, tone[2], { bin: rb('woodF') });
+        aabb('woodF', xm - 0.12, Z0, xm + 0.12, Z1, top - 0.04, top + 0.1, 0x3A3430, { bin: rb('woodF') });
+      }
+      BI.roofTop = Math.max(BI.roofTop || 0, top);
+      BI.ridgeAlongX = alongX;
+    });
+
+    // flat roofs get a parapet along the real outline
+    if (!gable) {
+      var Ol = B.outline;
+      for (var i = 0; i < Ol.length; i++) {
+        var a = Ol[i], b = Ol[(i + 1) % Ol.length];
+        var ax = wx(a[0]), az = wz(a[1]), bx = wx(b[0]), bz = wz(b[1]);
+        aabb(KIND[B.kind].mat === 'stone' ? 'stone' : 'brick',
+          Math.min(ax, bx) - TH / 2, Math.min(az, bz) - TH / 2, Math.max(ax, bx) + TH / 2, Math.max(az, bz) + TH / 2,
+          H, H + 0.55, B.kind === 'store' ? 0x8E5A46 : 0xB8AA92, { bin: rb('brick') });
+      }
+    }
+    BI.roofs = flushBins(bins);
+  }
+
+  /* ------------------------------------------------------------ furniture
+     Everything sits inside the rectangle the blueprint draws for it, sized to
+     a real object where the drawing is generous, and anchored against the
+     side it backs onto.                                                      */
+  var OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
+  var FWD = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+  // Local frame for a rect: u runs from the back edge toward the front, s
+  // across it. back is the side the object is pushed up against.
+  function furnFrame(x0, z0, x1, z1, back) {
+    var f = FWD[OPP[back]];
+    var Lf = f[0] ? x1 - x0 : z1 - z0, Ls = f[0] ? z1 - z0 : x1 - x0;
+    var bx = f[0] > 0 ? x0 : f[0] < 0 ? x1 : (x0 + x1) / 2;
+    var bz = f[1] > 0 ? z0 : f[1] < 0 ? z1 : (z0 + z1) / 2;
+    return {
+      Lf: Lf, Ls: Ls,
+      // world AABB for local u0..u1 (from back), s0..s1 (from centre)
+      box: function (mat, u0, u1, s0, s1, y0, y1, hex, o) {
+        var ax, az, cx, cz;
+        if (f[0]) { ax = bx + f[0] * u0; cx = bx + f[0] * u1; az = bz + (z0 + z1) / 2 - bz + s0; cz = (z0 + z1) / 2 + s1; }
+        else { az = bz + f[1] * u0; cz = bz + f[1] * u1; ax = (x0 + x1) / 2 + s0; cx = (x0 + x1) / 2 + s1; }
+        aabb(mat, Math.min(ax, cx), Math.min(az, cz), Math.max(ax, cx), Math.max(az, cz), y0, y1, hex, o);
+      },
+      point: function (u, s) {
+        return f[0] ? [bx + f[0] * u, (z0 + z1) / 2 + s] : [(x0 + x1) / 2 + s, bz + f[1] * u];
+      }
+    };
+  }
+  var WOODS = [0x7A5536, 0x8A6440, 0x5E432C, 0x6E4E34];
+  var SOFAS = [0x6D6A5E, 0x4F5F6B, 0x7A4E44, 0x5E6B4E, 0x8A7A62];
+  var BLANKETS = [0x5B6F8C, 0x8A5A4A, 0x6E7B5A, 0xA89A7A, 0x7A6488];
+  var LOW = { bed: 1, sofa: 1, armchair: 1, table: 1, dtable: 1, desk: 1, counter: 1, island: 1, bar: 1,
+              stove: 1, sink: 1, vanity: 1, tub: 1, shower: 1, pew: 1, altar: 1, checkout: 1, dresser: 1,
+              tv: 1, toilet: 1, nightstand: 1 };
+
+  function furniture(f, tone, B) {
+    var type = f[0];
+    var x0 = wx(f[1]), z0 = wz(f[2]), x1 = wx(f[3]), z1 = wz(f[4]), facing = f[5];
+    var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+    var seed = hash2(f[1], f[2], 90);
+    var wood = WOODS[Math.floor(seed * WOODS.length)];
+    var long = w >= d;
+    // Default "back": beds by their head, seats and toilets opposite where
+    // they face, everything else against its longer wall-side.
+    var back = facing ? (type === 'bed' || type === 'stairs' ? facing : OPP[facing]) : (long ? 'N' : 'W');
+    if (type === 'stairs') back = OPP[facing];
+    var F = furnFrame(x0, z0, x1, z1, back);
+    var colFn = function (low) { colRect(x0, z0, x1, z1, low); };
+
+    switch (type) {
+      case 'bed': {
+        var L = Math.min(F.Lf, 2.1), S = Math.min(F.Ls, F.Ls > 1.5 ? 1.7 : 1.05), sh = S / 2;
+        var blanket = BLANKETS[Math.floor(seed * BLANKETS.length)];
+        F.box('wood', 0, L, -sh, sh, 0, 0.36, wood);
+        F.box('fabric', 0.06, L - 0.04, -sh + 0.04, sh - 0.04, 0.36, 0.56, 0xDCD7CC);
+        F.box('fabric', L * 0.36, L + 0.02, -sh - 0.02, sh + 0.02, 0.3, 0.6, blanket);
+        if (S > 1.3) {
+          F.box('fabric', 0.14, 0.52, -sh + 0.1, -0.04, 0.56, 0.7, 0xEEEAE0);
+          F.box('fabric', 0.14, 0.52, 0.04, sh - 0.1, 0.56, 0.7, 0xEEEAE0);
+        } else F.box('fabric', 0.14, 0.5, -sh + 0.12, sh - 0.12, 0.56, 0.7, 0xEEEAE0);
+        F.box('wood', 0, 0.08, -sh - 0.03, sh + 0.03, 0, 1.05, wood);
+        var bp0 = F.point(0, -sh), bp1 = F.point(L, sh);
+        colRect(Math.min(bp0[0], bp1[0]), Math.min(bp0[1], bp1[1]), Math.max(bp0[0], bp1[0]), Math.max(bp0[1], bp1[1]), true);
+        return;
+      }
+      case 'sofa': case 'armchair': {
+        var D2 = Math.min(F.Lf, 0.95), W2 = Math.min(F.Ls, type === 'sofa' ? 2.4 : 0.95), hw = W2 / 2;
+        var cloth = SOFAS[Math.floor(seed * SOFAS.length)];
+        F.box('fabric', 0, D2, -hw, hw, 0.08, 0.44, cloth);
+        F.box('fabric', 0, 0.24, -hw, hw, 0.44, 0.92, cloth);
+        F.box('fabric', 0, D2, -hw, -hw + 0.18, 0.44, 0.66, cloth);
+        F.box('fabric', 0, D2, hw - 0.18, hw, 0.44, 0.66, cloth);
+        var seats = type === 'sofa' ? 3 : 1, sw = (W2 - 0.36) / seats;
+        for (var si = 0; si < seats; si++) {
+          F.box('fabric', 0.24, D2 - 0.02, -hw + 0.18 + si * sw + 0.02, -hw + 0.18 + (si + 1) * sw - 0.02, 0.44, 0.52, cloth + 0x0A0A0A);
+        }
+        var sp0 = F.point(0, -hw), sp1 = F.point(D2, hw);
+        colRect(Math.min(sp0[0], sp1[0]), Math.min(sp0[1], sp1[1]), Math.max(sp0[0], sp1[0]), Math.max(sp0[1], sp1[1]), true);
+        return;
+      }
+      case 'chair': {
+        var cw2 = Math.min(0.46, F.Ls) / 2, cd2 = Math.min(0.46, F.Lf);
+        F.box('wood', 0.02, cd2, -cw2, cw2, 0.42, 0.47, wood);
+        F.box('wood', 0, 0.05, -cw2, cw2, 0.47, 0.95, wood);
+        [[0.03, -cw2 + 0.02], [0.03, cw2 - 0.06], [cd2 - 0.05, -cw2 + 0.02], [cd2 - 0.05, cw2 - 0.06]].forEach(function (l) {
+          F.box('wood', l[0], l[0] + 0.04, l[1], l[1] + 0.04, 0, 0.42, wood);
+        });
+        colCircle(cx, cz, 0.24, true);
+        return;
+      }
+      case 'stool':
+        addGeo('metal', PROTO.cyl8, cx, 0.35, cz, 0.05, 0.7, 0.05, 0, 0, 0, 0x6A6E72);
+        addGeo('fabric', PROTO.cyl8, cx, 0.72, cz, 0.2, 0.07, 0.2, 0, 0, 0, 0x8A3A34);
+        return;
+      case 'table': case 'dtable': case 'desk': {
+        var th = type === 'table' ? 0.44 : 0.76;
+        var tw = Math.min(w, type === 'table' ? 1.2 : 2.0), td = Math.min(d, type === 'table' ? 0.7 : 1.1);
+        if (type === 'table' && d > w) { tw = Math.min(w, 0.7); td = Math.min(d, 1.2); }
+        aabb('wood', cx - tw / 2, cz - td / 2, cx + tw / 2, cz + td / 2, th - 0.05, th, wood);
+        if (type === 'desk') {
+          aabb('wood', cx - tw / 2, cz - td / 2, cx - tw / 2 + 0.05, cz + td / 2, 0, th - 0.05, wood);
+          aabb('wood', cx + tw / 2 - 0.05, cz - td / 2, cx + tw / 2, cz + td / 2, 0, th - 0.05, wood);
+        } else {
+          [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (s) {
+            aabb('wood', cx + s[0] * (tw / 2 - 0.08) - 0.03, cz + s[1] * (td / 2 - 0.08) - 0.03,
+                 cx + s[0] * (tw / 2 - 0.08) + 0.03, cz + s[1] * (td / 2 - 0.08) + 0.03, 0, th - 0.05, wood);
+          });
+        }
+        colRect(cx - tw / 2, cz - td / 2, cx + tw / 2, cz + td / 2, true);
+        return;
+      }
+      case 'counter': case 'island': case 'bar': case 'stove': case 'sink': case 'vanity': case 'checkout': {
+        var ch = type === 'bar' ? 1.02 : type === 'vanity' ? 0.82 : type === 'checkout' ? 0.92 : 0.88;
+        var cab = type === 'checkout' ? 0x7C8288 : type === 'bar' ? 0x5E432C : tone[3];
+        var topHex = type === 'bar' ? 0x3E2C1E : type === 'checkout' ? 0x2A2D30 : type === 'vanity' ? 0xE8E6E0 : 0x8E8A84;
+        aabb('wood', x0 + 0.03, z0 + 0.03, x1 - 0.03, z1 - 0.03, 0, ch - 0.05, cab, { noBottom: true });
+        aabb('plain', x0, z0, x1, z1, ch - 0.05, ch, topHex, { noBottom: true });
+        if (type === 'stove') {
+          var bw = Math.min(w, 0.8) / 2, bd = Math.min(d, 0.6) / 2;
+          aabb('plain', cx - bw, cz - bd, cx + bw, cz + bd, ch, ch + 0.02, 0x1E2022);
+          [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]].forEach(function (s) {
+            aabb('metal', cx + s[0] * bw - 0.09, cz + s[1] * bd - 0.09, cx + s[0] * bw + 0.09, cz + s[1] * bd + 0.09, ch + 0.02, ch + 0.035, 0x45484C);
+          });
+        }
+        if (type === 'sink' || type === 'vanity') {
+          var sw2 = Math.min(w, 0.6) / 2, sd2 = Math.min(d, 0.45) / 2;
+          aabb('metal', cx - sw2, cz - sd2, cx + sw2, cz + sd2, ch - 0.01, ch + 0.005, type === 'vanity' ? 0xF4F2EC : 0xA8ACB0);
+        }
+        if (type === 'checkout') {
+          var rp = long ? [x0 + 0.3, cz] : [cx, z0 + 0.3];
+          aabb('plain', rp[0] - 0.22, rp[1] - 0.18, rp[0] + 0.22, rp[1] + 0.18, ch, ch + 0.26, 0x2E3236);
+        }
+        colRect(x0, z0, x1, z1, true);
+        return;
+      }
+      case 'fridge':
+        aabb('metal', x0 + 0.04, z0 + 0.04, x1 - 0.04, z1 - 0.04, 0, 1.82, 0xD8D8D2);
+        aabb('metal', x0 + 0.02, z0 + 0.02, x1 - 0.02, z1 - 0.02, 1.18, 1.21, 0x9A9C9E);
+        colRect(x0, z0, x1, z1, false);
+        return;
+      case 'toilet': {
+        var tb = Math.min(F.Lf, 0.72);
+        F.box('plain', 0, 0.2, -0.22, 0.22, 0.35, 0.82, 0xECEBE6);
+        F.box('plain', 0.16, tb, -0.19, 0.19, 0, 0.42, 0xF2F1EC);
+        F.box('plain', 0.2, tb - 0.04, -0.15, 0.15, 0.42, 0.44, 0xD8DCDE);
+        colCircle(cx, cz, 0.32, true);
+        return;
+      }
+      case 'tub': {
+        var tl = Math.min(long ? w : d, 1.75), ts = Math.min(long ? d : w, 0.8);
+        var tx0 = long ? x0 : cx - ts / 2, tz0 = long ? cz - ts / 2 : z0;
+        var tx1 = long ? x0 + tl : cx + ts / 2, tz1 = long ? cz + ts / 2 : z0 + tl;
+        aabb('plain', tx0, tz0, tx1, tz1, 0, 0.56, 0xEEEDE8);
+        aabb('plain', tx0 + 0.08, tz0 + 0.08, tx1 - 0.08, tz1 - 0.08, 0.56, 0.565, 0x6E8A96);
+        colRect(tx0, tz0, tx1, tz1, true);
+        return;
+      }
+      case 'shower':
+        aabb('plain', x0, z0, x1, z1, 0, 0.08, 0xE6E6E2);
+        aabb('metal', x1 - 0.04, z0, x1, z1, 0.08, 2.0, 0xB8C4C8);
+        aabb('metal', x0, z1 - 0.04, x1, z1, 0.08, 2.0, 0xB8C4C8);
+        colRect(x0, z0, x1, z1, true);
+        return;
+      case 'dresser': case 'nightstand': case 'wardrobe': case 'cabinet': {
+        var hh = type === 'dresser' ? 0.9 : type === 'nightstand' ? 0.56 : type === 'wardrobe' ? 2.0 : 1.1;
+        aabb('wood', x0, z0, x1, z1, 0, hh, wood);
+        for (var dr = 1; dr < (type === 'wardrobe' ? 1 : 3); dr++) {
+          aabb('wood', x0 - 0.01, z0 - 0.01, x1 + 0.01, z1 + 0.01, hh * dr / 3 - 0.012, hh * dr / 3 + 0.012, 0x3A2A1C);
+        }
+        if (type === 'wardrobe') aabb('wood', cx - 0.01, z0 - 0.01, cx + 0.01, z1 + 0.01, 0.05, hh - 0.05, 0x3A2A1C);
+        if (type !== 'nightstand') colRect(x0, z0, x1, z1, hh < 1.5);
+        return;
+      }
+      case 'tv': {
+        aabb('wood', x0, z0, x1, z1, 0, 0.5, wood);
+        var sx = long ? Math.min(w * 0.8, 1.3) : 0.06, sz = long ? 0.06 : Math.min(d * 0.8, 1.3);
+        aabb('plain', cx - sx / 2, cz - sz / 2, cx + sx / 2, cz + sz / 2, 0.52, 1.24, 0x0E1012);
+        colRect(x0, z0, x1, z1, true);
+        return;
+      }
+      case 'stairs': {
+        // climbing toward `facing`; the top runs into the attic hatch
+        var nSt = Math.max(3, Math.floor(F.Lf / 0.28));
+        for (var st = 0; st < nSt; st++) {
+          F.box('wood', st * F.Lf / nSt, F.Lf, -F.Ls / 2, F.Ls / 2, st * 0.2, (st + 1) * 0.2, st % 2 ? wood : wood + 0x080808, { noBottom: true });
+        }
+        colRect(x0, z0, x1, z1, false);
+        return;
+      }
+      case 'shelf': case 'wallshelf': {
+        var sh2 = type === 'wallshelf' ? 2.0 : 1.7;
+        aabb('metal', x0, z0, x1, z1, 0, 0.12, 0x54585C);
+        aabb('products', x0 + 0.02, z0 + 0.02, x1 - 0.02, z1 - 0.02, 0.12, sh2 - 0.06, 0xFFFFFF, { uvs: 0.5 });
+        aabb('metal', x0, z0, x1, z1, sh2 - 0.06, sh2, 0x8A8E92);
+        colRect(x0, z0, x1, z1, false);
+        return;
+      }
+      case 'pew': {
+        // pews face the altar, to the north
+        aabb('wood', x0, z0 + 0.1, x1, z1, 0.42, 0.48, 0x5E3F28);
+        aabb('wood', x0, z1 - 0.07, x1, z1, 0.48, 0.98, 0x5E3F28);
+        aabb('wood', x0, z0, x0 + 0.07, z1, 0, 1.0, 0x4E3420);
+        aabb('wood', x1 - 0.07, z0, x1, z1, 0, 1.0, 0x4E3420);
+        colRect(x0, z0, x1, z1, true);
+        return;
+      }
+      case 'altar':
+        aabb('wood', x0 + 0.1, z0 + 0.1, x1 - 0.1, z1 - 0.1, 0.3, 1.25, 0x5A3C26);
+        aabb('fabric', x0, z0, x1, z1, 1.25, 1.29, 0xECE8DC);
+        aabb('fabric', x0 + 0.6, z1 - 0.02, x1 - 0.6, z1 + 0.01, 0.6, 1.25, 0x7A2A2A);
+        colRect(x0, z0, x1, z1, true);
+        return;
+      case 'lectern':
+        aabb('wood', cx - 0.2, cz - 0.18, cx + 0.2, cz + 0.18, 0.3, 1.35, 0x5A3C26);
+        addGeo('wood', PROTO.cyl6, cx, 1.4, cz, 0.3, 0.08, 0.26, -0.35, 0, 0, 0x6A4A30);
+        colCircle(cx, cz, 0.3, true);
+        return;
+    }
+  }
+
+  /* ---- slabs and canopies */
+  function buildSlabs() {
+    OAK.slabs.forEach(function (s) {
+      aabb('plain', wx(s[0]), wz(s[1]), wx(s[2]), wz(s[3]), 0, s[4] > 0.5 ? 0.3 : s[4],
+        s[4] > 0.5 ? 0x7A7874 : 0x6A4A34, { noBottom: true });
+    });
+    OAK.canopies.forEach(function (c, i) {
+      var x0 = wx(c[0]), z0 = wz(c[1]), x1 = wx(c[2]), z1 = wz(c[3]);
+      var hgt = i === 2 ? 0.22 : i === 0 ? 3.4 : 3.1;
+      if (i === 2) { aabb('plain', x0, z0, x1, z1, 0, hgt, 0x8E8A84, { noBottom: true }); return; }
+      aabb('metalF', x0, z0, x1, z1, hgt, hgt + 0.18, 0x4A5A62);
+      // posts on the side away from the wall it hangs off
+      var posts = i === 0 ? [[x0 + 0.12, z0 + 0.12], [x1 - 0.12, z0 + 0.12]]
+                          : [[x0 + 0.12, z0 + 0.12], [x0 + 0.12, z1 - 0.12]];
+      posts.forEach(function (p) {
+        aabb('metalF', p[0] - 0.07, p[1] - 0.07, p[0] + 0.07, p[1] + 0.07, 0, hgt, 0x3A4046);
+        colCircle(p[0], p[1], 0.14, false);
+      });
+    });
+    // rooftop units on the park school, sitting on its east slope
+    var ps = BUILDINGS.filter(function (b) { return b.spec.id === 'schoolPark'; })[0];
+    OAK.roofVents.forEach(function (v) {
+      var x0 = wx(v[0]), z0 = wz(v[1]), x1 = wx(v[2]), z1 = wz(v[3]);
+      var main = ps.parts.reduce(function (m, p) { return (p[2] - p[0]) * (p[3] - p[1]) > (m[2] - m[0]) * (m[3] - m[1]) ? p : m; });
+      var half = (main[2] - main[0]) / 2, ridge = (main[0] + main[2]) / 2;
+      var y = KIND.school.h + KIND.school.pitch * (half - Math.abs((x0 + x1) / 2 - ridge));
+      var b = ps.vents || (ps.vents = { mat: 'metal', p: [], n: [], u: [], c: [] });
+      aabb('metal', x0, z0, x1, z1, y - 0.2, y + 0.55, 0x8A9094, { bin: b });
+    });
+    if (ps.vents) ps.roofs = ps.roofs.concat(flushBins({ v: ps.vents }));
+  }
+  /* ---------------------------------------------------------------- trees
+     Five species, sized from the canopy the blueprint draws. The forest strip
+     down the west edge is mostly conifers; yards and the park get broadleaf. */
+  var TREE_KINDS = {
+    oak: function (x, z, R, s) {
+      var th = 1.9 + 0.45 * R, tr = 0.14 + 0.07 * R;
+      addGeo('bark', PROTO.cyl6, x, th / 2, z, tr, th, tr, 0, s * 6, 0, 0x5A4634, { uvs: 2 });
+      addGeo('leaf', PROTO.ico1, x, th + 0.75 * R, z, 0.82 * R, 0.68 * R, 0.82 * R, 0, s * 3, 0, 0x3E5A2E, { jitter: 0.22, uvs: 1.5 });
+      for (var k = 0; k < 4; k++) {
+        var a = s * 9 + k * TAU / 4, dd = 0.52 * R;
+        addGeo('leaf', PROTO.ico0, x + Math.cos(a) * dd, th + 0.45 * R + (k & 1) * 0.2 * R, z + Math.sin(a) * dd,
+          0.56 * R, 0.48 * R, 0.56 * R, 0, a, 0, 0x466532, { jitter: 0.25, uvs: 1.5 });
+      }
+      return tr;
+    },
+    maple: function (x, z, R, s) {
+      var th = 2.3 + 0.4 * R, tr = 0.12 + 0.06 * R;
+      addGeo('bark', PROTO.cyl6, x, th / 2, z, tr, th, tr, 0, s * 6, 0, 0x5E4A38, { uvs: 2 });
+      addGeo('leaf', PROTO.ico1, x, th + 0.8 * R, z, 0.95 * R, 0.85 * R, 0.95 * R, 0, s * 3, 0, 0x55692C, { jitter: 0.2, uvs: 1.5 });
+      addGeo('leaf', PROTO.ico0, x + 0.2 * R, th + 1.45 * R, z - 0.1 * R, 0.5 * R, 0.42 * R, 0.5 * R, 0, s, 0, 0x5E7432, { jitter: 0.2, uvs: 1.5 });
+      return tr;
+    },
+    pine: function (x, z, R, s) {
+      var trunk = 1.0 + 0.2 * R, tr = 0.1 + 0.05 * R;
+      addGeo('bark', PROTO.cyl6, x, trunk / 2 + 0.3, z, tr, trunk + 0.6, tr, 0, s * 6, 0, 0x4E3A2A, { uvs: 2 });
+      for (var k = 0; k < 4; k++) {
+        var rr = R * (1.0 - k * 0.2), hh = 1.25 * R + 0.6;
+        addGeo('leaf', PROTO.cone7, x, trunk + k * 0.62 * R + hh / 2, z, rr, hh, rr, 0, s * 5 + k, 0, 0x2A4A34, { jitter: 0.18, uvs: 1.5 });
+      }
+      return tr;
+    },
+    spruce: function (x, z, R, s) {
+      var trunk = 0.8, tr = 0.09 + 0.04 * R, rr0 = 0.72 * R;
+      addGeo('bark', PROTO.cyl6, x, 0.6, z, tr, 1.2, tr, 0, 0, 0, 0x4A3828, { uvs: 2 });
+      for (var k = 0; k < 5; k++) {
+        var rr = rr0 * (1.0 - k * 0.17), hh = 1.1 * R + 0.8;
+        addGeo('leaf', PROTO.cone7, x, trunk + k * 0.72 * R + hh / 2, z, rr, hh, rr, 0, s * 7 + k, 0, 0x24402E, { jitter: 0.16, uvs: 1.5 });
+      }
+      return tr;
+    },
+    birch: function (x, z, R, s) {
+      var th = 2.0 + 0.45 * R, tr = 0.1 + 0.03 * R;
+      addGeo('birch', PROTO.cyl6, x, (th + 0.5 * R) / 2, z, tr, th + 0.5 * R, tr, 0, 0, 0, 0xE0DCD2, { uvs: 3 });
+      for (var k = 0; k < 3; k++) {
+        var a = s * 11 + k * 2.1;
+        addGeo('leaf', PROTO.ico1, x + Math.cos(a) * 0.3 * R, th + 0.45 * R + k * 0.5 * R, z + Math.sin(a) * 0.3 * R,
+          0.72 * R, 0.8 * R, 0.72 * R, 0, a, 0, 0x6E8A3A, { jitter: 0.2, uvs: 1.5 });
+      }
+      return tr;
+    }
+  };
+  function buildTrees() {
+    var forest = ['pine', 'spruce', 'pine', 'oak', 'spruce', 'maple'];
+    var yard = ['oak', 'maple', 'birch', 'oak', 'maple'];
+    OAK.trees.forEach(function (t, i) {
+      var s = hash2(t[0], t[1], 100);
+      var inForest = t[0] < 175 || (t[1] > 960 && t[0] < 520);
+      var list = inForest ? forest : yard;
+      var kind = list[Math.floor(s * list.length)];
+      var R = Math.max(1.0, t[2] / 10);
+      var tr = TREE_KINDS[kind](wx(t[0]), wz(t[1]), R, s);
+      colCircle(wx(t[0]), wz(t[1]), tr + 0.14, false);
+      void i;
+    });
+    OAK.bushes.forEach(function (b) {
+      var x = wx(b[0]), z = wz(b[1]), R = b[2] / 10;
+      for (var k = 0; k < 4; k++) {
+        var a = k * 1.7 + b[0];
+        addGeo('leaf', PROTO.ico0, x + Math.cos(a) * 0.35 * R, 0.45 * R, z + Math.sin(a) * 0.35 * R,
+          0.62 * R, 0.5 * R, 0.62 * R, 0, a, 0, 0x34502C, { jitter: 0.25, uvs: 2 });
+      }
+      colCircle(x, z, 0.8 * R, true);
+    });
+  }
+
+  /* --------------------------------------------------------------- fences */
+  function buildFences() {
+    OAK.fences.forEach(function (f) {
+      var x0 = wx(f[0]), z0 = wz(f[1]), x1 = wx(f[2]), z1 = wz(f[3]);
+      var iron = f[0] >= 1590;             // the church and park lots
+      var len = Math.hypot(x1 - x0, z1 - z0), vert = x0 === x1;
+      var hgt = iron ? 1.3 : 1.05, post = iron ? 0x24272B : 0xB8B0A0;
+      var n = Math.max(1, Math.round(len / 2.4));
+      for (var k = 0; k < n; k++) {
+        var a = k / n, b = (k + 1) / n;
+        var ax = x0 + (x1 - x0) * a, az = z0 + (z1 - z0) * a, bx = x0 + (x1 - x0) * b, bz = z0 + (z1 - z0) * b;
+        var bin = binFor(iron ? 'iron' : 'picket', ax, az);
+        var L = Math.hypot(bx - ax, bz - az);
+        if (vert) quad(bin, [ax, 0, az], [bx, 0, bz], [bx, hgt, bz], [ax, hgt, az], iron ? 0x2E3136 : 0xC8C0B0, L, 1);
+        else quad(bin, [ax, 0, az], [bx, 0, bz], [bx, hgt, bz], [ax, hgt, az], iron ? 0x2E3136 : 0xC8C0B0, L, 1);
+        aabb(iron ? 'metal' : 'wood', ax - 0.06, az - 0.06, ax + 0.06, az + 0.06, 0, hgt + 0.08, post);
+      }
+      aabb(iron ? 'metal' : 'wood', x1 - 0.06, z1 - 0.06, x1 + 0.06, z1 + 0.06, 0, hgt + 0.08, post);
+      colRect(Math.min(x0, x1) - 0.1, Math.min(z0, z1) - 0.1, Math.max(x0, x1) + 0.1, Math.max(z0, z1) + 0.1, true);
+    });
+  }
+
+  /* ------------------------------------------------------------------ cars
+     Built along local +X (nose), then turned to the blueprint's heading.     */
+  var PAINT = [0x8A2F2A, 0x2F4E78, 0xC9C6BC, 0x8E9398, 0x3E5A44, 0x6A5A3A, 0x1E2226, 0x7A6A9A];
+  function buildCar(kind, px, py, deg) {
+    var x = wx(px), z = wz(py), ry = -deg * PI / 180;
+    var c = Math.cos(ry), s = Math.sin(ry);
+    var seed = hash2(px, py, 120);
+    var paint = PAINT[Math.floor(seed * PAINT.length)];
+    var wreck = kind === 'wreck' || kind === 'pickupWreck';
+    if (wreck) paint = kind === 'wreck' ? 0x3A2E26 : 0x5A4632;
+    function P(lx, lz) { return [x + lx * c + lz * s, z - lx * s + lz * c]; }
+    function part(mat, lx, lz, sx, sz, y0, y1, hex) {
+      var p = P(lx, lz);
+      box(mat, p[0], p[1], sx, sz, y0, y1, hex, ry);
+    }
+    function wheel(lx, lz, r) {
+      var p = P(lx, lz);
+      addGeo('plain', PROTO.cyl8, p[0], r, p[1], r, 0.26, r, PI / 2, ry, 0, 0x16181A, { order: 'YXZ' });
+    }
+    var L, W;
+    if (kind === 'moto') {
+      // on its side in the road
+      part('metal', 0, 0, 1.3, 0.28, 0.1, 0.34, 0x6A2A26);
+      part('plain', 0.1, 0.05, 0.5, 0.35, 0.1, 0.3, 0x1A1C1E);
+      [[-0.75, 0], [0.75, 0]].forEach(function (w) {
+        var p = P(w[0], w[1]);
+        addGeo('plain', PROTO.cyl8, p[0], 0.1, p[1], 0.34, 0.12, 0.34, 0, 0, 0, 0x16181A);
+      });
+      colCircle(x, z, 0.8, true);
+      return;
+    }
+    if (kind === 'boxtruck') {
+      L = 8.6; W = 2.4;
+      part('metal', 2.9, 0, 2.2, 2.3, 0.55, 1.9, 0xD8D4CA);                // cab
+      part('glass', 3.55, 0, 0.9, 2.1, 1.35, 2.35, 0x1C2630);
+      part('metal', 3.0, 0, 1.9, 2.3, 1.9, 2.5, 0xD8D4CA);
+      part('metal', -1.1, 0, 5.9, 2.44, 0.8, 3.4, 0xB8B4AC);               // box
+      part('metal', -1.1, 1.23, 5.6, 0.02, 1.4, 2.6, 0x9A4A32);             // livery stripe
+      part('metal', -1.1, -1.23, 5.6, 0.02, 1.4, 2.6, 0x9A4A32);
+      part('plain', 0, 0, 8.4, 1.4, 0.35, 0.8, 0x26282A);                   // chassis
+      [[3.0, 1.05], [3.0, -1.05], [-2.4, 1.05], [-2.4, -1.05], [-3.4, 1.05], [-3.4, -1.05]].forEach(function (w) { wheel(w[0], w[1], 0.46); });
+      for (var k = -3; k <= 3; k++) { var q = P(k * 1.2, 0); colCircle(q[0], q[1], 1.3, false); }
+      return;
+    }
+    if (kind === 'pickupWreck') {
+      L = 5.3; W = 1.95;
+      part('metal', 0, 0, L, W, 0.42, 1.0, paint);
+      part('metal', 0.55, 0, 1.6, 1.8, 1.0, 1.62, paint);
+      part('plain', 0.55, 0, 1.5, 1.7, 1.0, 1.55, 0x121416);               // glass long gone
+      part('metal', -1.55, 0, 2.1, 1.84, 1.0, 1.02, 0x2A2420);               // empty bed
+      part('metal', -1.55, 0.9, 2.1, 0.08, 1.0, 1.32, paint);
+      part('metal', -1.55, -0.9, 2.1, 0.08, 1.0, 1.32, paint);
+      [[1.7, 0.86], [1.7, -0.86], [-1.6, 0.86]].forEach(function (w) { wheel(w[0], w[1], 0.4); });
+    } else {
+      var hatch = kind === 'hatch';
+      L = hatch ? 4.0 : 4.6; W = hatch ? 1.76 : 1.84;
+      var cabL = hatch ? 2.3 : 2.2, cabX = hatch ? -0.35 : -0.15;
+      part('metal', 0, 0, L, W, 0.34, 0.86, paint);                           // lower body
+      part('metal', 0.02, 0, L - 0.2, W - 0.1, 0.86, 0.9, paint);
+      part(wreck ? 'plain' : 'glass', cabX, 0, cabL, W - 0.16, 0.9, 1.34, wreck ? 0x101214 : 0x1C2630);
+      part('metal', cabX - 0.05, 0, cabL - 0.6, W - 0.26, 1.34, 1.42, wreck ? 0x241C18 : paint);
+      part('plain', L / 2 - 0.04, 0, 0.12, W - 0.1, 0.3, 0.5, 0x2A2C2E);    // bumpers
+      part('plain', -L / 2 + 0.04, 0, 0.12, W - 0.1, 0.3, 0.5, 0x2A2C2E);
+      if (!wreck) {
+        part('lens', L / 2 - 0.01, W / 2 - 0.28, 0.04, 0.34, 0.62, 0.74, 0x8C8A70);
+        part('lens', L / 2 - 0.01, -W / 2 + 0.28, 0.04, 0.34, 0.62, 0.74, 0x8C8A70);
+        part('plain', -L / 2 + 0.01, W / 2 - 0.26, 0.04, 0.3, 0.62, 0.76, 0x6A1C18);
+        part('plain', -L / 2 + 0.01, -W / 2 + 0.26, 0.04, 0.3, 0.62, 0.76, 0x6A1C18);
+      }
+      var wb = L / 2 - 0.78;
+      [[wb, W / 2 - 0.12], [wb, -W / 2 + 0.12], [-wb, W / 2 - 0.12], [-wb, -W / 2 + 0.12]].forEach(function (w, k) {
+        if (wreck && k === 3) return;                    // one wheel gone
+        wheel(w[0], w[1], 0.34);
+      });
+    }
+    var n = Math.ceil(L / W);
+    for (var i = 0; i < n; i++) {
+      var q2 = P(-L / 2 + W / 2 + i * (L - W) / Math.max(1, n - 1), 0);
+      colCircle(q2[0], q2[1], W / 2 + 0.06, false);
+    }
+  }
+
+  /* ---------------------------------------------------- street furniture */
+  function buildStreet() {
+    // post lamps on the sidewalks, cobra-head arm lights along the avenues
+    LAMPS.forEach(function (l) {
+      var px = l.arm ? l.postX : l.x;
+      addGeo('metal', PROTO.cyl6, px, 0.25, l.z, 0.2, 0.5, 0.2, 0, 0, 0, 0x2B3036);
+      addGeo('metal', PROTO.cyl6, px, l.h / 2 + 0.2, l.z, 0.08, l.h + 0.4, 0.08, 0, 0, 0, 0x343A40);
+      if (l.arm) {
+        var ax0 = Math.min(px, l.x), ax1 = Math.max(px, l.x);
+        aabb('metal', ax0, l.z - 0.05, ax1 + 0.1, l.z + 0.05, l.h + 0.28, l.h + 0.38, 0x343A40);
+        aabb('metal', l.x - 0.38, l.z - 0.2, l.x + 0.38, l.z + 0.2, l.h + 0.14, l.h + 0.34, 0x40464C);
+        aabb('lens', l.x - 0.3, l.z - 0.14, l.x + 0.3, l.z + 0.14, l.h + 0.1, l.h + 0.14, 0xFFE4A8);
+      } else {
+        aabb('metal', l.x - 0.3, l.z - 0.3, l.x + 0.3, l.z + 0.3, l.h + 0.5, l.h + 0.62, 0x40464C);
+        aabb('lens', l.x - 0.22, l.z - 0.22, l.x + 0.22, l.z + 0.22, l.h + 0.2, l.h + 0.5, 0xFFE4A8);
+      }
+      colCircle(px, l.z, 0.22, false);
+    });
+
+    OAK.signs.forEach(function (sg) {
+      var x = wx(sg[1]), z = wz(sg[2]);
+      addGeo('metal', PROTO.cyl6, x, 1.3, z, 0.04, 2.6, 0.04, 0, 0, 0, 0x7A8086);
+      if (sg[0] === 'diamond') {
+        addGeo('metal', PROTO.box, x, 2.3, z + 0.05, 0.62, 0.62, 0.03, 0, 0, PI / 4, 0xC9A227);
+      } else {
+        aabb('metal', x - 0.5, z - 0.03, x + 0.5, z + 0.03, 2.5, 2.72, 0x2E6B45);
+        aabb('metal', x - 0.03, z - 0.5, x + 0.03, z + 0.5, 2.76, 2.98, 0x2E6B45);
+      }
+      colCircle(x, z, 0.12, false);
+    });
+
+    OAK.cars.forEach(function (c) { buildCar(c[0], c[1], c[2], c[3]); });
+
+    OAK.debris.forEach(function (d, i) {
+      var x = wx(d[0]), z = wz(d[1]), L = d[2], Wd = d[3];
+      var n = 5 + Math.floor(L * 2);
+      for (var k = 0; k < n; k++) {
+        var hx = (hash2(i, k, 130) - 0.5) * L, hz = (hash2(i, k, 131) - 0.5) * Wd;
+        var sz = 0.2 + hash2(i, k, 132) * 0.45;
+        var hexes = [0x6A6660, 0x5A4A3A, 0x3E4246, 0x7E766A, 0x4A3A2C];
+        box(hash2(i, k, 134) < 0.3 ? 'wood' : 'plain', x + hx, z + hz, sz * (1 + hash2(i, k, 135)), sz,
+          0, sz * 0.6, hexes[Math.floor(hash2(i, k, 133) * hexes.length)], hash2(i, k, 136) * PI);
+      }
+      colCircle(x, z, Math.max(L, Wd) * 0.4, true);
+    });
+
+    // plank barricades, orange-and-white, on A-frame legs
+    OAK.barricades.forEach(function (b) {
+      var ax = wx(b[0]), az = wz(b[1]), bx = wx(b[2]), bz = wz(b[3]);
+      var L = Math.hypot(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2;
+      var ry = -Math.atan2(bz - az, bx - ax);
+      box('stripe', mx, mz, L, 0.06, 0.52, 0.72, 0xFFFFFF, ry, { uvs: 1 });
+      box('stripe', mx, mz, L, 0.06, 0.84, 1.04, 0xFFFFFF, ry, { uvs: 1 });
+      [0.1, 0.9].forEach(function (t) {
+        var lx = ax + (bx - ax) * t, lz = az + (bz - az) * t;
+        box('wood', lx, lz, 0.08, 0.7, 0, 1.0, 0x8A7A62, ry);
+      });
+      for (var k = 0; k <= 4; k++) colCircle(ax + (bx - ax) * k / 4, az + (bz - az) * k / 4, 0.4, true);
+    });
+
+    // playground and park
+    OAK.play.forEach(function (p) {
+      var x0 = wx(p[1]), z0 = wz(p[2]), x1 = wx(p[3]), z1 = wz(p[4]);
+      var cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      if (p[0] === 'swings') {
+        [x0, x1].forEach(function (xx) {
+          addGeo('metal', PROTO.cyl6, xx, 1.15, cz - 0.55, 0.05, 2.45, 0.05, 0.42, 0, 0, 0x8A3A30);
+          addGeo('metal', PROTO.cyl6, xx, 1.15, cz + 0.55, 0.05, 2.45, 0.05, -0.42, 0, 0, 0x8A3A30);
+          colCircle(xx, cz, 0.35, false);
+        });
+        aabb('metal', x0, cz - 0.05, x1, cz + 0.05, 2.25, 2.35, 0x8A3A30);
+        [0.3, 0.7].forEach(function (t) {
+          var sx = x0 + (x1 - x0) * t;
+          aabb('metal', sx - 0.22, cz - 0.02, sx - 0.2, cz + 0.02, 0.5, 2.25, 0x9A9EA2);
+          aabb('metal', sx + 0.2, cz - 0.02, sx + 0.22, cz + 0.02, 0.5, 2.25, 0x9A9EA2);
+          aabb('plain', sx - 0.26, cz - 0.12, sx + 0.26, cz + 0.12, 0.46, 0.52, 0x2A2C2E);
+        });
+      } else if (p[0] === 'slide') {
+        // tower at one end, chute running down toward the facing direction
+        var dir = p[5] === 'W' ? [-1, 0] : [-0.7, 0.7];
+        var tx = dir[0] < 0 ? x1 - 0.8 : x0 + 0.8, tz = p[5] === 'W' ? cz : z0 + 0.8;
+        [[-0.55, -0.55], [0.55, -0.55], [-0.55, 0.55], [0.55, 0.55]].forEach(function (o) {
+          aabb('metal', tx + o[0] - 0.05, tz + o[1] - 0.05, tx + o[0] + 0.05, tz + o[1] + 0.05, 0, 2.3, 0x3E6A8A);
+        });
+        aabb('wood', tx - 0.6, tz - 0.6, tx + 0.6, tz + 0.6, 1.5, 1.6, 0x8A6440);
+        aabb('metal', tx - 0.62, tz - 0.62, tx + 0.62, tz + 0.62, 2.25, 2.35, 0xA84A30);
+        for (var r = 0; r < 5; r++) {
+          var ly = 0.3 * (r + 1);
+          aabb('metal', tx - 0.45, tz + 0.55 - 0.03 - (dir[1] > 0 ? 1.1 : 0), tx + 0.45, tz + 0.58 - (dir[1] > 0 ? 1.1 : 0), ly, ly + 0.04, 0x9A9EA2);
+        }
+        var chuteLen = 3.0, ang = Math.atan2(dir[1], dir[0]);
+        var ccx = tx + dir[0] * (0.6 + chuteLen / 2 * 0.94), ccz = tz + dir[1] * (0.6 + chuteLen / 2 * 0.94);
+        addGeo('plain', PROTO.box, ccx, 0.85, ccz, chuteLen, 0.06, 0.62, 0, -ang, -0.5, 0xC8A430);
+        colCircle(tx, tz, 0.9, false);
+        colCircle(ccx, ccz, 0.6, true);
+      } else if (p[0] === 'bench') {
+        var ry = -(p[5] || 0) * PI / 180, L = Math.max(x1 - x0, 1.6);
+        box('wood', cx, cz, L, 0.45, 0.42, 0.48, 0x7A5A3A, ry);
+        box('wood', cx + Math.sin(ry) * 0.2, cz + Math.cos(ry) * 0.2, L, 0.06, 0.5, 0.9, 0x7A5A3A, ry);
+        [-0.42, 0.42].forEach(function (t) {
+          box('metal', cx + Math.cos(-ry) * L * t, cz + Math.sin(-ry) * L * t, 0.06, 0.5, 0, 0.42, 0x2E3236, ry);
+        });
+        colCircle(cx, cz, L / 2, true);
+      }
+    });
+
+    // fuel pumps on the forecourt: island, body, display, hose
+    [[609, 557], [609, 602]].forEach(function (p) {
+      var x = wx(p[0]), z = wz(p[1]);
+      aabb('plain', x - 0.45, z - 0.9, x + 0.45, z + 0.9, 0, 0.16, 0x8E8A84);
+      aabb('metal', x - 0.25, z - 0.4, x + 0.25, z + 0.4, 0.16, 1.7, 0xB8362E);
+      aabb('metal', x - 0.26, z - 0.41, x + 0.26, z + 0.41, 1.3, 1.72, 0xE8E4DA);
+      aabb('lens', x - 0.27, z - 0.22, x + 0.27, z + 0.22, 1.36, 1.58, 0x3A5A4A);
+      aabb('plain', x + 0.25, z - 0.03, x + 0.3, z + 0.03, 0.5, 1.2, 0x121314);
+      colCircle(x, z, 0.62, false);
+    });
+  }
+  /* -------------------------------------------------------- assemble town */
+  function buildTown() {
+    BUILDINGS.forEach(buildBuilding);
+    buildSlabs();
+    buildTrees();
+    buildFences();
+    buildStreet();
+    flushBins(BINS);
+    buildGrid();
+    buildNav();
+  }
+
+  // Roofs lift off the building you are standing in, so its rooms read.
+  function updateRoofs() {
+    var inside = G.screen === 'menu' || G.screen === 'how' ? null : buildingAt(player.x, player.z, 0.15);
+    for (var i = 0; i < BUILDINGS.length; i++) {
+      var BI = BUILDINGS[i], show = BI !== inside;
+      if (show === BI.shown) continue;
+      BI.shown = show;
+      for (var k = 0; k < BI.roofs.length; k++) BI.roofs[k].visible = show;
+    }
+  }
+
+  // Screen position and depth of the player for the see-through dither.
+  var _fv = new T.Vector3();
+  function updateFade() {
+    if (G.screen === 'menu' || G.screen === 'how' || player.hp <= 0) {
+      FADE.uFadePx.value.set(-1e4, -1e4);
+      return;
+    }
+    _fv.set(player.x, 1.1, player.z).applyMatrix4(camera.matrixWorldInverse);
+    FADE.uFadeDepth.value = -_fv.z;
+    _fv.set(player.x, 1.1, player.z).project(camera);
+    FADE.uFadePx.value.set((_fv.x * 0.5 + 0.5) * Post.bufW, (_fv.y * 0.5 + 0.5) * Post.bufH);
+    FADE.uFadeR.value = Post.bufH * 0.11;
+  }
+
+  /* ------------------------------------------------------------ navigation
+     A flow field: breadth-first distance from the player over a 0.5 m grid,
+     rebuilt whenever the player changes cell. Each zombie walks downhill on it, so the
+     horde finds doors and goes round houses instead of pressing into walls.  */
+  var NAV = { cs: 0.5 };
+  NAV.w = Math.ceil((BX1 - BX0) / NAV.cs);
+  NAV.h = Math.ceil((BZ1 - BZ0) / NAV.cs);
+  NAV.block = new Uint8Array(NAV.w * NAV.h);
+  NAV.indoor = new Uint8Array(NAV.w * NAV.h);
+  NAV.dist = new Uint16Array(NAV.w * NAV.h);
+  NAV.queue = new Int32Array(NAV.w * NAV.h);
+  NAV.at = -1; NAV.t = -9;
+  var FAR = 65535;
+
+  function navCell(x, z) {
+    var i = Math.floor((x - BX0) / NAV.cs), j = Math.floor((z - BZ0) / NAV.cs);
+    if (i < 0 || j < 0 || i >= NAV.w || j >= NAV.h) return -1;
+    return j * NAV.w + i;
+  }
+  function buildNav() {
+    var cs = NAV.cs, pad = 0.2;
+    function mark(x0, z0, x1, z1) {
+      var i0 = Math.max(0, Math.floor((x0 - BX0) / cs - 0.5 + 1e-6) + 1);
+      var i1 = Math.min(NAV.w - 1, Math.floor((x1 - BX0) / cs - 0.5));
+      var j0 = Math.max(0, Math.floor((z0 - BZ0) / cs - 0.5 + 1e-6) + 1);
+      var j1 = Math.min(NAV.h - 1, Math.floor((z1 - BZ0) / cs - 0.5));
+      for (var j = j0; j <= j1; j++) for (var i = i0; i <= i1; i++) NAV.block[j * NAV.w + i] = 1;
+    }
+    rects.forEach(function (r) { mark(r.x - r.w / 2 - pad, r.z - r.d / 2 - pad, r.x + r.w / 2 + pad, r.z + r.d / 2 + pad); });
+    props.forEach(function (p) {
+      var R = p.r + pad;
+      for (var j = Math.max(0, Math.floor((p.z - R - BZ0) / cs)); j <= Math.min(NAV.h - 1, Math.floor((p.z + R - BZ0) / cs)); j++) {
+        for (var i = Math.max(0, Math.floor((p.x - R - BX0) / cs)); i <= Math.min(NAV.w - 1, Math.floor((p.x + R - BX0) / cs)); i++) {
+          var cx = BX0 + (i + 0.5) * cs, cz = BZ0 + (j + 0.5) * cs;
+          if (Math.hypot(cx - p.x, cz - p.z) < R) NAV.block[j * NAV.w + i] = 1;
+        }
+      }
+    });
+    for (var j = 0; j < NAV.h; j++) for (var i = 0; i < NAV.w; i++) {
+      if (buildingAt(BX0 + (i + 0.5) * cs, BZ0 + (j + 0.5) * cs, 0.3)) NAV.indoor[j * NAV.w + i] = 1;
+      if (i === 0 || j === 0 || i === NAV.w - 1 || j === NAV.h - 1) NAV.block[j * NAV.w + i] = 1;
+    }
+  }
+
+  function updateNav(force) {
+    var c = navCell(player.x, player.z);
+    if (c < 0) return;
+    if (!force && c === NAV.at && G.time - NAV.t < 1.5) return;
+    if (!force && G.time - NAV.t < 0.2) return;
+    NAV.at = c; NAV.t = G.time;
+    var W = NAV.w, D = NAV.dist, Q = NAV.queue, BL = NAV.block;
+    D.fill(FAR);
+    // standing against a wall can put the player's own cell inside the pad
+    var start = c;
+    if (BL[start]) {
+      for (var r = 1; r < 3 && BL[start]; r++) {
+        for (var dj = -r; dj <= r && BL[start]; dj++) for (var di = -r; di <= r; di++) {
+          var cc = c + dj * W + di;
+          if (cc >= 0 && cc < D.length && !BL[cc]) { start = cc; break; }
+        }
+      }
+    }
+    var head = 0, tail = 0;
+    D[start] = 0; Q[tail++] = start;
+    while (head < tail) {
+      var k = Q[head++], nd = D[k] + 1;
+      if (nd > 400) continue;                    // 200 m of path: the whole town
+      var n1 = k - 1, n2 = k + 1, n3 = k - W, n4 = k + W;
+      if (!BL[n1] && D[n1] === FAR) { D[n1] = nd; Q[tail++] = n1; }
+      if (!BL[n2] && D[n2] === FAR) { D[n2] = nd; Q[tail++] = n2; }
+      if (!BL[n3] && D[n3] === FAR) { D[n3] = nd; Q[tail++] = n3; }
+      if (!BL[n4] && D[n4] === FAR) { D[n4] = nd; Q[tail++] = n4; }
+    }
+  }
+
+  // Direction a body at (x, z) should walk. Follows the field a few cells ahead
+  // and aims at that point, which straightens the grid's staircase paths.
+  var _steer = { x: 0, z: 0, d: FAR };
+  function steer(x, z) {
+    var W = NAV.w, D = NAV.dist, BL = NAV.block;
+    var c = navCell(x, z);
+    _steer.d = FAR;
+    if (c < 0) return null;
+    if (D[c] === FAR) {
+      // pushed into a padded cell: step to the best neighbour instead
+      var best = -1, bd = FAR;
+      for (var dj = -2; dj <= 2; dj++) for (var di = -2; di <= 2; di++) {
+        var q = c + dj * W + di;
+        if (q >= 0 && q < D.length && D[q] < bd) { bd = D[q]; best = q; }
+      }
+      if (best < 0) return null;
+      c = best;
+    }
+    var cur = c;
+    for (var step = 0; step < 4; step++) {
+      var bestN = -1, bestD = D[cur];
+      for (var ddj = -1; ddj <= 1; ddj++) for (var ddi = -1; ddi <= 1; ddi++) {
+        if (!ddi && !ddj) continue;
+        var nq = cur + ddj * W + ddi;
+        if (nq < 0 || nq >= D.length || BL[nq]) continue;
+        // no cutting corners past a wall end
+        if (ddi && ddj && (BL[cur + ddi] || BL[cur + ddj * W])) continue;
+        var dv = D[nq] + (ddi && ddj ? 0.41 : 0);
+        if (dv < bestD) { bestD = dv; bestN = nq; }
+      }
+      if (bestN < 0) break;
+      cur = bestN;
+    }
+    _steer.d = D[c];
+    if (cur === c) return null;
+    var tx = BX0 + ((cur % W) + 0.5) * NAV.cs, tz = BZ0 + (Math.floor(cur / W) + 0.5) * NAV.cs;
+    var dx = tx - x, dz = tz - z, dl = Math.hypot(dx, dz) || 1;
+    _steer.x = dx / dl; _steer.z = dz / dl;
+    return _steer;
+  }
+
+  // A random walkable, outdoor cell a path distance of d0..d1 metres away.
+  function navSpot(d0, d1, outdoor) {
+    var lo = d0 / NAV.cs, hi = d1 / NAV.cs;
+    var pc = navCell(player.x, player.z);
+    if (pc < 0) return null;
+    var pi = pc % NAV.w, pj = Math.floor(pc / NAV.w), rr = Math.ceil(hi);
+    for (var t = 0; t < 60; t++) {
+      var ci = pi + Math.floor((Math.random() * 2 - 1) * rr), cj = pj + Math.floor((Math.random() * 2 - 1) * rr);
+      if (ci < 1 || cj < 1 || ci >= NAV.w - 1 || cj >= NAV.h - 1) continue;
+      var k = cj * NAV.w + ci;
+      var dv = NAV.dist[k];
+      if (dv < lo || dv > hi || NAV.block[k]) continue;
+      if (outdoor && NAV.indoor[k]) continue;
+      return { x: BX0 + ((k % NAV.w) + 0.5) * NAV.cs, z: BZ0 + (Math.floor(k / NAV.w) + 0.5) * NAV.cs };
+    }
+    return null;
+  }
+
+  // minimap source: the ground at 1 px per metre, with roofs painted in
+  var miniSrc = document.createElement('canvas');
+  miniSrc.width = Math.ceil(BX1 - BX0) * 2; miniSrc.height = Math.ceil(BZ1 - BZ0) * 2;
+  (function () {
+    var g = miniSrc.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.drawImage(groundCanvas, 0, 0, miniSrc.width, miniSrc.height);
+    g.fillStyle = 'rgba(5,7,9,.35)';
+    g.fillRect(0, 0, miniSrc.width, miniSrc.height);
+    g.fillStyle = 'rgba(92,100,110,.95)';
+    BUILDINGS.forEach(function (BI) {
+      BI.parts.forEach(function (r) {
+        g.fillRect((r[0] - BX0) * 2, (r[1] - BZ0) * 2, (r[2] - r[0]) * 2, (r[3] - r[1]) * 2);
+      });
+    });
+  })();
+
+  buildTown();
 
   /* ------------------------------------------------------------- the player
      Few enough of these to be a normal Group rather than instanced.          */
@@ -1797,13 +3190,15 @@ function main(hotData) {
     // Spawn in a ring just beyond the visible frame, measured from the PLAYER
     // rather than the arena centre — otherwise a cornered player gets a free
     // breather while the horde walks the length of the lot.
+    // By PATH distance on the flow field, outdoors, and out of straight-line
+    // reach: close enough to arrive soon, never popping in beside you or
+    // inside a room with no way out.
     var x = 0, z = 0, ok = false;
-    for (var tries = 0; tries < 10 && !ok; tries++) {
-      var ang = rand(0, TAU);
-      var dist = rand(17, 22);
-      x = clamp(player.x + Math.cos(ang) * dist, -ARENA + 1.6, ARENA - 1.6);
-      z = clamp(player.z + Math.sin(ang) * dist, -ARENA + 1.6, ARENA - 1.6);
-      ok = Math.hypot(x - player.x, z - player.z) > 11 && !blockedAt(x, z);
+    for (var tries = 0; tries < 12 && !ok; tries++) {
+      var spot = navSpot(18, 34, true);
+      if (!spot) continue;
+      x = spot.x; z = spot.z;
+      ok = Math.hypot(x - player.x, z - player.z) > 13 && !blockedAt(x, z);
     }
     if (!ok) return;
 
@@ -2266,16 +3661,27 @@ function main(hotData) {
     }
   }
 
-  // Walls stop bullets too, so buildings actually provide cover.
-  function blockedAt(x, z) {
+  // Walls stop bullets too, so buildings actually provide cover. solid: skip
+  // the low things a bullet flies over (beds, counters, fences, pews).
+  function blockedAt(x, z, solid) {
     var list = nearColliders(x, z);
     for (var i = 0; i < list.length; i++) {
       var p = list[i];
+      if (solid && p.low) continue;
       if (p.isRect) {
         if (Math.abs(x - p.x) < p.w / 2 && Math.abs(z - p.z) < p.d / 2) return true;
       } else if (Math.hypot(x - p.x, z - p.z) < p.r) return true;
     }
     return false;
+  }
+
+  // Clear line between two points, through anything a bullet would stop on.
+  function lineClear(ax, az, bx, bz) {
+    var n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.35);
+    for (var k = 1; k < n; k++) {
+      if (blockedAt(ax + (bx - ax) * k / n, az + (bz - az) * k / n, true)) return false;
+    }
+    return true;
   }
 
   function nearestZombie(maxDist) {
@@ -2423,9 +3829,10 @@ function main(hotData) {
 
   function spawnDrop(kind) {
     for (var tries = 0; tries < 24; tries++) {
-      var ang = rand(0, TAU), d = rand(7, 15);
-      var x = clamp(player.x + Math.cos(ang) * d, -ARENA + 3, ARENA - 3);
-      var z = clamp(player.z + Math.sin(ang) * d, -ARENA + 3, ARENA - 3);
+      // somewhere you can actually walk to, a short path away
+      var ds = navSpot(7, 16, false);
+      if (!ds) continue;
+      var x = ds.x, z = ds.z;
       if (Math.hypot(x - player.x, z - player.z) < 5) continue;
       if (blockedAt(x, z) || blockedAt(x + 1.2, z) || blockedAt(x, z + 1.2)) continue;
       pickups.push({ x: x, z: z, kind: kind, spin: rand(0, TAU), life: 9999 });
@@ -2443,10 +3850,11 @@ function main(hotData) {
     if (!pool.length || pickups.length >= MAXPK) return;
     var id = pick(pool);
     for (var tries = 0; tries < 24; tries++) {
-      var ang = rand(0, TAU), d = rand(8, 17);
-      var x = clamp(player.x + Math.cos(ang) * d, -ARENA + 3, ARENA - 3);
-      var z = clamp(player.z + Math.sin(ang) * d, -ARENA + 3, ARENA - 3);
-      if (Math.hypot(x - player.x, z - player.z) < 6) continue;
+      // somewhere you can actually walk to, a short path away
+      var ds = navSpot(8, 18, false);
+      if (!ds) continue;
+      var x = ds.x, z = ds.z;
+      if (Math.hypot(x - player.x, z - player.z) < 5) continue;
       if (blockedAt(x, z) || blockedAt(x + 1.3, z) || blockedAt(x, z + 1.3)) continue;
       pickups.push({ x: x, z: z, kind: 'weapon', wep: id, spin: rand(0, TAU), life: 9999 });
       return;
@@ -2524,8 +3932,9 @@ function main(hotData) {
     zombies.length = 0; bullets.length = 0; eBullets.length = 0;
     parts.length = 0; pickups.length = 0; decals.length = 0;
     upgradeLevels = {};
-    player.x = 0; player.z = 0; player.vx = 0; player.vz = 0; player.angle = 0;
+    player.x = SPAWN.x; player.z = SPAWN.z; player.vx = 0; player.vz = 0; player.angle = PI;
     resolveProps(player);
+    updateNav(true);
     player.maxHp = 100; player.hp = 100; player.speed = 7.0;
     player.regen = 0; player.armor = 0; player.magnet = 3.2; player.knock = 0;
     player.lastHurt = -99;
@@ -2603,8 +4012,8 @@ function main(hotData) {
     player.vz = lerp(player.vz, targetVz, 1 - Math.pow(0.0016, dt));
     player.x += player.vx * dt;
     player.z += player.vz * dt;
-    player.x = clamp(player.x, -ARENA + 1.4, ARENA - 1.4);
-    player.z = clamp(player.z, -ARENA + 1.4, ARENA - 1.4);
+    player.x = inX(player.x, 1.0);
+    player.z = inZ(player.z, 1.0);
     resolveProps(player);
 
     // Gait advances by distance travelled / stride length, so the feet plant
@@ -2681,11 +4090,19 @@ function main(hotData) {
         // spitters hold at range and lob acid
         z.atkCd -= dt;
         var want = t.range * 0.8;
-        var dir = dist > want + 1.5 ? 1 : (dist < want - 2 ? -0.6 : 0);
+        z.losCd = (z.losCd || 0) - dt;
+        if (z.losCd <= 0) { z.losCd = 0.25; z.los = dist < t.range + 2 && lineClear(z.x, z.z, player.x, player.z); }
+        var dir = !z.los || dist > want + 1.5 ? 1 : (dist < want - 2 ? -0.6 : 0);
         moveSp = z.speed * rageMul * Math.abs(dir);
-        z.x += (dx / dist) * z.speed * rageMul * dir * dt;
-        z.z += (dz / dist) * z.speed * rageMul * dir * dt;
-        if (dist < t.range && z.atkCd <= 0) {
+        var smx = dx / dist, smz = dz / dist;
+        if (dir > 0 && !(z.los && dist < 2.6)) {
+          var sst = steer(z.x, z.z);
+          if (sst) { smx = sst.x; smz = sst.z; }
+        }
+        z.x += smx * z.speed * rageMul * dir * dt;
+        z.z += smz * z.speed * rageMul * dir * dt;
+        if (dir > 0) z.angle = Math.atan2(smx, smz);
+        if (dist < t.range && z.los && z.atkCd <= 0) {
           z.atkCd = t.cooldown * rand(0.8, 1.25);
           if (eBullets.length < MAXE) {
             var sp = 12;
@@ -2700,8 +4117,21 @@ function main(hotData) {
         var chase = dist > (z.radius + player.radius + 0.1) ? 1 : 0;
         var sp2 = z.speed * rageMul * (z.lunge > 0 ? 1.8 : 1);
         moveSp = sp2 * chase;
-        z.x += (dx / dist) * sp2 * chase * dt;
-        z.z += (dz / dist) * sp2 * chase * dt;
+        var mvx = dx / dist, mvz = dz / dist;
+        // Close in directly once near; otherwise walk the flow field, which
+        // knows where the doors are.
+        if (dist > 2.6) {
+          var zst = steer(z.x, z.z);
+          if (zst) { mvx = zst.x; mvz = zst.z; }
+        }
+        // turn smoothly rather than snapping between grid directions
+        if (z.hx === undefined) { z.hx = mvx; z.hz = mvz; }
+        z.hx = lerp(z.hx, mvx, Math.min(1, dt * 9));
+        z.hz = lerp(z.hz, mvz, Math.min(1, dt * 9));
+        var hl = Math.hypot(z.hx, z.hz) || 1;
+        z.x += (z.hx / hl) * sp2 * chase * dt;
+        z.z += (z.hz / hl) * sp2 * chase * dt;
+        if (dist > 2.6) z.angle = Math.atan2(z.hx, z.hz);
         if (z.lunge > 0) z.lunge -= dt;
 
         if (!t.howls) {
@@ -2733,8 +4163,8 @@ function main(hotData) {
       }
 
       resolveProps(z);
-      z.x = clamp(z.x, -ARENA + 1.2, ARENA - 1.2);
-      z.z = clamp(z.z, -ARENA + 1.2, ARENA - 1.2);
+      z.x = inX(z.x, 0.8);
+      z.z = inZ(z.z, 0.8);
 
       // Gait from distance covered, not a fixed tempo — a brute at 1.8 u/s and
       // a runner at 5 u/s now plant their feet at rates that match the ground.
@@ -2754,15 +4184,23 @@ function main(hotData) {
     /* ----- player bullets */
     for (var b = bullets.length - 1; b >= 0; b--) {
       var bu = bullets[b];
+      var obx = bu.x, obz = bu.z;
       bu.x += bu.vx * dt;
       bu.z += bu.vz * dt;
       bu.life -= dt;
 
       var gone = bu.life <= 0 ||
-        Math.abs(bu.x) > ARENA - 1 || Math.abs(bu.z) > ARENA - 1;
+        bu.x < BX0 + 0.5 || bu.x > BX1 - 0.5 || bu.z < BZ0 + 0.5 || bu.z > BZ1 - 0.5;
 
       if (!gone) {
-        if (blockedAt(bu.x, bu.z)) {
+        // Sub-stepped: a fast round covers more than a wall's thickness in one
+        // step, and would tunnel straight through it otherwise.
+        var segN = Math.ceil(Math.hypot(bu.x - obx, bu.z - obz) / 0.16), hitW = false;
+        for (var sgi = 1; sgi <= segN && !hitW; sgi++) {
+          var sgx = obx + (bu.x - obx) * sgi / segN, sgz = obz + (bu.z - obz) * sgi / segN;
+          if (blockedAt(sgx, sgz, true)) { bu.x = sgx; bu.z = sgz; hitW = true; }
+        }
+        if (hitW) {
           if (bu.boom) blastAt(bu.x, bu.z, eff.blastRadius, eff.blastDamage, false, null);
           else burst(bu.x, 0.9, bu.z, 3, 'spark', 1.4);
           gone = true;
@@ -2810,7 +4248,8 @@ function main(hotData) {
         damagePlayer(eb.dmg);
         burst(eb.x, 1.0, eb.z, 5, 'gore', 2);
       }
-      if (hitP || eb.life <= 0 || Math.abs(eb.x) > ARENA || Math.abs(eb.z) > ARENA) {
+      if (hitP || eb.life <= 0 || blockedAt(eb.x, eb.z, true) ||
+          eb.x < BX0 || eb.x > BX1 || eb.z < BZ0 || eb.z > BZ1) {
         eBullets.splice(e, 1);
       }
     }
@@ -3166,7 +4605,7 @@ function main(hotData) {
   })();
 
   var miniCv = $('minimap'), miniCtx = miniCv.getContext('2d');
-  var MINI_RANGE = 48;   // world units from the player, edge to centre
+  var MINI_RANGE = 34;   // world units from the player, edge to centre
 
   function syncMinimap() {
     var live = G.screen === 'playing' || G.screen === 'cheats';
@@ -3176,19 +4615,18 @@ function main(hotData) {
     var w = miniCv.width, c = w / 2, k = c / MINI_RANGE;
     miniCtx.clearRect(0, 0, w, w);
 
-    // building footprints: the layout is what you navigate by
-    miniCtx.fillStyle = 'rgba(70,80,92,.72)';
-    for (var bi = 0; bi < CITY.buildings.length; bi++) {
-      var bb = CITY.buildings[bi];
-      var bx = c + (bb.x - player.x) * k, bz = c + (bb.z - player.z) * k;
-      var bw = bb.w * k, bd = bb.d * k;
-      if (bx + bw < 0 || bz + bd < 0 || bx - bw > w || bz - bd > w) continue;
-      miniCtx.fillRect(bx - bw / 2, bz - bd / 2, bw, bd);
-    }
+    // the town itself: streets and rooftops are what you navigate by
+    var sr = miniSrc.width / (BX1 - BX0);
+    miniCtx.save();
+    miniCtx.globalAlpha = 0.9;
+    miniCtx.drawImage(miniSrc,
+      (player.x - MINI_RANGE - BX0) * sr, (player.z - MINI_RANGE - BZ0) * sr,
+      MINI_RANGE * 2 * sr, MINI_RANGE * 2 * sr, 0, 0, w, w);
+    miniCtx.restore();
     miniCtx.strokeStyle = 'rgba(46,57,65,.9)';
     miniCtx.lineWidth = 2;
-    miniCtx.strokeRect(c + (-ARENA - player.x) * k, c + (-ARENA - player.z) * k,
-                       ARENA * 2 * k, ARENA * 2 * k);
+    miniCtx.strokeRect(c + (BX0 - player.x) * k, c + (BZ0 - player.z) * k,
+                       (BX1 - BX0) * k, (BZ1 - BZ0) * k);
     // lamps as landmarks, since light is how you orient at night
     miniCtx.fillStyle = 'rgba(255,164,36,.55)';
     for (var li2 = 0; li2 < LAMPS.length; li2++) {
@@ -3300,8 +4738,8 @@ function main(hotData) {
   function menuAmbience(dt) {
     menuAngle += dt * 0.085;
     var r = 17;
-    camera.position.set(Math.cos(menuAngle) * r, 13.5, Math.sin(menuAngle) * r);
-    camera.lookAt(0, 1.1, 0);
+    camera.position.set(MENU_C.x + Math.cos(menuAngle) * r, 13.5, MENU_C.z + Math.sin(menuAngle) * r);
+    camera.lookAt(MENU_C.x, 1.1, MENU_C.z);
     scene.fog.near = 24; scene.fog.far = 58;
 
     // a handful of wanderers so the menu is a living scene, not a still
@@ -3310,7 +4748,7 @@ function main(hotData) {
     }
     for (var i = 0; i < zombies.length; i++) {
       var z = zombies[i];
-      var dx = -z.x, dz = -z.z;
+      var dx = MENU_C.x - z.x, dz = MENU_C.z - z.z;
       var d = Math.hypot(dx, dz) || 1;
       if (d > 5) {
         z.x += (dx / d) * z.speed * 0.45 * dt;
@@ -3630,7 +5068,11 @@ function main(hotData) {
       blastLight.intensity = 0;
     }
 
+    updateRoofs();
+    if (G.screen === 'playing') updateNav(false);
     syncPostSize(false);
+    camera.updateMatrixWorld();
+    updateFade();
     Post.render(scene, camera);
   }
 
@@ -3707,6 +5149,9 @@ function main(hotData) {
     navigator.serviceWorker.register('sw.js').catch(function () {});
   }
 
+  // the menu's wanderers need a flow field to spawn on
+  player.x = MENU_C.x; player.z = MENU_C.z;
+  updateNav(true);
   show('menu');
   requestAnimationFrame(frame);
 }
