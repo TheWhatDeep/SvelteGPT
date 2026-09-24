@@ -1649,9 +1649,12 @@ function main(hotData) {
   // get reassigned to the nearest of the town's thirty posts.
   // Fixed light count, so no shader recompiles while you walk around.
   var LAMP_LIGHTS = 4;
+  // The lamps burn red, the town's one colour at night. Red carries less
+  // brightness than the old amber, so they burn a little harder to match.
+  var LAMP_RED = 0xFF2A1C;
   var lampLights = [];
   for (var li = 0; li < LAMP_LIGHTS; li++) {
-    var pl = new T.PointLight(0xFFB042, 0, 19, 1.7);
+    var pl = new T.PointLight(LAMP_RED, 0, 19, 1.7);
     pl.position.set(0, 6.4, 0);
     scene.add(pl);
     lampLights.push(pl);
@@ -1733,7 +1736,7 @@ function main(hotData) {
           var N = LAMPS[lj.userData.want];
           lj.userData.anchor = lj.userData.want;
           lj.position.set(N.x, N.fire ? 1.3 : N.h, N.z);
-          lj.color.setHex(N.fire ? 0xFF7A26 : 0xFFB042);
+          lj.color.setHex(N.fire ? 0xFF7A26 : LAMP_RED);
           lj.distance = N.fire ? 13 : 19;
         }
         continue;
@@ -1741,7 +1744,7 @@ function main(hotData) {
 
       var A = LAMPS[lj.userData.anchor];
       if (!A) continue;
-      var want = A.fire ? 2.2 + Math.sin(G.time * 11 + A.x) * 0.35 : 2.5;
+      var want = A.fire ? 2.2 + Math.sin(G.time * 11 + A.x) * 0.35 : 3.1;
       lj.intensity += (want - lj.intensity) * step;
     }
   }
@@ -2941,10 +2944,10 @@ function main(hotData) {
         var ax0 = Math.min(px, l.x), ax1 = Math.max(px, l.x);
         aabb('metal', ax0, l.z - 0.05, ax1 + 0.1, l.z + 0.05, l.h + 0.28, l.h + 0.38, 0x343A40);
         aabb('metal', l.x - 0.38, l.z - 0.2, l.x + 0.38, l.z + 0.2, l.h + 0.14, l.h + 0.34, 0x40464C);
-        aabb('lens', l.x - 0.3, l.z - 0.14, l.x + 0.3, l.z + 0.14, l.h + 0.1, l.h + 0.14, 0xFFE4A8);
+        aabb('lens', l.x - 0.3, l.z - 0.14, l.x + 0.3, l.z + 0.14, l.h + 0.1, l.h + 0.14, 0xFF6A58);
       } else {
         aabb('metal', l.x - 0.3, l.z - 0.3, l.x + 0.3, l.z + 0.3, l.h + 0.5, l.h + 0.62, 0x40464C);
-        aabb('lens', l.x - 0.22, l.z - 0.22, l.x + 0.22, l.z + 0.22, l.h + 0.2, l.h + 0.5, 0xFFE4A8);
+        aabb('lens', l.x - 0.22, l.z - 0.22, l.x + 0.22, l.z + 0.22, l.h + 0.2, l.h + 0.5, 0xFF6A58);
       }
       colCircle(px, l.z, 0.22, false);
     });

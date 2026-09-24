@@ -280,7 +280,7 @@ lights, on a fixed budget:
 - **Your eyes.** A faint point light a few steps round the player — the eyes
   adjusting to the dark — so you can see yourself and whatever is right on top
   of you, and nothing further.
-- **Streetlamps.** Only the nearest few can ever be on screen, so a small pool
+- **Streetlamps** burn red, to match the interface. Only the nearest few can ever be on screen, so a small pool
   of point lights is reassigned to the closest of the town's thirty posts. The
   pool size is a quality tier: 2 lights on battery, 3 on balanced, 4 on high. A
   light keeps its post while that post is still wanted, and a light that has to
@@ -417,7 +417,7 @@ can't guarantee. Four passes: scene into a render target, a bright-pass that
 downsamples, a separable blur in two directions, then a composite.
 
 - The bright-pass keys on **max channel, not luma**. This palette's highlights
-  are saturated amber, which luma weighting under-reads and refuses to bloom.
+  are saturated red, which luma weighting under-reads and refuses to bloom.
 - The composite also runs **FXAA**, which is load-bearing: rendering into a
   render target bypasses the canvas's MSAA entirely, so without it turning
   effects on would make edges *worse*.
