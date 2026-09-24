@@ -25,9 +25,9 @@ source of truth, still no build step for development.
 ## What it is
 
 You hold Oakhaven — a small town at night — against the dead, paced by an
-**AI Director**. Survive a horde, take one of three
-permanent upgrades, repeat until you're overrun. Score and best time persist
-locally.
+**AI Director**. Survive a horde, pick up what it leaves you, repeat until
+you're overrun. There are no upgrades, no cheats and no auto-aim: the gun you
+carry and your aim are all you have. Score and best time persist locally.
 
 - **Seven enemy types**, each entering at a higher level so you meet one new
   threat at a time. Level grows with hordes survived and time (see
@@ -56,21 +56,17 @@ locally.
   | Marksman | Slow and heavy, pierces 3 bodies, drops Brutes. |
   | Thumper | Lobs a grenade. Huge against a pack, wasteful on one body. |
 
-- **Eleven stacking upgrades**: damage, fire rate, pierce, crit, armour, regen,
-  pickup magnet, and more.
-- **Twin-stick by default.** The left half of the screen is a floating movement
-  stick, the right half aims and fires. **Auto-aim is off by default** and can be
-  switched on in Settings (the cog on the menu) or on the pause screen — with it on, the weapon tracks the
-  nearest walker and one thumb is enough. Manual aim always overrides it.
-
-  The default is deliberate: auto-aim plus auto-fire leaves the player with only
-  one verb ("don't die"), which rewards standing still in a corner. Giving the
-  right thumb a job keeps both hands in the fight.
-- **A quiet menu.** The logo — traced from the artwork into a vector path, so
-  it is sharp at any size on a transparent background — a Start button and your
-  best run. Settings (auto-aim, cheats, quality, effects, sound) sit behind the
-  **cog** in the bottom-right corner, in a pop-up over the menu; the **i** beside
-  it opens How to Play. Escape closes either.
+- **Twin-stick.** The left half of the screen is a floating movement stick,
+  the right half aims and fires. There is no auto-aim: auto-aim plus auto-fire
+  leaves the player one verb ("don't die"), which rewards standing still in a
+  corner. Giving the right thumb a job keeps both hands in the fight.
+- **A one-word menu.** The logo — traced from the artwork into a vector path,
+  so it is sharp at any size on a transparent background — and **Survive**.
+  Settings (quality, effects, sound) sit behind the **cog** in the bottom-right
+  corner, in a pop-up over the menu; the **i** beside it opens How to Play.
+  Escape closes either.
+- **Blood and black.** The interface is near-black (#050505 up to a dark
+  red-brown for borders) with one accent, blood red.
 - **Synthesised audio** — gunfire, groans, impacts — generated with WebAudio.
   No audio files.
 
@@ -93,11 +89,14 @@ the last body drops. The Director cycles through four states:
 | **Build** | A rising trickle of the common dead | intensity > 0.55, or 35 s |
 | **Peak** | The horde: a budget of bodies from one direction, or two from level 6 | budget spent and ≥ 8 s, or 45 s |
 | **Relax** | Nothing | intensity < 0.15 for 4 s (40 s cap) |
-| **Respite** | Nothing; an upgrade, and supplies | 12–20 s, or you push on 50 m |
+| **Respite** | Nothing; supplies placed ahead of you | 12–20 s, or you push on 50 m |
 
 **Relax is gated on the player, not a clock.** Hurt and cornered, it waits;
-that is the thing a fixed spawn schedule can never do. A horde is announced with its
-own low swell before it arrives.
+that is the thing a fixed spawn schedule can never do. A horde gets no banner. You hear
+it — a few voices screaming out in the dark, synthesised: buzzing sources through
+two vowel formants, pitch torn upward and falling away — and a red warning sign
+flashes at the top of the screen for three seconds, then goes (it holds steady
+instead of flashing if the device asks for reduced motion).
 
 - **Out of sight.** Every spawn is off screen, outdoors, and reachable by path
   (18–38 m by path, never under 14 m in a straight line), preferring behind
@@ -320,21 +319,6 @@ actually see rather than what exists.
 It is a 2D canvas redrawn each frame — a few dozen `arc` calls, far cheaper than
 DOM nodes, and it became necessary the moment darkness landed.
 
-## Cheats
-
-Turn **Cheats: On** in Settings (the cog on the menu) or on the pause screen and a slider button appears in the
-HUD beside pause. It opens a panel with every weapon (tap to equip) and every
-upgrade (tap to add a level, up to its normal cap). The world freezes while the
-panel is open, so you can build a loadout without being eaten.
-
-Touching anything in the panel marks the run: it will not write a best time or
-best score, and the game-over screen says so. Testing a level-12 Howler pack
-shouldn't quietly overwrite a real record.
-
-With cheats on, a readout along the bottom edge also shows what the Director is
-thinking: its state and time in it, intensity and where it is heading, the horde
-budget spent, bodies alive, level, and time to the next special.
-
 ## Controls
 
 | | Touch | Desktop |
@@ -342,7 +326,6 @@ budget spent, bodies alive, level, and time to the next special.
 | Move | Drag on the left half | `WASD` / arrow keys |
 | Aim | Drag on the right half | Mouse |
 | Fire | While aiming | Hold mouse button |
-| Fire (auto-aim on) | Automatic | Automatic |
 | Pause | Button, top right | `Esc` |
 
 ## How it's built
@@ -416,23 +399,15 @@ zero network requests after the engine loads.
 Enemy health, speed **and damage** all scale with the Director's level:
 
 ```js
-hpScale  = 1 + 0.135 * (level - 1)
+hpScale  = 1 + 0.07 * (level - 1)
 spScale  = min(1.42, 1 + 0.022 * (level - 1))
-dmgScale = 1 + 0.12  * (level - 1)
+dmgScale = 1 + 0.06 * (level - 1)
 ```
 
-Damage scaling is load-bearing, not decoration. Without it, flat damage
-reduction eventually zeroes every hit: a −10 flat armour bonus against an
-unscaled 9-damage Shambler floors at 1, the global 0.42s hit cooldown caps
-incoming damage at ~2.4/sec regardless of how many bodies are on you, and 3.5
-HP/sec of regen then exceeds that ceiling. The result was a player who could
-not be killed by anything except Brutes and Bloaters.
-
-The fix is three-part: damage scales, armour is a **percentage** (7%/level to a
-35% cap) so it can never trivialise a hit, and regen only ticks **2.2 seconds
-after you were last hit**, making it a between-fights recovery tool rather than
-a combat one. A fully-maxed defensive build standing still in nine level-7
-zombies now loses ~19 HP/sec.
+The curve is gentle because the player never gets stronger: there are no
+upgrades, only the guns you find. Health and damage grow at about half the rate
+they did when a run stacked damage, armour and regen bonuses, so level 8 means
+zombies with 1.5× the health, not 2×.
 
 ### Post-processing: bloom, FXAA and the grade
 
@@ -507,18 +482,6 @@ Zombies walk the same way with more character. Some shamblers and bloaters drag
 a bad leg — it barely swings or bends, the body drops onto it each step, and the
 cadence is uneven, hurrying off it. Most carry one arm lower; heads loll, each
 at its own pace; brutes and bloaters stomp with a heavy roll; runners run.
-
-### Weapons are base stats; upgrades are multipliers
-
-Upgrades used to mutate `player.damage` directly. That works until weapons can
-swap, at which point "+25% damage" earned on a rifle silently becomes a flat
-number on a shotgun and your build evaporates.
-
-So weapons hold base stats, upgrades write only to `player.mul` (damage, fire
-rate, bullet speed, range) and `player.add` (pierce, shots, crit, spread), and
-a single `recalc()` derives the effective stats into a reused `eff` object
-whenever either side changes. The hot loop never re-derives or allocates, and a
-build carries across every weapon swap.
 
 ### Gait is derived, not tuned
 
