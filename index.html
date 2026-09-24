@@ -5,21 +5,21 @@
 
 <style>
 /* ============================================================
-   GRAVEYARD SHIFT — sodium-vapor palette
+   GRAVEYARD SHIFT — blood and black palette
    Deliberately single-theme: this is a night-time arcade world,
    so every colour is painted explicitly rather than inherited.
    ============================================================ */
 :root{
-  --pit:#050709;
-  --ink:#0A0D10;
-  --slate:#141A20;
-  --slate-2:#1D252D;
-  --fog:#2E3941;
-  --bone:#EDE7D9;
-  --bone-dim:#98A2A8;
-  --bone-faint:#5E6A71;
-  --sodium:#FFA424;
-  --sodium-deep:#C97A12;
+  --pit:#050505;
+  --ink:#080808;
+  --slate:#0D0C0C;
+  --slate-2:#161313;
+  --fog:#2C2323;
+  --bone:#EDE7E3;
+  --bone-dim:#9C9494;
+  --bone-faint:#665C5C;
+  --red:#E2282F;
+  --red-deep:#8E1016;
   --ember:#D0490F;
   --viscera:#9E1B24;
   --viscera-bright:#E23B3B;
@@ -68,7 +68,7 @@ body{
   position:absolute;inset:0;pointer-events:none;z-index:2;
   background:
     radial-gradient(ellipse 104% 82% at 50% 48%,
-      rgba(5,7,9,0) 50%, rgba(5,7,9,.38) 80%, rgba(5,7,9,.78) 100%);
+      rgba(5,5,5,0) 50%, rgba(5,5,5,.38) 80%, rgba(5,5,5,.78) 100%);
 }
 
 /* ---------------- HUD ---------------- */
@@ -80,13 +80,13 @@ body{
   display:flex;flex-direction:column;gap:7px;
   padding:12px 16px 26px;
   /* the lot can be bright under a lamp — keep the readout legible over it */
-  background:linear-gradient(180deg,rgba(5,7,9,.82) 0%,rgba(5,7,9,.52) 58%,rgba(5,7,9,0) 100%);
+  background:linear-gradient(180deg,rgba(5,5,5,.82) 0%,rgba(5,5,5,.52) 58%,rgba(5,5,5,0) 100%);
 }
 .vit{display:flex;align-items:center;gap:10px;}
 
 .hpwrap{
   position:relative;flex:1;max-width:420px;height:21px;
-  background:rgba(5,7,9,.72);
+  background:rgba(5,5,5,.72);
   border:1px solid var(--fog);
   overflow:hidden;
 }
@@ -112,7 +112,7 @@ body{
   pointer-events:auto;
   width:46px;height:46px;flex:none;
   display:grid;place-items:center;
-  background:rgba(10,13,16,.78);
+  background:rgba(8,8,8,.78);
   border:1px solid var(--fog);
   color:var(--bone-dim);
   cursor:pointer;
@@ -129,43 +129,28 @@ body{
   color:var(--bone);font-weight:700;font-size:var(--fs-value);
   font-variant-numeric:tabular-nums;letter-spacing:.04em;
 }
-.readout .tm b{color:var(--sodium);}
+.readout .tm b{color:var(--red);}
 .readout .wep{
-  color:var(--pit);background:var(--sodium);
+  color:var(--bone);background:var(--red);
   font-weight:700;letter-spacing:.1em;
   padding:2px 8px 1px;
 }
 
-/* Director readout (cheats only) */
-#dir-dbg{
-  position:absolute;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;
-  max-width:calc(100% - 24px);pointer-events:none;
-  font:600 11px/1.35 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.02em;
-  color:#BFE6FF;background:rgba(5,7,9,.72);border:1px solid var(--fog);padding:4px 7px;
+/* Horde warning: a red sign at the top that flashes, then goes */
+#horde-warn{
+  position:absolute;left:50%;top:calc(58px + env(safe-area-inset-top,0px));
+  width:clamp(44px,6.4vw,58px);height:auto;margin-left:calc(clamp(44px,6.4vw,58px) / -2);
+  pointer-events:none;z-index:4;opacity:0;color:var(--red);
+  filter:drop-shadow(0 0 14px rgba(226,40,47,.7));
 }
-
-/* Horde announcement */
-#announce{
-  position:absolute;left:0;right:0;top:34%;
-  text-align:center;pointer-events:none;z-index:4;
-  opacity:0;
-}
-#announce.show{animation:announce 2.1s cubic-bezier(.16,.9,.3,1) forwards;}
-#announce .a-sub{
-  font-size:var(--fs-label);letter-spacing:.38em;text-transform:uppercase;
-  color:var(--sodium-deep);margin-bottom:-2px;
-}
-#announce .a-main{
-  font-family:var(--f-display);font-weight:800;
-  font-size:clamp(46px,17vw,90px);line-height:.88;
-  color:var(--bone);letter-spacing:.01em;
-  text-shadow:0 0 34px rgba(255,164,36,.42);
-}
-@keyframes announce{
-  0%{opacity:0;transform:translateY(14px) scale(.96);}
-  16%{opacity:1;transform:translateY(0) scale(1);}
-  72%{opacity:1;}
-  100%{opacity:0;transform:translateY(-8px);}
+#horde-warn svg{display:block;width:100%;height:auto;}
+#horde-warn.show{animation:hordewarn 3.2s linear forwards;}
+@keyframes hordewarn-still{0%,80%{opacity:1;}100%{opacity:0;}}
+@keyframes hordewarn{
+  0%,12%,24%,36%,48%,60%{opacity:1;}
+  6%,18%,30%,42%,54%{opacity:.12;}
+  78%{opacity:1;}
+  100%{opacity:0;}
 }
 
 /* Weapon pickup toast */
@@ -177,8 +162,8 @@ body{
 #toast.show{animation:toast 2.4s cubic-bezier(.16,.9,.3,1) forwards;}
 #toast .t-name{
   font-family:var(--f-display);font-weight:800;
-  font-size:clamp(30px,8vw,42px);line-height:.95;color:var(--sodium);
-  letter-spacing:.02em;text-shadow:0 0 26px rgba(255,164,36,.45);
+  font-size:clamp(30px,8vw,42px);line-height:.95;color:var(--red);
+  letter-spacing:.02em;text-shadow:0 0 26px rgba(226,40,47,.45);
 }
 #toast .t-sub{
   font-size:var(--fs-label);color:var(--bone-dim);
@@ -207,7 +192,7 @@ body{
   border-radius:50%;opacity:0;transition:opacity .14s ease;
   border:1.5px solid rgba(237,231,217,.2);
   background:radial-gradient(circle at 50% 50%,
-    rgba(20,26,32,.42) 0%, rgba(20,26,32,.16) 68%, rgba(20,26,32,0) 100%);
+    rgba(13,12,12,.42) 0%, rgba(13,12,12,.16) 68%, rgba(13,12,12,0) 100%);
 }
 .stick.on{opacity:1;}
 .knob{
@@ -216,9 +201,9 @@ body{
   background:rgba(237,231,217,.16);
   border:1.5px solid rgba(237,231,217,.5);
 }
-#stick-aim{border-color:rgba(255,164,36,.34);}
+#stick-aim{border-color:rgba(226,40,47,.34);}
 #stick-aim .knob{
-  background:rgba(255,164,36,.2);border-color:rgba(255,164,36,.62);
+  background:rgba(226,40,47,.2);border-color:rgba(226,40,47,.62);
 }
 .hintzone{
   position:absolute;bottom:0;height:42%;width:50%;
@@ -235,7 +220,7 @@ body{
 #minimap{
   position:absolute;right:16px;top:112px;width:104px;height:104px;z-index:3;
   pointer-events:none;opacity:0;transition:opacity .2s ease;
-  background:rgba(5,7,9,.62);
+  background:rgba(5,5,5,.62);
   border:1px solid var(--fog);
 }
 #minimap.on{opacity:1;}
@@ -257,7 +242,7 @@ body{
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   padding:26px 20px;
-  background:rgba(5,7,9,.78);
+  background:rgba(5,5,5,.78);
   -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
   overflow-y:auto;
 }
@@ -266,7 +251,7 @@ body{
 
 .eyebrow{
   font-size:var(--fs-label);letter-spacing:.38em;text-transform:uppercase;
-  color:var(--sodium-deep);text-align:center;
+  color:var(--red);text-align:center;
 }
 .wordmark{
   font-family:var(--f-display);font-weight:800;
@@ -277,14 +262,14 @@ body{
   text-align:center;color:var(--bone);
   letter-spacing:.005em;text-wrap:balance;
   margin:6px 0 0;
-  text-shadow:0 0 46px rgba(255,164,36,.3);
+  text-shadow:0 0 46px rgba(226,40,47,.3);
 }
-.wordmark .lo{display:block;color:var(--sodium);}
+.wordmark .lo{display:block;color:var(--red);}
 /* the logo: traced from the artwork into a vector, so it is sharp at any size */
 .logo-h{margin:10px 0 0;line-height:0;}
 .logo{
   display:block;width:100%;height:auto;max-height:34vh;
-  filter:drop-shadow(0 0 22px rgba(255,164,36,.22)) drop-shadow(0 2px 0 rgba(0,0,0,.55));
+  filter:drop-shadow(0 0 22px rgba(226,40,47,.22)) drop-shadow(0 2px 0 rgba(0,0,0,.55));
 }
 
 /* Menu corner: info and settings, clear of the notch and home bar */
@@ -296,23 +281,23 @@ body{
 .icon-btn{
   pointer-events:auto;width:48px;height:48px;padding:11px;box-sizing:border-box;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
-  color:var(--bone);background:rgba(5,7,9,.55);border:1px solid var(--fog);
+  color:var(--bone);background:rgba(5,5,5,.55);border:1px solid var(--fog);
   transition:color .12s ease,border-color .12s ease,background .12s ease;
 }
 .icon-btn svg{width:100%;height:100%;display:block;}
 .icon-btn:active,.icon-btn[aria-expanded="true"]{
-  color:var(--sodium);border-color:var(--sodium-deep);background:rgba(255,164,36,.08);
+  color:var(--red);border-color:var(--red-deep);background:rgba(226,40,47,.08);
 }
 .icon-btn:focus-visible{outline:2px solid var(--bone);outline-offset:2px;}
 /* the settings pop-up rises out of the corner, over a dimmed menu */
-.set-pop{position:absolute;inset:0;z-index:2;background:rgba(5,7,9,.5);}
+.set-pop{position:absolute;inset:0;z-index:2;background:rgba(5,5,5,.5);}
 .set-pop[hidden]{display:none;}
 .set-card{
   position:absolute;box-sizing:border-box;
   right:calc(16px + env(safe-area-inset-right,0px));
   bottom:calc(72px + env(safe-area-inset-bottom,0px));
   width:min(340px,calc(100% - 32px));max-height:calc(100% - 96px);overflow-y:auto;
-  background:var(--slate);border-top:2px solid var(--sodium);
+  background:var(--slate);border-top:2px solid var(--red);
   padding:14px 16px 16px;
 }
 .set-card .toggles{margin-top:12px;}
@@ -327,11 +312,18 @@ body{
   font-family:var(--f-display);font-weight:700;
   font-size:clamp(27px,7.4vw,36px);letter-spacing:.08em;text-transform:uppercase;
   padding:15px 18px 12px;
-  color:var(--pit);background:var(--sodium);
+  color:var(--bone);background:var(--red);
   border:none;cursor:pointer;
   transition:background .12s ease,transform .07s ease;
 }
-.btn:active{transform:translateY(1px);background:#FFB44E;}
+.btn:active{transform:translateY(1px);background:#F0434A;}
+/* the menu is one word: an outlined button that fills with red on touch */
+#btn-play{
+  width:auto;min-width:220px;margin:0 auto;padding:13px 34px 11px;
+  background:transparent;color:var(--bone);border:1px solid var(--red);
+  letter-spacing:.34em;text-indent:.34em;font-size:clamp(22px,5.4vw,30px);
+}
+#btn-play:hover,#btn-play:active{background:var(--red);}
 .btn.ghost{
   background:transparent;color:var(--bone);
   border:1px solid var(--fog);font-size:clamp(20px,5.5vw,27px);padding:13px 18px 11px;
@@ -347,7 +339,7 @@ body{
   color:var(--bone-faint);text-align:center;
 }
 .metarow b{
-  display:block;color:var(--sodium);font-size:clamp(23px,6.2vw,29px);font-weight:600;
+  display:block;color:var(--red);font-size:clamp(23px,6.2vw,29px);font-weight:600;
   letter-spacing:.02em;font-variant-numeric:tabular-nums;
   font-family:var(--f-display);
 }
@@ -366,11 +358,11 @@ body{
   border:1px solid var(--fog);
 }
 .tog[aria-pressed="true"]{
-  color:var(--sodium);border-color:var(--sodium-deep);
-  background:rgba(255,164,36,.08);
+  color:var(--red);border-color:var(--red-deep);
+  background:rgba(226,40,47,.08);
 }
 
-/* Upgrade cards */
+/* Screen headings */
 .up-head{text-align:center;margin-bottom:20px;}
 .up-title{
   font-family:var(--f-display);font-weight:800;
@@ -378,39 +370,8 @@ body{
 }
 .up-sub{
   font-size:var(--fs-label);letter-spacing:.26em;text-transform:uppercase;
-  color:var(--sodium-deep);margin-top:4px;
+  color:var(--red);margin-top:4px;
 }
-.cards{display:flex;flex-direction:column;gap:9px;}
-.card{
-  pointer-events:auto;display:flex;align-items:center;gap:13px;
-  width:100%;text-align:left;cursor:pointer;
-  padding:15px 15px;
-  background:var(--slate);border:1px solid var(--fog);
-  border-left:3px solid var(--sodium);
-  color:var(--bone);font-family:var(--f-ui);
-  transition:background .12s ease,transform .07s ease;
-}
-.card:active{transform:translateY(1px);background:var(--slate-2);}
-.card:focus-visible{outline:2px solid var(--sodium);outline-offset:2px;}
-.card .glyph{
-  flex:none;width:44px;height:44px;display:grid;place-items:center;
-  background:rgba(255,164,36,.1);border:1px solid rgba(255,164,36,.26);
-}
-.card .glyph svg{width:23px;height:23px;display:block;}
-.card .body{flex:1;min-width:0;}
-/* both are spans inside a flex item, so they need to be blocks to stack */
-.card .nm,.card .ds{display:block;}
-.card .nm{
-  font-weight:700;font-size:clamp(17px,4.7vw,21px);letter-spacing:.02em;line-height:1.16;
-}
-.card .ds{
-  font-size:clamp(14px,3.8vw,17px);color:var(--bone-dim);line-height:1.38;margin-top:3px;
-}
-.card .lv{
-  flex:none;font-size:var(--fs-micro);letter-spacing:.08em;color:var(--bone-faint);
-  text-transform:uppercase;font-variant-numeric:tabular-nums;
-}
-
 /* Game over stats */
 .stats{
   display:grid;grid-template-columns:1fr 1fr;gap:1px;
@@ -426,7 +387,7 @@ body{
   color:var(--bone);line-height:1.05;margin-top:3px;
   font-variant-numeric:tabular-nums;
 }
-.stat .v.hi{color:var(--sodium);}
+.stat .v.hi{color:var(--red);}
 
 .howto{
   margin-top:18px;font-size:var(--fs-body);line-height:1.62;color:var(--bone-dim);
@@ -434,71 +395,22 @@ body{
 .howto p{margin:0 0 9px;}
 .howto b{color:var(--bone);font-weight:600;}
 .howto .k{
-  color:var(--sodium);font-weight:600;
+  color:var(--red);font-weight:600;
 }
 
-/* ---------------- Cheat panel ----------------
-   Deliberately reads as a tool, not part of the game: denser, flatter, no
-   display face, so it never gets mistaken for real UI in a screenshot. */
-.sheet{
-  justify-content:flex-end;
-  padding:0;
-  background:rgba(5,7,9,.42);
-}
-.cheat-panel{
-  /* the page reset is content-box, so width:100% + padding would overflow */
-  box-sizing:border-box;
-  width:100%;max-width:440px;margin:0 auto;
-  background:var(--slate);
-  border-top:2px solid var(--sodium);
-  padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px));
-  max-height:72%;overflow-y:auto;
-  display:flex;flex-direction:column;gap:10px;
-}
-.cheat-head{display:flex;align-items:center;gap:10px;}
-.cheat-title{
+/* Settings pop-up heading */
+.set-head{display:flex;align-items:center;gap:10px;}
+.set-title-t{
   flex:1;font-size:var(--fs-label);font-weight:700;
-  letter-spacing:.22em;text-transform:uppercase;color:var(--sodium);
+  letter-spacing:.22em;text-transform:uppercase;color:var(--red);
 }
-.cheat-close{
+.set-close{
   pointer-events:auto;font-family:var(--f-ui);
   font-size:var(--fs-micro);font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;padding:9px 14px;min-height:40px;cursor:pointer;
   background:transparent;color:var(--bone);border:1px solid var(--fog);
 }
-.cheat-close:active{background:var(--slate-2);}
-.cheat-sec{
-  font-size:var(--fs-micro);letter-spacing:.2em;text-transform:uppercase;
-  color:var(--bone-faint);border-bottom:1px solid var(--fog);
-  padding-bottom:5px;margin-top:2px;
-}
-.cheat-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px;
-}
-.cheat-btn{
-  pointer-events:auto;cursor:pointer;text-align:left;
-  font-family:var(--f-ui);font-size:var(--fs-micro);font-weight:600;
-  line-height:1.2;padding:8px 9px;min-height:42px;
-  background:var(--slate-2);color:var(--bone);
-  border:1px solid var(--fog);
-  display:flex;flex-direction:column;justify-content:center;gap:2px;
-}
-.cheat-btn:active{background:var(--fog);}
-.cheat-btn .lvl{
-  font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--sodium);font-variant-numeric:tabular-nums;
-}
-.cheat-btn[data-on="1"]{
-  background:var(--sodium);color:var(--pit);border-color:var(--sodium);
-}
-.cheat-btn[data-on="1"] .lvl{color:var(--pit);opacity:.72;}
-.cheat-btn[disabled]{opacity:.42;cursor:default;}
-.cheat-btn[disabled] .lvl{color:var(--bone-faint);}
-.cheat-note{
-  font-size:var(--fs-micro);line-height:1.45;color:var(--bone-faint);
-}
-.cheat-note b{color:var(--ember);}
-
+.set-close:active{background:var(--slate-2);}
 #rotate{
   position:absolute;inset:0;z-index:30;display:none;
   align-items:center;justify-content:center;padding:26px 24px;
@@ -506,7 +418,7 @@ body{
 }
 #rotate.on{display:flex;}
 #rotate .rot-inner{max-width:320px;color:var(--bone-dim);}
-#rotate svg{width:74px;height:52px;color:var(--sodium);display:block;margin:0 auto 16px;}
+#rotate svg{width:74px;height:52px;color:var(--red);display:block;margin:0 auto 16px;}
 #rotate .rot-title{
   font-family:var(--f-display);font-weight:800;font-size:34px;
   color:var(--bone);line-height:1;margin-bottom:8px;
@@ -555,7 +467,7 @@ body{
 }
 
 @media (prefers-reduced-motion:reduce){
-  #announce.show{animation-duration:.01ms;}
+  #horde-warn.show{animation:hordewarn-still 3.2s linear forwards;}
   *{transition-duration:.01ms!important;}
 }
 </style>
@@ -583,15 +495,6 @@ body{
           <div class="hptext" id="hp-text">100 / 100</div>
         </div>
         <div class="hudbtns">
-          <button class="pausebtn" id="btn-cheats" aria-label="Cheats" hidden>
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M1 4h5M10 4h5M1 8h9M14 8h1M1 12h3M8 12h7"
-                    stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-              <circle cx="8" cy="4" r="2" fill="currentColor"/>
-              <circle cx="12" cy="8" r="2" fill="currentColor"/>
-              <circle cx="6" cy="12" r="2" fill="currentColor"/>
-            </svg>
-          </button>
           <button class="pausebtn" id="btn-pause" aria-label="Pause">
             <svg viewBox="0 0 12 14" aria-hidden="true">
               <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
@@ -609,24 +512,22 @@ body{
     </div>
   </div>
 
-  <div id="announce"><div class="a-sub" id="a-sub">Horde</div><div class="a-main" id="a-main">Incoming</div></div>
-  <div id="dir-dbg" hidden></div>
+  <div id="horde-warn" role="img" aria-label="Horde incoming">
+    <svg viewBox="0 0 64 56" aria-hidden="true">
+      <path d="M32 3L61 53H3z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M32 20v16" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="32" cy="44.5" r="3.6" fill="currentColor"/>
+    </svg>
+  </div>
   <div id="hurt"></div>
   <div id="toast"><div class="t-name" id="toast-name"></div><div class="t-sub" id="toast-sub"></div></div>
 
   <!-- MENU -->
   <section class="screen" id="sc-menu">
     <div class="panel">
-      <div class="eyebrow">Sector 7 &middot; Night Shift</div>
       <h1 class="logo-h"><svg class="logo" viewBox="0 0 881 345" role="img" aria-labelledby="logo-t"><title id="logo-t">Graveyard Shift</title><path fill="#fff" fill-rule="evenodd" d="M272.6 340.1C271.7 340 269.4 337.9 262.6 331.3L260 328.8L260 321L260 313.3L258.8 309.4C258.1 307.3 257.5 305.3 257.4 305C257.3 304.6 257.5 304.4 258.1 304.2C259.5 303.8 284.6 304 284.9 304.4C285 304.6 284.8 305.3 284.6 305.9C283.2 309.2 282.9 310.9 282.9 314.1C282.9 317.1 283 317.4 283.9 318.5C285.4 320.6 285.8 320.7 293.8 320.7L301 320.7L302.7 319L304.4 317.4L304.3 308.8C304.2 299.2 304.1 298.9 301.9 297.8C300.4 297 294.1 294.3 292.7 293.9C292 293.8 291.4 293.5 291.2 293.3C291 293.1 290.6 293 290.3 293C290 293 289.6 292.8 289.3 292.5C289.1 292.2 288.6 292 288.3 292C287.9 292 287.1 291.8 286.4 291.5C285.7 291.2 284.7 290.8 284.2 290.5C283.6 290.3 282.6 289.8 281.9 289.5C281.2 289.2 280.5 289 280.3 289C280.1 289 279.1 288.6 277.9 288C276.8 287.5 275.5 287 275 286.8C272.3 286 269.6 284.4 266.5 281.6C264.7 279.9 263.1 278.4 263.1 278.3C263 278.1 262.7 278 262.5 278C262.3 278 261.6 277.5 261.1 276.9L260.1 275.7L259.9 259.2C259.9 250 259.9 242.1 259.9 241.6C260 241 261.6 239.2 265.4 235.5C268.3 232.6 271.2 229.9 271.8 229.6C272.7 229.1 274.6 229 293.7 229C311.4 229 314.6 229.1 315.4 229.5C316 229.8 318.8 232.3 321.6 235.2L326.9 240.4L327.1 248.7C327.3 254.3 327.5 257.5 327.8 258.7C328.1 259.7 328.5 261.4 328.8 262.4C329.1 263.5 329.3 264.5 329.2 264.7C329 264.9 324 265 315.9 265L302.9 265L303.1 263.8C303.2 263.1 303.5 261.5 303.8 260.4C304.3 258.8 304.4 257.3 304.3 254.8L304.2 251.4L302.8 250.2C302.1 249.5 301.2 248.9 300.8 248.8C300.4 248.7 296.8 248.7 292.8 248.7L285.5 248.8L284.2 250.2L283 251.5L283 258.6C283 267.6 282.8 267.3 287.9 269.5C289.9 270.3 291.6 271 291.8 271C291.9 271 293 271.4 294.2 272C295.4 272.6 296.5 273 296.7 273C297 273 297.9 273.4 300.5 274.5C301.1 274.7 302.4 275.3 303.5 275.7C304.6 276.1 305.6 276.6 305.8 276.7C306 276.9 306.4 277 306.7 277C307 277 307.4 277.2 307.7 277.5C307.9 277.8 308.4 278 308.8 278C309.2 278 309.9 278.2 310.5 278.5C311 278.8 311.6 279 311.8 279C312.1 279 312.4 279.2 312.7 279.5C312.9 279.8 313.4 280 313.7 280C315.1 280 318.3 281.9 320.5 284.2C321.1 284.7 322.7 286.1 324.1 287.3C325.5 288.5 326.8 289.9 326.9 290.3C327.1 290.8 327.2 299.6 327.2 309.9L327.2 328.6L322.2 333.7C319.4 336.4 316.6 339 316 339.4L314.8 340.2L294.2 340.2C282.8 340.2 273.1 340.2 272.6 340.1ZM343.1 339.8C342.9 339.3 343 338.9 344 335.2C344.4 333.7 344.9 331.8 345.1 331C345.5 329 345.8 251 345.4 243.7C345.2 240.7 344.9 238.1 344.7 237.9C344.5 237.7 344.3 237.2 344.3 236.9C344.3 236.1 343.1 231.9 342.6 230.7C341.8 229.2 342.1 229.2 356.6 229.1C364.1 229.1 370.4 229.2 370.8 229.2C371.3 229.4 371.4 229.6 371.2 230.8C371.1 231.5 370.8 232.5 370.5 233C370.3 233.4 369.7 235 369.3 236.3C368.7 238.5 368.5 239.9 368.3 246.3C368.2 250.5 368.1 258 368.1 263.1L368.2 272.4L369.2 273.2L370.2 274L380.5 274C391.8 274 391.8 274 392.6 272.1C392.9 271.4 393 266.9 392.9 255.7C392.8 240.7 392.8 240.1 392.1 237.8C391.7 236.5 391.2 235 391.1 234.3C391 233.7 390.7 232.9 390.5 232.5C389.9 231.6 389.6 229.8 389.9 229.6C390.1 229.4 415.9 229.2 417.8 229.3C418.3 229.3 418.4 229.5 418.2 230.7C418.1 231.5 417.8 232.4 417.6 232.8C417.2 233.5 416.8 234.9 415.8 239.8C415.1 243.4 415.1 325.6 415.8 329.5C416.9 335 417.3 336.7 417.6 337.1C417.9 337.5 418.5 340 418.3 340C417.5 340.2 391.5 340.4 390.9 340.2C389.9 340 389.8 339.4 390.5 337.9C390.7 337.3 391.3 335.2 391.9 333.2L392.8 329.5L392.9 312.3L393 295.1L391.8 294L390.6 293L380.5 293L370.3 293L369.1 294.1L368 295.3L368.1 312.2C368.2 326.2 368.3 329.5 368.7 331.2C369 332.3 369.4 333.9 369.7 334.8C369.9 335.8 370.3 336.9 370.5 337.3C370.7 337.8 371 338.5 371.1 339C371.2 339.8 371.1 339.8 369.2 340C368.1 340.2 361.8 340.3 355.2 340.3C344.9 340.3 343.3 340.3 343.1 339.8ZM432.9 340.1C432.3 339.9 432.2 339.4 432.6 338.3C433.1 337 434 333.9 434.5 331.3C435 329.1 435 323.9 434.9 284.2C434.8 235.3 434.9 238.4 432.8 232.7C432.3 231.4 432 230.1 432.1 229.9C432.2 229.5 434.9 229.4 446 229.3C453.6 229.2 460.1 229.2 460.4 229.3C461.1 229.4 461.2 230.4 460.6 231.6C460.3 232.1 459.8 233.8 459.3 235.3C458.9 236.9 458.4 238.3 458.3 238.5C457.9 238.9 457.9 329.1 458.3 330.1C458.5 330.5 458.9 332.3 459.3 334C459.7 335.7 460.3 337.7 460.6 338.3C460.9 339.1 461 339.5 460.7 339.8C460.4 340.1 456.5 340.2 446.9 340.2C439.5 340.3 433.2 340.2 432.9 340.1ZM475.7 340C475.4 339.8 475.3 339.5 475.6 338.6C476 337.4 476.4 335.8 477.3 332.5C477.7 330.7 477.8 325.1 477.9 285.5C478 242 478 240.4 477.4 238C476.1 233.2 475.7 231.8 475.3 230.9C475 230.3 475 229.9 475.2 229.7C475.4 229.5 487.9 229.3 508.6 229.2C535.5 229.1 541.8 229.2 542.2 229.6C542.4 229.8 542.7 231.2 542.8 232.6C542.9 234 543.2 236.4 543.5 238C543.8 239.6 544 241.4 544 242.2C544 242.9 544.2 245.2 544.5 247.3C544.8 249.4 544.9 251.2 544.8 251.4C544.6 251.8 542.8 251.8 542.5 251.3C542.4 251.2 542 251 541.6 251C541.2 251 540.5 250.8 540.1 250.5C539.6 250.3 538.1 249.7 536.8 249.3C534.6 248.7 534 248.6 518.4 248.7L502.3 248.8L501.7 249.7C501.1 250.5 501 251.2 501 261.8C501 271.9 501.1 273.2 501.6 274L502.1 275L508.6 275C514.9 275 515.1 275 518.3 274C520 273.4 521.8 272.8 522.2 272.6C522.6 272.4 523.2 272.3 523.5 272.5C524 272.7 524.1 273 523.9 275.2C523.8 276.6 523.7 282 523.7 287.2C523.7 297.8 523.8 297.2 521.1 295.9C516.7 293.7 517.3 293.8 509.7 293.7C502.7 293.6 502.6 293.6 501.8 294.4L501 295.1L501 312.5C501 322.1 501.1 330 501.3 330.1C501.4 330.2 501.7 331.1 501.8 332.1C502 334.2 502.7 336.4 503.9 339.1C504 339.2 503.8 339.5 503.5 339.8C503 340.3 501.3 340.3 489.6 340.3C482.2 340.3 476 340.2 475.7 340ZM574.9 340.1C574.4 340 574.3 339.7 574.4 339.1C574.8 337.4 575.4 335.2 575.6 334.9C575.7 334.7 576 333.4 576.3 332.2C576.7 330.3 576.8 322.7 576.9 290.5C577 251.3 577 251.3 576.3 250.1C575.8 249.4 575.3 249 574.6 248.8C574 248.7 570.1 248.7 566 248.7C559.5 248.8 558.3 248.9 557.2 249.5C555.8 250.1 554.9 250.5 552.4 251.5C550.5 252.3 550.1 251.9 550.6 249.6C550.8 248.7 551 247.5 551 246.9C551 246.3 551.2 244.6 551.5 243.2C551.8 241.7 552.2 238.1 552.5 235.3C552.9 232.4 553.2 229.8 553.4 229.6C553.6 229.3 560.6 229.2 588.5 229.2C627.3 229.2 624 228.9 624 231.6C624 232.3 624.1 233.7 624.3 234.6C624.7 236.3 625.6 244.8 625.9 249.1C626.1 251.5 626 251.7 625.4 251.7C625.1 251.7 624.7 251.6 624.5 251.4C624.4 251.3 623.8 251 623.1 250.8C622.4 250.5 620.9 250 619.8 249.6C618 248.9 617.3 248.8 609.8 248.8L601.7 248.8L600.9 249.6L600 250.5L600.1 290.3L600.2 330.2L601.2 334C601.8 336.2 602.5 338.2 602.7 338.6C603.6 340.1 603.3 340.2 588.9 340.2C581.5 340.3 575.2 340.2 574.9 340.1ZM122 212.8C121.7 212.5 123.7 210.1 128.8 204.8L131.5 202L206.7 202C248 202 282.5 202.1 283.2 202.1C284 202.1 284.9 201.9 285.2 201.6C285.6 201.3 288.1 201.1 296.3 201C306.8 200.8 311.5 200.4 313.7 199.5C314.3 199.3 316.2 198.6 317.8 198C319.5 197.4 321 196.8 321.2 196.6C321.4 196.5 322.3 196.1 323.2 195.8C324.1 195.5 325 195.1 325.2 195C325.7 194.5 325.4 190.7 324.8 190C324.4 189.5 324.4 189.2 324.8 187.8C325.1 186.9 325.5 185.5 325.7 184.6C326.1 183 327 182.4 327 183.6C327 184 327.2 184.7 327.5 185.2C327.8 185.7 328 186.4 328 186.7C328 187 328.2 187.7 328.6 188.3C329.1 189.4 329.1 189.5 328.4 189.9C327.8 190.3 327.7 190.7 327.7 192.2C327.7 194.4 328 194.6 330 193.9C330.8 193.6 332.1 193.2 332.8 193C334.4 192.7 335.9 192.1 337.9 191.3C339.2 190.7 339.2 190.7 339.4 188.6C339.6 187 339.5 186.4 339.1 185.9C338.6 185.4 338.6 185.1 339.1 182.6C339.7 179.3 340.2 177.8 340.6 178.2C340.8 178.4 341.4 179.8 342 181.4C343 184.4 343 185.6 342 186.1C341.7 186.4 341.8 189.5 342.1 189.9C342.3 190 342.8 189.9 343.4 189.7C344.8 189.2 346.7 188.8 350.2 188.4C351.8 188.2 353.1 187.9 353.3 187.8C353.9 187.5 353.7 182.9 353.2 181.8C352.7 180.9 352.7 180.5 353.3 178.1C353.7 176.7 354 175.2 354.1 174.8C354.4 173 356 175.5 356 177.7C356 178.2 356.1 178.7 356.3 178.8C357 179.2 357.1 181 356.4 181.8C355.9 182.4 355.9 183 355.9 185.3L356.1 188.1L359.8 187.9C362.7 187.7 363.6 187.5 363.9 187.1C364.2 186.7 364.3 184.5 364.3 179C364.3 170.7 364.5 170 366.5 166.8C367.9 164.6 370.2 162.3 371.4 161.7C372.3 161.3 372.5 161.4 374.5 163.3C376.6 165.4 379 168.8 379 169.8C379 170.1 379.2 170.7 379.3 171C379.5 171.4 379.7 174.5 379.7 178.4C379.7 182.1 379.9 185.4 380.1 185.8C380.3 186.3 380.6 186.4 381.9 186.2C382.8 186 384 185.7 384.7 185.4L386 184.9L386 182C386 179.8 385.9 179 385.5 178.7C384.9 178.1 384.9 176 385.5 175.1C385.8 174.8 386 174.1 386 173.7C386 172.2 386.4 171.3 387 171.3C387.5 171.3 387.7 171.7 387.8 172.6C388 173.3 388.3 174.5 388.5 175.4C389.1 177.4 389.1 178.1 388.5 178.7C387.8 179.3 387.8 184 388.5 184C389 184 391 183.2 392 182.6C392.3 182.5 392.8 182.2 393.2 182C395.5 181 398.3 179.6 398.9 179.1C399.5 178.6 399.6 178.1 399.7 175.9C399.8 174 399.7 173.2 399.4 173.1C398.4 172.7 398.3 171.7 399.1 169.3C399.6 167.9 400 166.4 400.1 165.9C400.3 165.1 400.4 165 400.8 165.3C401.1 165.6 401.5 166.4 401.7 167.1C401.9 167.9 402.3 169.3 402.6 170.2C403.1 171.9 403.1 172 402.6 172.6C401.8 173.4 401.7 178 402.5 178C402.8 178 403 177.9 403 177.7C403 177.5 404.1 177.1 405.4 176.7C406.7 176.3 408.3 175.7 408.9 175.5C409.5 175.2 410.3 175 410.7 175C411 175 411.4 174.9 411.5 174.7C411.6 174.5 412.2 174.3 412.8 174.2L414 174L414 171.1C414 168.4 413.9 168.1 413.1 167.4C412.6 166.9 412.4 166.4 412.5 166C412.9 165 413.7 162.2 413.9 161.1C414.1 159.6 415 159.8 415.5 161.5C417.1 166.7 417.1 166.6 416.5 167.5C416.2 168.1 416 169.1 416 170.9C416 172.4 416.1 173.6 416.2 173.7C416.3 173.8 417.1 173.7 417.9 173.4C420.9 172.5 421.5 172.4 424.5 172C426.1 171.8 427.6 171.6 427.7 171.5C427.9 171.4 428 169.9 428 168.3C428 165.8 427.9 165.2 427.3 164.4C426.7 163.5 426.7 163.4 427.1 161.7C427.7 159.6 427.9 158.9 428.2 157.6C428.4 156.4 429.6 156.3 429.8 157.4C429.9 157.8 430.1 158.6 430.2 159.2C430.3 159.7 430.5 160.9 430.7 161.8C431 163.1 431 163.6 430.5 164.5C430.1 165.2 430 166.2 430.1 168.3L430.2 171.2L433.8 171.3C437.4 171.5 438.2 171.8 437.8 172.9C437.5 173.5 436.7 173.7 433.2 173.8L430.2 173.8L430.2 187.8L430.2 201.8L441.6 201.9C448 202 453.2 201.9 453.4 201.7C453.7 201.4 453.8 174.5 453.5 174C453.4 173.8 452.5 173.7 451.6 173.6C450.6 173.6 449.1 173.5 448.2 173.4C446.7 173.2 446.5 173.1 446.5 172.3C446.5 171.5 446.5 171.5 450 171.4L453.6 171.3L453.7 168.4C453.8 166.1 453.7 165.3 453.3 164.5C452.8 163.6 452.8 163.3 453.2 161.3C453.5 160.1 453.8 158.6 453.9 157.8C454 157.1 454.2 156.4 454.3 156.2C454.7 155.8 455.7 157.2 456 158.6C457.1 164 457.1 164 456.6 164.6C456.1 165.1 456 165.9 456 168C456 169.6 456.1 171 456.3 171.3C456.4 171.5 458 171.9 459.9 172.2C461.7 172.4 464.1 172.8 465.3 173C467.9 173.5 468 173.4 468 170.5C468 169 467.8 168.3 467.5 168C466.9 167.5 466.9 166 467.5 163.9C467.8 162.9 468.1 161.8 468.2 161.2C468.3 160.6 468.6 160.3 469 160.3C469.6 160.3 470 160.9 470 162.1C470 162.5 470.3 163.7 470.7 164.8C471.3 166.8 471.3 167.5 470.5 167.8C470.1 167.9 470 168.7 470 171L470 174L470.9 174.2C471.4 174.3 472.1 174.5 472.4 174.7C472.7 174.9 473.2 175 473.5 175C473.7 175 474.4 175.2 474.9 175.5C475.4 175.7 476.9 176.3 478.3 176.7C479.6 177.1 480.8 177.5 480.9 177.7C481 177.9 481.3 178 481.5 178C482.2 178 482.2 173.2 481.5 172.9C480.9 172.6 480.9 171.5 481.5 169.5C481.8 168.6 482.1 167.3 482.2 166.6C482.5 164.6 484 165 484 167C484 167.4 484.3 168.7 484.8 169.9L485.5 172.1L484.8 172.6C484.1 173.2 484.1 173.4 484.3 176.2L484.5 179.1L486.5 180.2C487.7 180.8 488.9 181.3 489.2 181.4C489.5 181.5 490.4 181.9 491 182.3C492.5 183.2 494.3 183.9 495.2 184.1C495.8 184.2 495.8 184 495.9 181.8C496 180 495.9 179.1 495.5 178.5C495 177.8 495 177.5 495.5 175.4C495.8 174.2 496.1 172.7 496.2 172.2C496.4 171 497.4 171.2 497.8 172.5C497.9 173.1 498.3 174.2 498.5 175C498.8 175.8 499 176.8 499.2 177.2C499.3 177.7 499.1 178.2 498.7 178.6C498 179.2 498 179.6 498.1 182.2L498.2 185.2L499.4 185.6C500 185.8 501.3 186 502.2 186.1L503.8 186.2L504 178.8C504.2 170.7 504.5 169.7 506.5 166.6C507.1 165.6 508.5 164 509.6 163L511.5 161.1L512.5 161.6C514.5 162.7 518.5 167.7 518.9 169.7C519 170.1 519.2 170.9 519.4 171.3C519.6 171.7 519.7 175.4 519.6 179.6C519.6 183.7 519.7 187.2 519.9 187.3C520.3 187.7 528 188.2 528 187.8C528.3 183.3 528.3 182.7 527.6 181.8C527 181 526.9 180.8 527.3 179.9C527.5 179.3 527.9 178.2 528 177.5C528.4 175.6 528.9 174.3 529.4 174.4C529.8 174.5 530.4 176.7 531 179.8C531.3 181.1 531.2 181.6 530.8 182C530.4 182.5 530.3 183.2 530.4 185.2L530.5 187.8L532.3 188.1C537.1 188.8 538.9 189.1 539.9 189.6C540.5 189.8 541.2 190 541.6 189.9C542.5 189.8 542.5 187.5 541.7 185.8C541 184.5 541 184.3 541.5 183.4C541.8 182.8 542 182.1 542 181.8C542 180.8 543.1 178.3 543.5 178.3C543.9 178.3 544.8 181.2 545.2 183.8C545.3 185 545.3 185.5 544.9 185.9C544.6 186.4 544.5 187.1 544.6 188.6C544.7 190.7 544.8 190.7 546.1 191.3C547.7 192 549.6 192.7 550.5 192.9C550.9 193 552.2 193.4 553.5 193.7C556.1 194.5 556.3 194.4 556.3 192C556.3 191 556.1 190.3 555.8 190C555.3 189.5 555.2 188.5 555.7 188.2C555.8 188.1 556 187.6 556 187.2C556 186.5 557 183.5 557.4 183.1C557.7 182.8 558.6 185.1 558.9 186.9C559 187.8 559.2 188.7 559.4 188.9C559.6 189.2 559.5 189.6 559.2 190.1C558.9 190.6 558.7 191.5 558.7 192.9C558.7 195.2 558.3 195 564 197.2C565.7 197.8 567.5 198.5 567.8 198.6C568.2 198.8 569.1 199.2 569.8 199.4C570.6 199.7 573.2 200.2 575.7 200.5C580.4 201 584.3 201.5 588.2 202C589.4 202.2 592.7 202.3 595.3 202.3C598 202.3 600.7 202.4 601.4 202.5C602.7 202.7 603.5 202.5 606 201.4C607 200.9 608.6 200.9 615.3 200.8C622.5 200.8 623.6 200.9 624.6 201.4C625.7 202 627.5 202 648.2 202C664.2 202 670.9 202.1 671.7 202.4C672.6 202.7 673.1 202.7 674.4 202.2C675.7 201.7 676.7 201.6 679.1 201.8C680.8 201.9 682.6 202.1 683 202.3C683.6 202.5 684.4 202.5 685.4 202.2C686.5 201.9 695.1 201.9 718.5 201.9L750.2 202L753.1 204.9C754.7 206.5 756 207.9 756 208.1C756 208.2 756.9 209.2 758 210.2C759.1 211.3 760 212.3 759.9 212.6C759.8 213 756.7 213.1 735.5 213.2C714 213.2 711 213.2 709.3 212.7C706.7 211.9 701.1 212 698.6 212.8C696.9 213.3 695.7 213.4 688.7 213.3C681.9 213.2 680.7 213.1 680 212.6C679.6 212.3 678.8 212 678.4 212C678 212 677.2 212.3 676.8 212.6C675.9 213.1 670.3 213.2 570.7 213.2C471.2 213.2 465.4 213.1 463.6 212.6C461.3 211.9 459.4 211.8 457.2 212.5C455.1 213.2 451.7 213.2 450.8 212.5C449.9 211.8 441.9 211.8 440.7 212.5C440 212.9 437.5 213 426.9 213L413.9 213L412.7 212C411.1 210.7 410 210.7 408.1 212L406.7 213L392.2 213C378.4 213.1 377.6 213.1 377 212.5C375.9 211.5 370 211.5 368.3 212.5C367.2 213.2 366.5 213.2 319.3 213.2C269.8 213.2 270 213.2 270 211.9C270 210.9 265.3 208 263.5 208C262.4 208 260.5 209.1 260 210C259.6 210.8 255.7 212 253.8 212C253.1 212 251.8 212.3 251 212.6C249.7 213 246.4 213.1 221.2 213.2C197.4 213.2 192.4 213.2 190.2 212.7C185.5 211.9 185.4 211.9 184.7 212.5C184.1 213 182 213.1 153.2 213.1C130.8 213.2 122.2 213.1 122 212.8ZM20.1 204.5C19.6 204.2 16 201 12.2 197.3C5.9 191.2 5.3 190.5 4.8 188.9C4.4 187.4 4.3 177.6 4.3 105.7C4.3 47.9 4.4 23.8 4.7 22.9C4.9 22.1 5.5 21.1 6 20.6C6.6 20.1 7 19.5 7 19.4C7 19.3 11.7 13.9 12.5 13.2C12.7 13 13.5 11.9 14.4 10.8C16 8.7 18.7 6 20 5.3C20.7 4.9 25.5 4.8 48.2 4.8L75.6 4.8L76.9 5.7C78.3 6.6 79.6 7.8 80.8 9.4C81.2 9.8 82.3 11.1 83.3 12.2C84.3 13.3 85.6 14.8 86.2 15.5C86.9 16.2 88.2 17.7 89.1 18.7C90.1 19.7 91 20.9 91.2 21.3C91.5 21.9 91.7 26.2 91.8 36.3C91.9 51.4 91.8 50.3 93.4 54.3C93.8 55.2 94.9 58.8 95.1 59.7C95.4 60.9 95.2 60.9 90.7 61.1C88.9 61.2 85.3 61.4 82.6 61.6C65.3 62.9 58.3 63.3 58.3 62.7C58.3 62.5 58.5 62 58.6 61.6C58.8 61.2 59.2 59.9 59.5 58.8C59.8 57.7 60.3 56.3 60.5 55.7C61.8 52 62 50.9 62 45C62 39.2 62 38.9 61.2 37.7C59.3 34.7 58.2 34.4 51.8 34.7C49.3 34.8 45.4 34.9 43.3 35L39.4 35L37.3 37.2C36.1 38.4 35.1 39.6 34.9 39.9C34.8 40.2 34.7 68.2 34.7 102.1L34.7 163.8L35.4 164.9C36.4 166.4 39.5 168.1 40.6 167.8C41.1 167.7 42.4 167.4 43.5 167.2C44.6 167 46 166.6 46.7 166.4C47.3 166.2 49.9 165.6 52.5 165C55.1 164.4 57.5 163.6 58 163.3C58.4 162.9 59.5 161.7 60.4 160.5L62 158.4L61.9 139.6L61.8 120.8L60.6 120.7C60 120.7 58.8 120.9 58 121.1C56.6 121.6 56.5 121.6 56 121.1C55.7 120.8 55 119.3 54.5 117.9C54.1 116.5 53.5 115.1 53.4 114.7C52.5 113.1 52 111.6 52 110.8C52 110.4 51.9 110 51.7 110C51.5 110 51.1 109.1 50.7 107.9C50.3 106.8 49.7 105.4 49.5 104.8C48.7 103 48.1 101.5 47.5 99.8C47.2 98.9 46.5 97.3 46.1 96.3C45.6 95.3 45.2 94 45.2 93.3C45.2 92 44.6 92.2 52.2 91.4C54.2 91.1 57.2 90.8 58.8 90.5C63.8 89.7 66.3 89.4 70.3 89C72.4 88.8 74.3 88.5 74.4 88.5C74.5 88.4 76 88.2 77.6 88C79.2 87.9 81.4 87.6 82.5 87.4C86.7 86.7 94.6 85.9 95.2 86.1C95.6 86.3 95.7 86.5 95.5 86.9C95.4 87.2 94.9 89 94.4 90.8C94 92.7 93.5 94.5 93.4 94.8C93.2 95.2 92.8 96.5 92.5 97.8C91.9 100 91.8 102.1 91.7 135.3L91.6 170.4L90.5 172.1C89.9 173.1 89.1 174.1 88.8 174.5C88.4 174.9 87.6 176 86.9 177.1C86.2 178.1 85.5 179 85.3 179C85.1 179 85 179.2 85 179.3C85 179.5 84.5 180.3 84 181.1C78.6 188.6 77.8 189.5 76.1 189.9C75.6 190 74.6 190.3 73.8 190.5C73.1 190.8 72.2 191 71.8 191C71.4 191 71 191.1 70.8 191.3C70.6 191.4 69.1 191.9 67.5 192.3C65.9 192.7 63.3 193.4 61.8 193.8C60.4 194.3 58.6 194.7 57.8 194.8C57.1 195 56 195.2 55.3 195.5C54.7 195.7 53.3 196.2 52.2 196.5C48.7 197.4 46.5 198 45.5 198.4C44.1 198.8 41.1 199.7 39.7 200C38.4 200.3 36.5 200.9 35.6 201.4C35.3 201.5 34.4 201.7 33.5 201.8C32.6 202 31.7 202.2 31.4 202.4C31.2 202.6 30.5 202.9 29.9 203C29.3 203.2 27.4 203.7 25.7 204.1C22.1 205.1 21.5 205.2 20.1 204.5ZM855.7 204.1C850.5 202.8 850.4 202.8 850 202.5C849.8 202.4 848.8 202.1 847.7 201.8C845.6 201.3 844 200.9 842.5 200.4C841.9 200.2 840.3 199.7 838.8 199.3C837.4 198.9 835.9 198.5 835.5 198.3C835.1 198.2 833.6 197.7 832 197.3C830.4 196.9 828.9 196.5 828.6 196.3C828.3 196.1 827.7 196 827.4 196C827.1 196 826.4 195.8 825.9 195.5C825.4 195.2 824.6 195 824.2 195C823.3 195 818.5 193.8 818 193.5C817.7 193.3 817 193.1 816.4 193C813.6 192.4 810.8 191.6 810.2 191.3C809.8 191.2 809.1 191 808.7 190.9C807.3 190.6 802.5 189.3 799.7 188.5C798.8 188.2 797.1 187.8 795.8 187.5C794.6 187.2 792.8 186.7 792 186.5C791.2 186.2 789.8 185.8 788.8 185.6C787.5 185.2 787.1 184.9 787.1 184.3C786.9 183.4 787.9 178.9 788.6 177.2C789.1 175.9 789.2 169.8 789.3 97.9C789.3 49.6 789.2 19.1 789 17.9C788.9 16.7 788.5 15 788.2 14.1C787.9 13.1 787.4 11.6 787.2 10.8C786.9 9.9 786.4 8.3 786 7.3C785.6 6.3 785.5 5.4 785.6 5.3C785.7 5.1 802.6 5 823.1 4.9C857 4.8 860.4 4.9 860.8 5.4C861 5.7 861.5 6 861.9 6.1C862.6 6.4 863.9 7.7 865.8 10.2C866.4 10.9 867.1 11.7 867.4 12C867.6 12.3 868.8 13.6 870 15C871.1 16.4 872.7 18.2 873.4 19C874.2 19.8 875.2 21.2 875.7 22L876.7 23.5L876.7 105.9L876.7 188.4L876 189.8C875.1 191.3 863.7 202.9 861.6 204.2C860.1 205.2 859.7 205.2 855.7 204.1ZM325.2 200C325.2 198.3 325.1 198.2 324.3 198.2C323.9 198.2 322.7 198.6 321.7 199C320.7 199.4 319.5 199.8 319 199.9C318 200.1 316.6 201.3 316.9 201.7C317 201.9 318.9 202 321.1 201.9L325.2 201.8L325.2 200ZM339.2 201.6C339.5 201.1 339.4 194.2 339 193.9C338.9 193.7 337.9 193.9 336.8 194.3C335.7 194.7 334.6 195 334.3 195C334 195 333.2 195.2 332.6 195.5C332 195.7 330.8 196.1 330 196.4C327.9 197 327.7 197.2 327.7 199.2C327.7 202.2 327.4 202 333.5 202C337.1 202 339 201.9 339.2 201.6ZM353.5 196.2L353.5 190.5L352.3 190.5C349.7 190.6 342.6 192 342.1 192.5C341.8 192.7 341.7 200.9 341.9 201.6C342 201.9 343.4 202 347.8 201.9L353.5 201.8L353.5 196.2ZM364 201.8C364.1 197.4 364 190.2 363.8 190C363.6 189.9 361.8 189.8 359.8 189.9L356 190.1L356 196L356 202L360 202C362.2 202 364 201.9 364 201.8ZM385.8 194.8L385.8 187.8L384.7 187.9C384 188 382.7 188.3 381.8 188.6L380 189.1L380 195.6L380 202L382.9 201.9L385.8 201.8L385.8 194.8ZM399.6 191.9C399.7 182.7 399.6 182 399.1 182C398.8 182 397.2 182.7 395.5 183.5C393.9 184.3 391.5 185.4 390.2 186L388 187.1L388 194.3C388 198.3 388.1 201.7 388.2 201.8C388.4 201.9 390.9 202 394 201.9L399.5 201.8L399.6 191.9ZM413.8 189.6L413.7 177.2L413 177.1C412 176.9 407.9 178.1 403.8 179.8L402 180.5L402 191.2L402 202L407.9 202L413.8 202L413.8 189.6ZM428 188L428 174L426 174C424.9 174 424 174.1 423.9 174.3C423.7 174.5 423 174.7 422.2 174.8C421.5 174.9 420.2 175.2 419.3 175.3C418.5 175.5 417.4 175.7 416.9 175.8L416 176L416 189L416 202L422 202L428 202L428 188ZM467.6 189.2C467.6 181.2 467.6 176.4 467.3 176.2C467.2 176 465.9 175.6 464.6 175.4C463.3 175.1 461.5 174.7 460.6 174.5C459.7 174.2 458.4 174 457.5 174L456 174L456 187.8C456 195.4 456.1 201.7 456.2 201.8C456.4 201.9 458.9 202 462 201.9L467.5 201.8L467.6 189.2ZM482 191.6C482 182.4 481.9 181.1 481.4 180.6C481.1 180.3 480.7 180 480.4 180C480.1 180 479.5 179.8 479.2 179.6C478.8 179.3 477.4 178.8 476 178.3C474.6 177.9 473.3 177.5 473.2 177.3C473 177.2 472.2 177 471.4 176.8L470 176.6L470 189.3L470 202L476 202L482 202L482 191.6ZM496 194.6L496 187.1L493.9 186.2C491.3 185 488.7 183.8 488 183.4C486.8 182.6 484.6 181.9 484.4 182.1C484.2 182.4 483.9 200.9 484.2 201.6C484.3 201.9 485.8 202 490.2 202L496 202L496 194.6ZM504 195.6L504 189.2L502.4 188.7C501.5 188.5 500.2 188.2 499.4 188.1L498 187.9L498 194.7C498 198.5 498.1 201.7 498.2 201.8C498.3 201.9 499.7 202 501.2 202L504 202L504 195.6ZM528 201.7C528 201.5 528 198.9 528 196C528 193.1 528 190.5 528 190.3C528 190.1 526.6 190 523.9 190.1L519.8 190.2L519.7 195.7C519.7 198.7 519.7 201.3 519.8 201.6C520 202.1 528 202.2 528 201.7ZM542.3 197.7C542.4 192.6 542.3 192.4 539.3 191.7C536.7 191.2 532.8 190.6 531.5 190.5L530.5 190.5L530.4 195.8C530.4 198.7 530.4 201.3 530.5 201.6C530.6 201.9 531.9 202 536.4 201.9L542.2 201.8L542.3 197.7ZM556.3 199.6C556.4 197.2 556.3 197 554 196.4C553.2 196.1 552.1 195.7 551.6 195.5C551 195.2 550.3 195 550 195C549.6 195 548.5 194.7 547.4 194.3C546.4 194 545.3 193.7 545.1 193.7C544.8 193.7 544.7 194.6 544.7 197.6C544.7 199.8 544.8 201.7 544.9 201.8C545 201.9 547.6 202 550.6 201.9L556.2 201.8L556.3 199.6ZM567 201.6C567 200.9 566 200.1 565 199.9C564.5 199.8 563.3 199.4 562.3 199C561.3 198.6 560.1 198.2 559.6 198.1C558.7 197.9 558.7 197.9 558.7 199.7C558.7 200.7 558.8 201.7 558.9 201.8C559 201.9 560.9 202 563.1 202C566.1 202 567 201.9 567 201.6ZM774.5 199.9C773.9 199.3 772.3 197.6 771 196C769.7 194.4 767 191.5 765.2 189.5C763.3 187.5 761.1 185 760.2 184C755.1 178.1 755 178.1 751.7 176.6C750.6 176.1 748.6 175.6 745.5 175.1C745 175 744 174.6 743.4 174.2L742.3 173.6L742.5 171.5C743 167.4 743.2 162.2 743 160.7C742.4 156.8 741.7 153.3 741.5 152.9C741.3 152.7 741.1 151.9 741 151.2C740.8 150.4 740.4 148.5 740 146.8C739.6 145.2 739.2 143.1 739.1 142.2C738.9 141.2 738.7 140.3 738.6 140.1C738.2 139.6 737 133.3 737 132.2C737 131.6 736.9 131 736.7 130.8C736.4 130.5 736.1 129.2 735.3 124.8C734.9 122.8 734.1 119.1 733.5 116.8C733.3 115.9 732.8 113.7 732.5 112C731.9 108.4 731.1 105.4 730.6 104.7C730.5 104.4 730.2 103.9 730.1 103.6C729.9 103 729.4 102.9 723.1 102.3C718.6 101.8 717.5 102.1 717 103.6C716.8 104 716.7 116 716.7 130.3C716.7 154.8 716.7 156.3 717.3 159.3C717.7 161 718 162.8 718 163.3C718 163.8 718.2 164.8 718.5 165.4C718.8 166.1 719 167.2 719 167.9L719 169.1L717.2 168.8C716.3 168.7 715.2 168.5 714.7 168.3C714.3 168.1 713.6 168 713.2 168C712.8 168 711.7 167.8 710.8 167.5C709.9 167.3 707.4 166.7 705.2 166.3C700.7 165.5 698.4 165.1 696.6 164.6C695.3 164.3 690.5 163.5 687.9 163.1C686.3 162.9 685.8 162.1 686.5 160.6C687 159.4 688.2 154.8 689.3 150.2C689.6 149.1 689.7 130.2 689.7 83.9C689.7 20.2 689.6 17.2 688.7 14.8C688.5 14.5 688.1 13 687.7 11.7C687.3 10.3 686.7 8.7 686.5 8.2C686.2 7.6 685.9 6.7 685.9 6.2L685.8 5.2L720.6 5.1L755.5 5L756.7 5.8C757.8 6.5 762.7 11.6 762.9 12.3C763 12.4 764.2 13.8 765.7 15.3C767.2 16.9 768.8 18.7 769.3 19.3L770.2 20.4L770.4 35C770.8 53.6 770.5 87.1 770.1 88.8C769.8 89.8 767.6 92.7 765.3 95C764.3 96.1 759.4 101.5 758.5 102.6C757.7 103.6 757.6 103.9 757.8 105.3C758 106.8 758.5 109.3 759.5 113.3C759.7 114.3 760.2 116.7 760.5 118.5C760.8 120.3 761.2 122.3 761.4 122.8C761.9 124.4 763 130.3 763 131.4C763 131.9 763.2 132.7 763.3 133C763.5 133.4 763.8 134.4 764 135.2C764.2 136.1 764.6 138.3 765 140.2C765.4 142 765.8 144.1 765.9 144.8C766 145.6 766.2 146.3 766.3 146.5C766.5 146.7 766.9 148.6 767.3 150.8C767.7 153 768.2 155.6 768.5 156.5C769.1 158.8 769.6 161.4 770 164C770.2 165.2 770.5 166.8 770.7 167.7C771.5 170.8 771.7 171.6 772.3 175.5C772.7 177.7 773.2 180 773.4 180.6C773.7 181.6 774.1 183.7 774.7 187.2C774.8 188.1 775 189.7 775 190.8C775 191.9 775.2 193.9 775.5 195.2C776.1 198.1 776.2 200.8 775.8 200.9C775.6 200.9 775 200.5 774.5 199.9ZM110.2 133.1C110.3 98.5 110.2 58.2 110 43.7C109.7 16.5 109.7 15.1 108.4 12.2C107.5 10.3 107.4 9.8 106.7 7.8C106.3 6.6 106 5.5 106.2 5.3C106.3 5.1 117.8 5 141 5C181.2 5 176.4 4.5 181.2 9.4C185.6 14 189.7 18.5 190.4 19.6C191 20.5 191 22.4 191.1 52.1L191.2 83.5L190.3 84.9C189.8 85.6 189 86.6 188.4 87.2C187.9 87.8 186.7 89.2 185.7 90.4C184.7 91.5 183.5 92.9 183.1 93.3C181.3 95.5 180 96.9 179 98.3C177.8 99.9 177.8 99.6 179.1 104.8C179.6 106.7 180 108.5 180 109C180 109.5 180.1 110 180.3 110.2C180.5 110.4 180.8 111.2 181 112C181.3 113.4 182.3 117.7 183 120.3C183.9 124 184.8 127.3 185 128.7C185.2 129.5 185.7 131.6 186.2 133.3C186.6 135.1 187 136.8 187 137.2C187 137.6 187.2 138.5 187.5 139.1C187.7 139.7 188.4 142.3 189 144.8C189.6 147.4 190.3 150 190.5 150.6C190.8 151.1 191 151.8 191 151.9C191 152.3 193.7 158.6 194.5 160.1C195.3 161.4 195.1 162.6 194.2 162.8C193.8 162.9 193 163.1 192.5 163.2C192 163.3 190.4 163.6 189 163.8C187.6 164 185.8 164.4 184.8 164.6C180.3 165.6 172.9 167 171.9 167C171.4 167 170.7 167.1 170.4 167.3C169.7 167.7 164.8 168.7 163.4 168.7C162.2 168.7 162.1 168.3 162.7 165.9C162.8 165.1 163.2 162.7 163.5 160.6C164.1 156.5 164 155.2 162.5 149.8C161.6 146.9 161 143.8 161 142.8C161 142.2 160.9 141.7 160.7 141.5C160.4 141.1 159.9 139.5 159.2 135.9C158.7 133.7 158.4 132.4 157.5 129.2C157.2 128.2 156.8 126.3 156.5 124.8C156.2 123.4 155.7 121.4 155.5 120.5C154.7 117.8 154 114.5 154 113.7C154 113.3 153.8 112.7 153.7 112.3C153.3 111.7 153.1 110.9 152.2 106.3C151.8 104.3 151.5 103.7 150.6 102.9C149.9 102.2 149.4 102 148.7 102.1C148.2 102.2 146.3 102.5 144.3 102.7C139.5 103.2 139.4 103.2 138.3 104.7L137.3 106.1L137.4 134.1C137.6 160.8 137.6 163.9 138.3 165.5C138.6 166.2 139.6 170.6 139.9 172.6C140.1 173.5 140 173.7 138.8 174.2C137.3 174.8 132.8 176 131.8 176C131.5 176 130.9 176.2 130.5 176.5C130.2 176.8 129.5 177 129.1 177C128.5 177 127.3 178 124.5 180.8C122.5 182.8 120.5 185 120 185.5C119.6 186.1 118.5 187.3 117.5 188.3C116.6 189.3 115 191.1 114 192.3C111.3 195.5 110.7 196 110.4 196C110.3 196 110.2 167.7 110.2 133.1ZM842.9 167.5C844 167 845.7 165.2 846.3 164.1C846.8 163.1 846.8 41.9 846.3 40.4C845.9 39.3 843.4 36.5 842.1 35.6C841.3 35.1 840.1 35 831.1 35L821 35L820.4 35.9C820 36.4 819.5 37.3 819.4 38C819.2 38.6 819.1 66 819 98.7C818.9 166.2 818.7 160.8 821.5 162.9C822.3 163.5 823.2 164 823.4 164C824.2 164 830.2 165.4 830.7 165.7C831.1 165.9 831.7 166 832.1 166C832.6 166 833.5 166.2 834.2 166.5C834.9 166.7 836.3 167 837.2 167.1C838.1 167.3 839.1 167.5 839.3 167.7C840.1 168.1 841.9 168.1 842.9 167.5ZM200.1 161.2C200 160.9 200.2 160.3 200.5 159.8C200.8 159.4 201 158.8 201 158.5C201 158.2 201.2 157.5 201.5 156.8C203 153.4 203.5 152.1 204.2 149.5C204.5 148.6 204.9 147.1 205.2 146.2C205.5 145.2 205.9 143.5 206.2 142.2C207.2 137.1 207.3 136.6 207.6 136.2C207.7 136 207.9 135.2 208 134.3C208.2 133.5 208.6 131.5 209 129.8C209.4 128.2 209.8 126.2 210 125.5C210.1 124.7 210.3 123.9 210.5 123.7C210.7 123.4 211 122.1 211.2 120.9C211.8 117.3 212.2 115.9 212.6 115.1C212.8 114.7 213 114 213 113.6C213 113.1 213.4 111.2 213.9 109.3C214.3 107.4 214.8 105.2 215 104.5C215.2 103.8 215.6 101.9 216 100.3C216.4 98.8 216.8 96.9 217 96.1C217.2 95.3 217.4 94.4 217.6 94.1C217.8 93.8 218 92.7 218.1 91.7C218.2 90.8 218.4 89.5 218.6 88.9C219.4 86.3 220 84 220.5 81.5C220.8 80 221.2 78.1 221.5 77.2C222.4 73.7 223 71.4 223.7 68.2C224.1 66.5 224.5 64.9 224.7 64.8C224.9 64.7 225 64.1 225 63.6C225 63 225.4 61.1 225.9 59.3C226.3 57.6 226.8 55.6 227 54.8C227.5 52.4 228.6 47.9 229.1 46C229.4 45 229.8 43.3 230 42.3C230.3 40.5 230.6 39.5 231.5 36.2C231.7 35.2 232.3 32.9 232.7 31C233.1 29.1 233.5 27.4 233.7 27.2C233.9 27 234 26.5 234 26.1C234 25.8 234.5 23.7 235 21.5C236.3 16.4 236.3 14.2 235 10.4C234.5 8.8 234 7 233.9 6.3L233.8 5.2L252.6 5.1C263.8 5 271.6 5.1 271.8 5.3C272.1 5.6 270.9 10.2 270.2 11C269.6 11.7 269.7 19.1 270.3 19.8C270.6 20.1 270.9 20.9 271 21.6C271.3 22.7 272 25.6 274.1 33.8C274.6 35.6 275 37.4 275 37.9C275 38.5 275.1 39 275.3 39.2C275.7 39.5 276.1 41.2 276.8 44.7C277.4 47.2 278 49.6 278.3 50.5C278.6 51.1 279.3 53.9 280 57C280.2 57.6 280.7 59.5 281.1 61.2C281.6 62.8 282 64.5 282 65C282 65.5 282.1 66 282.3 66.2C282.6 66.5 283.1 68.1 283.8 71.5C284 72.6 284.4 74 284.6 74.7C285.2 76.5 285.9 79.3 286.5 82C286.8 83.4 287.2 85 287.4 85.5C287.6 86 288 87.8 288.4 89.3C288.7 90.9 289.2 92.8 289.5 93.7C290 95.4 291.1 99.6 292 103C292.2 103.6 292.5 105 292.8 106C293.1 107 293.6 108.8 293.8 110C294.1 111.2 294.4 112.6 294.6 113.2C295.4 115.4 295.7 116.7 296 118.2C296.2 119.1 296.5 120.7 296.8 121.7C297.4 123.4 298.3 127.3 299 130.2C300.1 135.1 301.5 138.7 304.9 145.1C306.3 147.7 306.1 148 303.4 148C302.2 148 299.7 148.2 297.8 148.5C291.4 149.4 289.5 149.7 285.8 149.9C283.8 150 281.1 150.3 279.8 150.5C276.6 151.1 273.1 151.4 272.9 151.1C272.8 150.9 272.9 148.9 273.2 146.6C273.9 141.4 273.9 141.3 273.2 138.5C273 137.2 272.5 135.3 272.3 134.2C272.1 133.1 271.8 131.9 271.6 131.6C271.3 130.9 270.9 129.1 270.3 125.7C269.9 123.3 268.9 121 268.1 120.3C266.8 119.1 266.1 119 263.9 119.4C262.8 119.6 260.5 119.9 258.8 120C257.2 120.1 254.4 120.4 252.7 120.6C250.9 120.8 247 121.2 244 121.5C237.5 122.1 237.4 122.2 236.5 125.8C236.2 127.1 235.7 128.9 235.5 129.8C235 131.4 233.5 138 233 140.9C232.8 141.7 232.5 142.7 232.3 143.1C231.7 144.2 231.8 151.1 232.5 153C233.1 154.6 233.2 156.2 232.7 156.5C232.5 156.6 231.2 156.8 229.8 156.9C228.3 157 226.7 157.2 226.2 157.4C225.6 157.6 224.3 157.9 223.2 158C221.2 158.3 214 159.4 210.3 160C209.3 160.2 207.7 160.5 206.7 160.7C205.7 160.9 204.1 161.2 203.2 161.3C201 161.8 200.3 161.7 200.1 161.2ZM677 161.3C673.9 160.6 663.1 158.8 657.2 158C656.1 157.9 654.6 157.6 654 157.4C653.4 157.2 651.4 156.9 649.6 156.8C647.8 156.7 646.2 156.4 646.1 156.2C645.8 155.7 646 152.8 646.5 151.1C647.1 149 647.1 146 646.5 144C646.2 143.2 645.8 141.3 645.5 139.8C644.8 136.4 644.1 133.3 643.5 131.2C642.8 128.8 642 125.2 642 124.6C642 124.4 641.5 123.6 640.9 123C639.7 121.9 639.7 121.9 634.5 121.5C631.5 121.2 627.7 120.8 626 120.6C624.3 120.4 621.5 120.2 619.8 120C618.2 119.9 615.8 119.6 614.6 119.5C612.8 119.3 612.2 119.3 611.4 119.8C610.3 120.5 609 122.9 609 124.2C609 125.1 608.5 127.2 607.5 130.8C606.6 134.3 605.2 140.9 605.2 142C605.2 142.6 605.5 144.8 605.8 146.7C606.2 148.7 606.3 150.5 606.2 150.8C606 151.4 603.8 151.3 599.2 150.5C597.7 150.2 595.1 149.9 593.5 149.8C590.3 149.6 586.1 149.2 582 148.6C580.6 148.4 578.3 148.1 576.8 148C573.5 147.8 573.4 147.6 575.5 143.5C576.4 141.8 577.4 139.8 577.9 139C578.6 137.5 579.4 134.9 580 132.1C580.2 131.3 580.4 130.5 580.5 130.3C580.6 130.2 580.9 129 581.2 127.6C582.2 122.8 582.3 122.2 582.7 121.9C582.9 121.7 583 121.1 583 120.5C583 119.6 583.8 116.2 584.6 113.8C584.8 113.3 585.4 111.2 585.8 109.2C586.8 105.1 587 104.1 587.8 101.2C588.1 100.1 588.5 98.6 588.7 97.8C588.9 97.1 589.2 96 589.4 95.5C589.6 95 589.9 93.5 590.2 92.2C591.1 87.6 591.3 86.7 591.6 86.1C591.8 85.8 592.1 84.8 592.3 83.8C593 80.3 594.4 74.8 594.6 74.5C594.7 74.3 595 73.3 595.2 72.2C595.9 68.7 596.2 67.5 596.6 66.8C596.8 66.4 597 65.7 597 65.3C597 64.8 597.4 63.1 597.8 61.5C598.2 59.9 599 56.9 599.5 54.8C600 52.8 600.5 50.9 600.7 50.5C601.1 49.4 601.7 47 602.2 44.5C602.4 43.2 602.9 41.3 603.2 40.3C603.5 39.3 603.8 37.8 604 37C604.1 36.2 604.6 34.3 605 32.8C605.4 31.4 605.8 29.6 606 29C606.1 28.3 606.3 27.6 606.4 27.4C606.6 27.2 606.9 26 607.2 24.6C608 20.5 608.2 19.9 608.6 19.1C609.1 18.3 609.1 12.3 608.7 11.8C608.2 11.3 607 7.2 607 6.1L607 5L625.8 5L644.7 5L644.7 5.8C644.7 6.2 644.3 7.7 643.9 9C642.1 14.5 642.1 15.1 643 18.8C643.9 22.7 645.1 27.4 645.5 28.8C646.3 31.6 647 34.8 647 35.9C647 36.4 647.1 37 647.3 37.2C647.7 37.5 648 38.8 648.8 43.2C649.1 44.6 649.5 45.9 649.6 46.3C649.8 46.7 650 47.4 650 47.9C650 48.4 650.1 49 650.3 49.2C650.4 49.4 650.9 51 651.3 52.8C651.7 54.7 652.2 56.7 652.4 57.3C653.1 59.4 654 63.5 654 64.4C654 65 654.2 65.7 654.4 66.1C654.6 66.5 654.9 67.4 655 68C655.2 68.6 655.6 70.5 656 72.2C656.4 73.8 656.9 75.7 657 76.3C657.1 77 657.6 78.8 658 80.3C658.4 81.9 658.9 83.8 659 84.7C659.2 85.5 659.7 87.6 660.2 89.3C660.6 91.1 661 92.9 661 93.5C661 94 661.2 94.9 661.5 95.3C661.8 95.8 662 96.6 662 97.1C662 97.6 662.1 98.3 662.3 98.6C662.5 98.9 662.9 100.7 663.3 102.5C663.7 104.3 664.2 106.5 664.5 107.3C664.9 108.6 665.6 111.7 666.1 114.3C666.2 114.8 666.6 116.2 667 117.5C667.3 118.8 667.7 120.6 667.9 121.5C668 122.4 668.3 123.6 668.5 124.2C668.8 124.8 669 125.7 669 126.2C669 126.6 669.1 127.3 669.3 127.6C669.7 128.4 671 134 671 135C671 135.5 671.1 136 671.3 136.2C671.7 136.5 672 138.1 672.8 142.3C673 143.7 673.4 145.2 673.6 145.6C673.8 146 674 146.6 674 147.1C674 147.5 674.1 148 674.3 148.2C674.4 148.4 674.7 149.2 675 150C675.2 150.8 675.9 152.6 676.5 153.9C677.2 155.3 677.7 156.5 677.7 156.5C677.7 156.6 678 157.5 678.5 158.5C679.5 160.7 679.5 161.2 678.8 161.5C678.5 161.6 678.3 161.7 678.2 161.6C678.2 161.6 677.6 161.5 677 161.3ZM327.3 146.8C327.2 134.2 327.1 132 326.6 131.2C326.3 130.6 325.9 129 325.5 127.5C325 124.9 324.2 121.8 323.7 119.8C323.5 119.3 323.1 117.3 322.7 115.5C322 112.4 321.6 110.9 320.7 107.5C320.5 106.8 320.2 105.4 320 104.5C319.8 103.6 319.1 100.5 318.3 97.7C317.6 94.9 317 92.2 317 91.8C317 91.5 316.9 91 316.7 90.8C316.5 90.6 316.1 88.9 315.7 87C315.3 85.1 314.8 83 314.6 82.5C314.2 81.4 313.8 79.8 313.2 76.7C312.7 74.4 312.1 72.2 311 67.8C310.6 66.4 310.2 64.5 310 63.7C309.8 62.8 309.3 60.7 308.8 59C308.4 57.3 308 55.4 308 54.8C308 54.3 307.9 53.7 307.7 53.5C307.4 53.2 306.9 51.6 306.2 48.2C305.7 46.1 305.3 44.2 304.5 41.7C304.3 40.8 303.8 38.9 303.5 37.3C303.2 35.8 302.8 34.1 302.6 33.7C302.1 32.2 301 27.5 301 26.7C301 26.2 300.8 25.5 300.5 25C300.2 24.5 300 23.8 300 23.4C300 22.9 299.9 22.1 299.7 21.5C299.5 21 299 19.4 298.7 18C297.8 15 297.9 15.1 296.8 13.5C296.4 12.8 296 11.9 296 11.6C296 11.3 295.9 11 295.7 11C295.3 11 292.3 6.4 292.3 5.7C292.3 5 292.7 5 309.7 5L327 5L327 6.3C327 7 326.8 8.3 326.5 9.1C325.3 12.8 325.3 14 326 17.5C326.4 19.3 326.9 21.6 327 22.5C327.1 23.4 327.4 24.6 327.6 25.2C328.1 26.6 328.6 28.4 329.2 31.5C329.5 33 329.9 34.7 330 35.3C330.7 38.2 331.7 42.9 331.9 44.2C332 44.9 332.2 45.8 332.4 46.2C332.7 46.9 333.2 49 333.8 52.8C334 54.3 334.4 55.9 334.6 56.3C334.8 56.8 335.2 58.4 335.5 59.8C336.4 64.2 337 66.7 337.5 68.5C337.7 69.4 338.2 71.5 338.5 73.2C338.8 74.8 339.3 76.9 339.5 77.8C340.3 80.6 341 83.8 341 84.7C341 85.1 341.2 86.1 341.5 86.8C342 88.2 342.8 92.1 343.2 94.6C343.3 95.4 343.5 96 343.6 96C344.1 96 345.4 91.2 346.2 86.8C347.1 81.9 347.2 81.2 347.6 80C347.8 79.4 348.2 77.4 348.5 75.7C348.8 73.9 349.3 71.8 349.5 70.8C350 68.9 350.7 65.8 351.5 61.8C351.8 60.4 352.3 58.7 352.5 58.1C352.8 57.5 353 56.6 353 56.1C353 55.2 353.7 51.6 354.5 48.8C355 46.8 355.9 42.7 356.2 40.7C356.3 40 356.6 39.2 356.7 39.1C356.9 39 357 38.5 357 38C357 37.5 357.2 36.6 357.4 36.1C357.6 35.6 357.9 34 358.2 32.5C358.9 28.8 359.2 27.3 359.6 26.2C359.8 25.6 360.3 23.5 360.7 21.5C361.1 19.5 361.6 17.7 361.7 17.4C361.9 17.2 362.1 15.9 362.1 14.4C362.1 12.4 361.9 11.2 361.2 8.9C360.7 7.3 360.4 5.8 360.5 5.5C360.6 5.1 363 5 377.6 5C389 5 394.7 5.1 394.8 5.3C395.1 5.7 391.7 11 391.3 11C391.1 11 391 11.2 391 11.5C391 11.8 390.6 12.9 390 13.9C389.1 15.8 387.6 20.4 387 23.2C386.8 23.9 386.5 25.1 386.4 25.8C385.4 29.4 384.3 34 384 35.5C383.8 36.4 383.4 38.4 383 39.9C382.6 41.3 382.2 43.1 382 43.8C381.5 46.1 380.4 50.8 379.8 52.7C379.5 53.7 379.1 55.6 378.8 56.8C378.6 58.1 378.1 60 377.8 61C377.6 62 377.1 63.8 376.8 65C376.6 66.2 376.1 68 375.8 69C375.5 70 375.2 71.5 375 72.4C374.8 73.3 374.6 74.1 374.5 74.3C374.4 74.5 374.1 75.6 373.9 76.9C373.6 78.1 373.2 80 372.9 81C372.6 82 372.1 83.9 371.8 85.2C371.6 86.5 371.2 88.2 371 89.2C370.8 90.1 370.5 91 370.3 91.1C370.1 91.3 370 91.8 370 92.2C370 93 368.7 98.7 367.5 102.8C367.2 103.8 366.9 105.2 366.7 106.2C366.1 109.3 365.8 110.6 365.5 111C365.4 111.2 365 112.5 364.8 113.8C364.6 115.1 364.1 117.1 363.9 118.2C363.6 119.3 362.9 122 362.4 124.2C361.9 126.4 361.4 128.4 361.2 128.7C361.1 128.9 361 129.6 360.9 130.2C360.8 130.7 360.5 131.8 360.3 132.6C359.9 133.8 360 134.4 360.4 136.9C360.7 138.5 361.1 140.7 361.2 141.7C361.4 144 361.6 143.8 356.8 144.2C355.2 144.3 351.9 144.5 349.6 144.6C345.1 144.9 344.6 145.1 342.6 147C342 147.4 338.6 150.9 334.9 154.6C331.1 158.3 327.9 161.3 327.7 161.3C327.5 161.3 327.4 156.9 327.3 146.8ZM548.1 158.3C546.5 156.6 544.8 154.8 544.3 154.3C543.9 153.9 542.1 152.1 540.5 150.3C535.1 144.7 535.5 144.9 531.6 144.6C520.5 143.8 521.5 144 521.8 142.2C522 140.8 522.5 139.1 523.6 135.8C524.1 134.3 524.2 132.3 524.2 114.1C524.2 96.1 524.1 94 523.6 93C522.8 91.4 522.2 89.8 521.5 87.8C521.2 86.9 520.8 85.9 520.6 85.6C520 84.3 519 81.5 519 80.8C519 80.4 518.8 79.9 518.5 79.7C518.2 79.4 518 79 518 78.6C518 78.3 517.9 78 517.7 77.8C517.5 77.7 517.3 77.2 517.1 76.6C517 76 516.7 75 516.4 74.3C516.1 73.7 515.7 72.7 515.5 72.2C515.3 71.6 514.8 70.6 514.5 69.9C514.2 69.2 514 68.4 514 68.2C514 67.9 513.8 67.3 513.5 66.8C512.9 65.4 512.4 64.3 512.2 63.3C512.1 62.9 511.5 61.4 510.9 60C510.4 58.6 509.7 57 509.5 56.3C509.2 55.7 508.6 53.9 508 52.3C507.4 50.8 506.4 48.3 505.9 46.8C504.9 44.3 504.7 43.7 503.5 40.9C503.2 40.3 503 39.6 503 39.4C503 39.2 502.8 38.5 502.5 37.8C500.9 34.2 500 31.7 500 31.1C500 30.8 499.8 30.3 499.6 30C499.3 29.7 498.9 28.7 498.5 27.7C497.8 25.2 497.2 23.9 495.5 19.9C495.2 19.2 495 18.5 495 18.3C495 18.1 494.6 17.3 494 16.4C493.4 15.6 493 14.9 493 14.8C493 14.7 491.6 12.7 489.8 10.4C488 8.1 486.6 6 486.5 5.7C486.5 5.2 488.3 5.2 504.6 5.1L522.7 5L522.6 6.1C522.5 6.7 522.2 8 521.9 9.1C521.3 11.3 521.2 13.6 521.6 14.7C521.8 15.2 522.4 17.1 523 19C523.6 20.9 524.3 22.9 524.5 23.5C524.7 24.1 525.2 25.4 525.5 26.5C526 28.4 526.7 30.3 527.4 31.8C527.5 32.2 528 33.5 528.3 34.7C528.7 35.9 529.2 37.3 529.5 37.8C529.7 38.4 530.2 39.7 530.5 40.8C531 42.6 531.6 44 532.3 45.7C532.5 46 532.7 46.7 532.8 47.3C532.9 48 533.3 48.9 533.5 49.5C534.2 50.9 536 56.1 536 56.6C536 56.8 536.2 57.5 536.5 58.1C536.7 58.7 537 59.6 537.2 60.1C537.3 60.6 537.5 61 537.7 61C538.2 61 539 60 539 59.2C539 58.9 539.2 58.2 539.5 57.7C539.7 57.2 540.5 55.1 541.2 53C542.8 47.9 543.4 46.2 544.2 44.2C544.6 43.2 545.2 41.6 545.5 40.5C545.8 39.4 546.3 38.1 546.5 37.5C546.7 36.9 547.2 35.5 547.6 34.3C548 33.1 548.6 31.3 549 30.3C549.4 29.3 549.8 28.1 550 27.5C550.3 26.2 551.2 23.5 551.6 22.8C551.8 22.4 552.2 21.3 552.5 20.2C552.8 19.1 553.3 17.7 553.5 17.2C554.8 14 555 12.1 554.1 8.8C553.8 7.7 553.6 6.5 553.5 6L553.5 5.2L571.2 5.2C587.3 5.2 588.8 5.2 588.8 5.7C588.8 6 588 7.3 587.1 8.5C586.2 9.7 585.3 11.1 585 11.6C584.8 12.1 584.3 12.9 583.9 13.3C583.5 13.8 582.8 14.8 582.5 15.7C582.2 16.5 581.7 17.4 581.4 17.7C581.2 18 581 18.5 581 18.8C581 19.1 580.8 19.8 580.5 20.4C580.3 21 579.8 22.2 579.5 23C579.2 23.8 578.7 24.9 578.5 25.3C578.3 25.8 578 26.7 577.8 27.3C577.6 28.4 577.3 29.1 576.6 30.3C576.3 30.9 576.3 30.8 575.5 33.3C575 35 574.7 35.8 573.5 38.6C573.2 39.2 573 39.8 573 40C573 40.2 572.6 41.3 572 42.4C571.5 43.6 571 44.9 570.8 45.5C570.7 46 570.3 47.2 569.9 48.2C569.5 49.1 568.8 50.7 568.5 51.7C568.2 52.7 567.7 53.9 567.5 54.5C566.9 55.8 564.3 62.6 563.5 64.8C563.2 65.8 562.7 67 562.5 67.5C562.3 68 561.7 69.4 561.4 70.5C561 71.6 560.5 72.9 560.3 73.3C559.1 76.2 557.4 80.6 556.4 83.6C556 84.7 555.5 85.9 555.4 86.3C555.2 86.6 554.9 87.4 554.6 88C554.3 88.6 553.8 89.7 553.5 90.4C553.2 91.1 553 91.9 553 92.1C553 92.3 552.8 92.7 552.6 93C551.3 94.5 551.2 96.3 551.5 124.4C551.9 161.1 551.9 161.1 551.5 161.2C551.3 161.3 549.8 160 548.1 158.3ZM402.9 141.7C402.6 141.2 403.2 138.2 404 135.9C404.4 135 405 133 405.4 131.7C406 129.3 406 127.2 406 73.7C406 20.9 405.9 18 405.4 15.2C405 13.5 404.5 11.6 404.2 10.8C403.5 9.3 402.7 6.4 402.7 5.6C402.7 5 404.7 5 440.8 5L479 5L479.4 5.9C479.7 6.9 480 8.7 480.6 14C480.9 15.7 481.2 17.8 481.4 18.7C481.8 20.5 482.1 22.1 482.8 26.5C483.1 28.3 483.4 30.5 483.5 31.3C483.7 32.6 483.7 32.7 482.9 32.7C482.4 32.7 481.9 32.5 481.8 32.3C481.7 32.2 481.3 32 480.9 32C480.4 32 479.1 31.6 477.8 31.1C472.6 29.2 473.9 29.3 454 29.3C437 29.4 435.4 29.4 434.5 29.9C432.7 31 432.7 31.1 432.7 45C432.7 61.8 431.9 60.5 442.1 60.3C447.8 60.1 448.1 60.1 451 58.7C451.3 58.5 452 58.3 452.7 58.2C453.3 58 454.1 57.8 454.5 57.6C455.6 56.9 457.4 56.4 457.7 56.5C458.1 56.8 458.1 87.2 457.7 87.5C457.6 87.5 456.8 87.3 455.9 86.8C455 86.4 453.8 86 453.2 85.9C452.6 85.7 451.4 85.3 450.5 84.8C449 84 448.4 83.9 443.6 83.8C440.7 83.7 437.4 83.7 436.3 83.8C434.4 84 434.1 84.1 433.4 85.1C432.7 86.2 432.7 86.3 432.7 100.5L432.7 114.7L433.8 115.8C434.7 116.7 435.2 117 436.8 117.2C437.8 117.3 446.4 117.4 455.7 117.3C471.3 117.2 472.9 117.1 473.7 116.6C474.1 116.3 474.8 116 475.1 116C475.4 116 475.9 115.9 476.3 115.7C477.3 115.2 483.4 113.3 483.6 113.5C483.8 113.7 482.5 121.9 481.6 125.5C481.5 126.2 481.2 128 481 129.3C480.5 133.2 479.4 139.7 478.8 141.6C478.7 142 477.3 142 470.9 141.8C461.5 141.5 420.3 141.5 410.3 141.8C405.1 142 403 142 402.9 141.7ZM250.8 95.7C252.1 95.5 255.1 95.2 257.6 95C260 94.8 262.2 94.6 262.5 94.5C263.1 94.2 263.2 92.3 262.6 91.3C262.4 90.9 262.2 89.9 262 89.1C261.8 88.2 261.4 86.1 261 84.3C260.6 82.6 260.2 80.5 260 79.7C259.8 78.8 259.4 76.9 259 75.3C258.6 73.8 258.3 71.8 258.1 70.8C258 69.9 257.7 68.6 257.5 67.8C256.9 66 256.4 63.6 256 60.9C255.9 59.7 255.6 58.5 255.5 58.3C255.3 58 255.1 57.3 255 56.5C254.8 55.8 254.6 54.5 254.4 53.7C254.2 52.8 253.9 51.4 253.8 50.6C253.7 49.6 253.5 49 253.2 49.1C252.7 49.3 251.7 53.2 250.8 58C250.6 59.4 250.1 61.5 249.8 62.7C249.5 63.9 249.2 65.7 249 66.7C248.8 67.7 248.4 69.9 248 71.5C247.6 73.1 247.2 75.2 247 76C246.8 76.8 246.6 77.7 246.5 78C246.4 78.3 246.1 79.8 245.8 81.3C245 86.2 244.7 87.3 244.5 87.7C244.3 88.1 244 89.5 243.1 94.9L242.9 96L245.7 96C247.2 96 249.5 95.8 250.8 95.7ZM635.5 95.7C635.7 95.4 634.9 89.9 634.5 89.4C634.3 89 634 87.5 633.2 82.7C632.9 81.1 632.6 79.4 632.4 78.9C632.2 78.4 632 77.6 632 77.1C632 76.7 631.8 75.6 631.5 74.7C631.3 73.9 630.8 71.7 630.5 69.8C630.2 68 629.8 66 629.6 65.4C629.2 64.2 628.8 61.8 628.3 58.3C628.1 57 627.7 55.3 627.5 54.6C627.2 53.9 627 52.9 627 52.4C626.9 51.2 626.2 49.2 625.8 49.1C625.5 49 625.3 49.7 625.2 50.7C625.1 51.7 624.8 53.2 624.5 54.2C623.6 57.5 623.2 59.2 622.8 61.7C622.3 64.5 621.9 66.3 621.4 67.8C621.2 68.4 620.7 70.8 620.2 73.2C619.7 75.5 619.2 78.1 619 78.8C617.8 84.3 617.2 87 617 88.4C616.8 89.3 616.6 90.2 616.4 90.6C616.2 90.9 616 91.9 615.9 92.7C615.8 94.6 616.4 95 620 95C621.5 95 624.3 95.3 626.2 95.5C630 96 635.2 96.1 635.5 95.7ZM148 76.3C155.5 75.7 160 75.1 160.6 74.6C160.9 74.4 161.8 73.3 162.6 72.2L164 70.3L164 53.3C164 34.4 164.1 35.6 161.7 33L160.5 31.8L149.8 31.9L139.2 32L138.2 33L137.3 34L137.3 53.9C137.3 75.7 137.3 74.9 139.4 76.3C140.3 76.9 140.8 77 142 76.9C142.8 76.8 145.5 76.5 148 76.3ZM740.6 75.4C743.5 72.5 743.4 74 743.3 54L743.2 36.4L741.8 34.8C739.3 31.9 740.2 32.1 728.3 31.9C719.9 31.9 717.6 31.9 717.3 32.3C716.9 32.6 716.8 36.9 716.7 53L716.7 73.3L717.5 74.3C718.6 75.5 720.5 76 724.8 76C726.5 76 729.6 76.2 731.7 76.5C738.5 77.3 738.6 77.2 740.6 75.4Z"/></svg></h1>
-      <p class="tagline">The lamps are still burning and you are the only thing
-        still breathing. Hold the lot until sunrise.</p>
       <div class="stack">
-        <button class="btn" id="btn-play">Start Shift</button>
-      </div>
-      <div class="metarow">
-        <div>Best Time<b id="m-time">&mdash;</b></div>
-        <div>Best Score<b id="m-score">&mdash;</b></div>
+        <button class="btn" id="btn-play">Survive</button>
       </div>
     </div>
     <!-- bottom-right corner: how to play, then settings -->
@@ -637,13 +538,11 @@ body{
     </div>
     <div class="set-pop" id="menu-settings" hidden>
       <div class="set-card" role="dialog" aria-modal="true" aria-labelledby="set-title">
-        <div class="cheat-head">
-          <span class="cheat-title" id="set-title">Settings</span>
-          <button class="cheat-close" id="btn-settings-close">Close</button>
+        <div class="set-head">
+          <span class="set-title-t" id="set-title">Settings</span>
+          <button class="set-close" id="btn-settings-close">Close</button>
         </div>
         <div class="toggles">
-          <button class="tog wide" id="tog-aim" aria-pressed="false">Auto-aim: Off</button>
-          <button class="tog wide" id="tog-cheat" aria-pressed="false">Cheats: Off</button>
           <button class="tog" id="tog-quality" aria-pressed="false">Quality: Balanced</button>
           <button class="tog" id="tog-fx" aria-pressed="true">Effects: On</button>
           <button class="tog wide" id="tog-sound" aria-pressed="true">Sound: On</button>
@@ -657,7 +556,7 @@ body{
     <div class="panel">
       <div class="up-head">
         <div class="up-title">How to Play</div>
-        <div class="up-sub">Survive. Upgrade. Repeat.</div>
+        <div class="up-sub">Survive the night.</div>
       </div>
       <div class="howto">
         <p><b>Move</b> — drag anywhere on the <span class="k">left half</span> of the
@@ -665,9 +564,6 @@ body{
         <p><b>Shoot</b> — drag on the <span class="k">right half</span>. You fire in
           the direction you point, and only while you are pointing. Two thumbs,
           both busy.</p>
-        <p><b>Auto-aim</b> — off by default. Turn it on in Settings (the cog on the
-          menu) or on the pause screen and your weapon tracks the nearest walker on its own, so one thumb
-          is enough. Your own aim always overrides it.</p>
         <p><b>Grab the flashlight</b> — the night is black. One lies a few steps from
           where you start; a <span class="k">blue arrow</span> points to it if it is
           off-screen. Without it you can barely see past your own feet.</p>
@@ -676,9 +572,10 @@ body{
           is off-screen. Walk over it to swap.</p>
         <p><b>The Director</b> — decides when the dead come. They trickle in, build to
           a <span class="k">horde</span>, then give you a breather once you have
-          caught your breath — not on a clock. Survive a horde and choose one of
-          three permanent upgrades; they stack for the whole run. Supplies you are
-          short of turn up ahead of where you are heading.</p>
+          caught your breath — not on a clock. When a horde comes you will hear it
+          scream, and a <span class="k">red warning sign</span> flashes at the top of
+          the screen. Survive it and supplies you are short of turn up ahead of
+          where you are heading.</p>
         <p><b>How they hunt</b> — some wander until they notice you: they see your
           <span class="k">flashlight</span> from twice as far, and hear gunfire down the
           streets. Their swings wind up first — <span class="k">step back</span> and they
@@ -705,17 +602,6 @@ body{
     </div>
   </section>
 
-  <!-- UPGRADE -->
-  <section class="screen" id="sc-upgrade" hidden>
-    <div class="panel">
-      <div class="up-head">
-        <div class="up-title" id="up-title">Horde 1 Survived</div>
-        <div class="up-sub">Choose one &mdash; it is permanent</div>
-      </div>
-      <div class="cards" id="up-cards"></div>
-    </div>
-  </section>
-
   <!-- PAUSE -->
   <section class="screen" id="sc-pause" hidden>
     <div class="panel">
@@ -729,29 +615,9 @@ body{
         <button class="btn ghost" id="btn-quit">Quit to Menu</button>
       </div>
       <div class="toggles">
-        <button class="tog wide" id="tog-aim2" aria-pressed="false">Auto-aim: Off</button>
-        <button class="tog wide" id="tog-cheat2" aria-pressed="false">Cheats: Off</button>
         <button class="tog" id="tog-quality2" aria-pressed="false">Quality: Balanced</button>
         <button class="tog" id="tog-fx2" aria-pressed="true">Effects: On</button>
         <button class="tog wide" id="tog-sound2" aria-pressed="true">Sound: On</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- CHEATS -->
-  <section class="screen sheet" id="sc-cheats" hidden>
-    <div class="cheat-panel">
-      <div class="cheat-head">
-        <span class="cheat-title">Cheats</span>
-        <button class="cheat-close" id="btn-cheat-close">Close</button>
-      </div>
-      <div class="cheat-sec">Weapon &mdash; tap to equip</div>
-      <div class="cheat-grid" id="cheat-weps"></div>
-      <div class="cheat-sec">Upgrades &mdash; tap to add a level</div>
-      <div class="cheat-grid" id="cheat-ups"></div>
-      <div class="cheat-note">
-        The world is frozen while this is open. Using anything here marks the run:
-        it <b>will not set a best time or score</b>.
       </div>
     </div>
   </section>
@@ -921,9 +787,8 @@ function main(hotData) {
   });
 
   /* ------------------------------------------------------------------ weapons
-     Base stats live here; upgrades are multipliers layered on top (see recalc).
-     Keeping them separate is what lets you swap guns mid-run without your build
-     evaporating or a +25% bonus silently becoming a flat number.
+     There are no upgrades: the gun you carry is the whole of your firepower,
+     and a better one is found, not earned.
      snd: [filter start Hz, filter end Hz, duration, gain] for the report.
      recoil: kick is how hard the gun and shoulders snap back (0..1), cam how
      far the camera is shoved against the shot, bloom the extra spread each shot
@@ -1139,17 +1004,38 @@ function main(hotData) {
         o.start(t + i * 0.055); o.stop(t + i * 0.055 + 0.12);
       });
     },
-    // the horde cue: a low detuned swell that rises before the dead arrive
+    // The horde cue: the dead screaming, somewhere out in the dark. Three
+    // voices, each a buzzing source through two vowel formants ("aah" -> "ooh"
+    // as it dies), with its pitch torn upward and falling away, a rasp of
+    // breath on top. Staggered, so it reads as a crowd, not a siren.
     horde: function () {
       if (!this.on || !this.ready) return;
-      var t = this.ctx.currentTime;
-      [55, 55.7, 82.4].forEach(function (hz, i) {
-        var o = Audio_.ctx.createOscillator();
+      var ctx = this.ctx, t0 = ctx.currentTime;
+      [[0, 190, 1.0], [0.16, 150, 0.8], [0.31, 232, 0.65]].forEach(function (v) {
+        var t = t0 + v[0], hz = v[1], dur = 1.35;
+        var o = ctx.createOscillator();
         o.type = 'sawtooth';
-        o.frequency.setValueAtTime(hz, t);
-        o.frequency.linearRampToValueAtTime(hz * 1.06, t + 1.6);
-        Audio_.env(o, t, 0.9, 1.4, i === 2 ? 0.07 : 0.11);
-        o.start(t); o.stop(t + 2.5);
+        o.frequency.setValueAtTime(hz * 0.7, t);
+        o.frequency.exponentialRampToValueAtTime(hz * 2.1, t + 0.18);
+        o.frequency.exponentialRampToValueAtTime(hz * 1.6, t + 0.6);
+        o.frequency.exponentialRampToValueAtTime(hz * 0.8, t + dur);
+        var wob = ctx.createOscillator(), wg = ctx.createGain();   // a ragged throat
+        wob.frequency.value = 7 + Math.random() * 5; wg.gain.value = hz * 0.09;
+        wob.connect(wg); wg.connect(o.frequency);
+        var mix = ctx.createGain(); mix.gain.value = 1;
+        [[800, 560, 6], [1250, 900, 7]].forEach(function (fm) {
+          var f = ctx.createBiquadFilter();
+          f.type = 'bandpass'; f.Q.value = fm[2];
+          f.frequency.setValueAtTime(fm[0], t);
+          f.frequency.linearRampToValueAtTime(fm[1], t + dur);
+          o.connect(f); f.connect(mix);
+        });
+        var br = Audio_.noise(dur), bf = ctx.createBiquadFilter();
+        bf.type = 'bandpass'; bf.frequency.value = 2400; bf.Q.value = 0.9;
+        br.connect(bf); bf.connect(mix);
+        Audio_.env(mix, t, 0.09, dur, 0.5 * v[2]);
+        o.start(t); o.stop(t + dur + 0.1); wob.start(t); wob.stop(t + dur + 0.1);
+        br.start(t); br.stop(t + dur);
       });
     },
     fanfare: function () {
@@ -1181,8 +1067,6 @@ function main(hotData) {
   var canvas = $('scene');
   var app = $('app');
   var fxOn = store.get('fx', true);
-  var cheatsOn = store.get('cheats', false);
-  var autoAim = store.get('autoAim', false);   // off by default: aim is the player's job
   var quality = store.get('quality', 'balanced');
   if (QORDER.indexOf(quality) === -1) quality = 'balanced';
   var Q = QUALITY[quality];
@@ -3348,7 +3232,7 @@ function main(hotData) {
     var g = miniSrc.getContext('2d');
     g.imageSmoothingEnabled = true;
     g.drawImage(groundCanvas, 0, 0, miniSrc.width, miniSrc.height);
-    g.fillStyle = 'rgba(5,7,9,.35)';
+    g.fillStyle = 'rgba(5,5,5,.35)';
     g.fillRect(0, 0, miniSrc.width, miniSrc.height);
     g.fillStyle = 'rgba(92,100,110,.95)';
     BUILDINGS.forEach(function (BI) {
@@ -3371,9 +3255,6 @@ function main(hotData) {
     critMult: 2, regen: 0, armor: 0, magnet: 3.2, knock: 0,
     cooldown: 0, hurtCd: 0, muzzle: 0, gait: 0,
     wep: 'rifle', torch: false,
-    // upgrades write here, never to the weapon
-    mul: { damage: 1, fireRate: 1, bulletSpeed: 1, range: 1 },
-    add: { pierce: 0, shots: 0, crit: 0, spread: 0 },
     recoil: 0, bloom: 0, hipYaw: 0, back: 0, lean: 0, kx: 0, kz: 0
   };
 
@@ -3382,14 +3263,14 @@ function main(hotData) {
   var eff = {};
   function recalc() {
     var w = WEAPONS[player.wep];
-    eff.damage = w.damage * player.mul.damage;
-    eff.fireRate = w.fireRate * player.mul.fireRate;
-    eff.bulletSpeed = w.bulletSpeed * player.mul.bulletSpeed;
-    eff.range = w.range * player.mul.range;
-    eff.pierce = w.pierce + player.add.pierce;
-    eff.shots = w.shots + player.add.shots;
-    eff.spread = w.spread + player.add.spread;
-    eff.crit = Math.min(0.75, w.crit + player.add.crit);
+    eff.damage = w.damage;
+    eff.fireRate = w.fireRate;
+    eff.bulletSpeed = w.bulletSpeed;
+    eff.range = w.range;
+    eff.pierce = w.pierce;
+    eff.shots = w.shots;
+    eff.spread = w.spread;
+    eff.crit = Math.min(0.75, w.crit);
     eff.explosive = !!w.explosive;
     eff.blastRadius = w.blastRadius || 0;
     eff.blastDamage = w.blastDamage || 0;
@@ -4018,10 +3899,10 @@ function main(hotData) {
     }
     if (!ok) return;
 
-    var hpScale = 1 + 0.135 * (level - 1);
+    // gentler than it was: with no upgrades, the player never gets stronger
+    var hpScale = 1 + 0.07 * (level - 1);
     var spScale = Math.min(1.42, 1 + 0.022 * (level - 1));
-    // damage scales too — without this, flat armour eventually zeroes every hit
-    var dmgScale = 1 + 0.12 * (level - 1);
+    var dmgScale = 1 + 0.06 * (level - 1);
 
     zombies.push({
       type: typeName, x: x, z: z, angle: 0,
@@ -4072,85 +3953,20 @@ function main(hotData) {
 
   /* ------------------------------------------------------------------ state */
   var G = {
-    screen: 'menu',        // menu | how | playing | upgrade | pause | over
-    hordes: 0, level: 1, score: 0, kills: 0, time: 0, cheated: false, blastT: 0,
+    screen: 'menu',        // menu | how | playing | pause | over
+    hordes: 0, level: 1, score: 0, kills: 0, time: 0, blastT: 0,
     shake: 0, running: true
   };
   var best = { time: store.get('bestTime', 0), score: store.get('bestScore', 0) };
   // best wave was retired with the wave system; drop the stale record
   try { localStorage.removeItem('gys.bestWave'); } catch (e) {}
 
-  /* ---------------------------------------------------------------- upgrades */
-  var UPGRADES = [
-    { id: 'dmg', name: 'Hollow Points', max: 8, glyph: 'burst',
-      desc: function () { return '+25% weapon damage'; },
-      apply: function () { player.mul.damage *= 1.25; } },
-    { id: 'rof', name: 'Lightened Bolt', max: 8, glyph: 'rate',
-      desc: function () { return '+18% fire rate'; },
-      apply: function () { player.mul.fireRate *= 1.18; } },
-    { id: 'spd', name: 'Lighter Boots', max: 5, glyph: 'boot',
-      desc: function () { return '+12% movement speed'; },
-      apply: function () { player.speed *= 1.12; } },
-    { id: 'hp', name: 'Field Rations', max: 8, glyph: 'heart',
-      desc: function () { return '+25 max health, fully heal'; },
-      apply: function () { player.maxHp += 25; player.hp = player.maxHp; } },
-    { id: 'pierce', name: 'Steel Core', max: 4, glyph: 'pierce',
-      desc: function () { return 'Rounds pass through +1 body'; },
-      apply: function () { player.add.pierce += 1; } },
-    { id: 'crit', name: 'Marked Rounds', max: 6, glyph: 'crit',
-      desc: function () { return '+8% critical chance'; },
-      apply: function () { player.add.crit += 0.08; } },
-    { id: 'regen', name: 'Combat Stims', max: 5, glyph: 'cross',
-      desc: function () { return '+0.55 health/sec once you go 2s unhit'; },
-      apply: function () { player.regen += 0.55; } },
-    { id: 'armor', name: 'Plate Carrier', max: 5, glyph: 'shield',
-      desc: function () { return 'Take 7% less damage, up to 35%'; },
-      apply: function () { player.armor = Math.min(0.35, player.armor + 0.07); } },
-    { id: 'magnet', name: 'Scav Instinct', max: 4, glyph: 'magnet',
-      desc: function () { return '+70% pickup radius'; },
-      apply: function () { player.magnet *= 1.7; } },
-    { id: 'vel', name: 'Hot Loads', max: 4, glyph: 'vel',
-      desc: function () { return '+25% bullet speed and range'; },
-      apply: function () { player.mul.bulletSpeed *= 1.25; player.mul.range *= 1.12; } },
-    { id: 'knock', name: 'Heavy Slugs', max: 3, glyph: 'burst',
-      desc: function () { return '+18% damage, rounds knock bodies back'; },
-      apply: function () { player.mul.damage *= 1.18; player.knock += 1.6; } }
-  ];
-  var upgradeLevels = {};
-
-  var GLYPHS = {
-    burst: '<path d="M10 1l2.1 5.2L17.5 5l-3 4.6 4 3.3-5.6.6L12 19l-2-4.6L4.4 15l2.4-4.2L3 7.6l5.4.5z" fill="currentColor"/>',
-    rate: '<path d="M2 14h4l2-8 3 12 2.5-7H18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-    boot: '<path d="M4 2h4v7l6 3v5H4z" fill="currentColor"/>',
-    heart: '<path d="M10 17S2.5 12.4 2.5 7.4A4 4 0 0110 5.6a4 4 0 017.5 1.8c0 5-7.5 9.6-7.5 9.6z" fill="currentColor"/>',
-    pierce: '<path d="M1 10h14M11 6l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
-    fan: '<path d="M10 17L4 4M10 17l6-13M10 17V3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-    crit: '<circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="10" cy="10" r="2.4" fill="currentColor"/>',
-    cross: '<path d="M8 2h4v6h6v4h-6v6H8v-6H2V8h6z" fill="currentColor"/>',
-    shield: '<path d="M10 2l7 2.6v5c0 4.4-3 7.6-7 8.9-4-1.3-7-4.5-7-8.9v-5z" fill="currentColor"/>',
-    magnet: '<path d="M4 3v7a6 6 0 0012 0V3h-4v7a2 2 0 01-4 0V3z" fill="currentColor"/>',
-    vel: '<path d="M2 13l10-9-3 6h9L8 19l3-6z" fill="currentColor"/>'
-  };
-
-  function offerUpgrades() {
-    var pool = UPGRADES.filter(function (u) {
-      return (upgradeLevels[u.id] || 0) < u.max;
-    });
-    var out = [];
-    var copy = pool.slice();
-    while (out.length < 3 && copy.length) {
-      out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
-    }
-    return out;
-  }
-
-  /* ---------------------------------------------------------------- UI wiring */
   var ui = {
-    hud: $('hud'), menu: $('sc-menu'), how: $('sc-how'), upgrade: $('sc-upgrade'),
-    pause: $('sc-pause'), over: $('sc-over'), cheats: $('sc-cheats'),
+    hud: $('hud'), menu: $('sc-menu'), how: $('sc-how'),
+    pause: $('sc-pause'), over: $('sc-over'),
     hpFill: $('hp-fill'), hpGhost: $('hp-ghost'), hpText: $('hp-text'),
     roWep: $('ro-wep'), roTime: $('ro-time'), roScore: $('ro-score'), roKills: $('ro-kills'),
-    announce: $('announce'), aMain: $('a-main'), aSub: $('a-sub'), hurt: $('hurt')
+    hordeWarn: $('horde-warn'), hurt: $('hurt')
   };
 
   function show(name) {
@@ -4158,20 +3974,13 @@ function main(hotData) {
     G.screen = name;
     ui.menu.hidden = name !== 'menu';
     ui.how.hidden = name !== 'how';
-    ui.upgrade.hidden = name !== 'upgrade';
     ui.pause.hidden = name !== 'pause';
-    ui.cheats.hidden = name !== 'cheats';
     ui.over.hidden = name !== 'over';
-    ui.hud.hidden = !(name === 'playing' || name === 'pause' || name === 'cheats');
+    ui.hud.hidden = !(name === 'playing' || name === 'pause');
     $('hint-l').classList.toggle('gone', name !== 'playing');
     $('hint-r').classList.toggle('gone', name !== 'playing');
   }
 
-  function refreshBest() {
-    $('m-time').textContent = best.time ? fmtTime(best.time) : '—';
-    $('m-score').textContent = best.score ? best.score.toLocaleString() : '—';
-  }
-  refreshBest();
 
   function showToast(name, sub) {
     $('toast-name').textContent = name;
@@ -4182,12 +3991,12 @@ function main(hotData) {
     el.classList.add('show');
   }
 
-  function announce(sub, main) {
-    ui.aSub.textContent = sub;
-    ui.aMain.textContent = main;
-    ui.announce.classList.remove('show');
-    void ui.announce.offsetWidth;
-    ui.announce.classList.add('show');
+  // A horde gets no banner: a scream, and a red sign that flashes at the top
+  // for a few seconds and goes.
+  function hordeWarning() {
+    ui.hordeWarn.classList.remove('show');
+    void ui.hordeWarn.offsetWidth;
+    ui.hordeWarn.classList.add('show');
   }
 
   function updateHud() {
@@ -4218,21 +4027,6 @@ function main(hotData) {
     $('tog-quality2').setAttribute('aria-pressed', name === 'high');
   }
 
-  function setAutoAim(on) {
-    autoAim = on;
-    store.set('autoAim', on);
-    var label = 'Auto-aim: ' + (on ? 'On' : 'Off');
-    $('tog-aim').textContent = label;
-    $('tog-aim2').textContent = label;
-    $('tog-aim').setAttribute('aria-pressed', on);
-    $('tog-aim2').setAttribute('aria-pressed', on);
-    $('hint-l').textContent = IS_TOUCH ? 'move' : 'w a s d';
-    $('hint-r').textContent = IS_TOUCH
-      ? (on ? 'aim' : 'aim + fire')
-      : (on ? 'mouse aims' : 'mouse \u00b7 hold to fire');
-  }
-
-  /* ------------------------------------------------------------ cheat panel */
   function setEffects(on, persist) {
     fxOn = on;
     if (persist !== false) store.set('fx', on);
@@ -4244,71 +4038,6 @@ function main(hotData) {
     $('tog-fx2').textContent = label;
     $('tog-fx').setAttribute('aria-pressed', on);
     $('tog-fx2').setAttribute('aria-pressed', on);
-  }
-
-  function setCheats(on) {
-    cheatsOn = on;
-    store.set('cheats', on);
-    var label = 'Cheats: ' + (on ? 'On' : 'Off');
-    $('tog-cheat').textContent = label;
-    $('tog-cheat2').textContent = label;
-    $('tog-cheat').setAttribute('aria-pressed', on);
-    $('tog-cheat2').setAttribute('aria-pressed', on);
-    $('btn-cheats').hidden = !on;
-    if (!on && G.screen === 'cheats') show('playing');
-  }
-
-  function buildCheatPanel() {
-    var wepHost = $('cheat-weps');
-    wepHost.innerHTML = '';
-    WEP_IDS.forEach(function (id) {
-      var w = WEAPONS[id];
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'cheat-btn';
-      btn.dataset.on = id === player.wep ? '1' : '0';
-      btn.innerHTML = '<span></span><span class="lvl"></span>';
-      btn.firstChild.textContent = w.name;
-      btn.lastChild.textContent = id === player.wep ? 'Equipped' : w.short;
-      btn.addEventListener('click', function () {
-        G.cheated = true;
-        equip(id, false);
-        buildCheatPanel();
-        updateHud();
-      });
-      wepHost.appendChild(btn);
-    });
-
-    var upHost = $('cheat-ups');
-    upHost.innerHTML = '';
-    UPGRADES.forEach(function (u) {
-      var lvl = upgradeLevels[u.id] || 0;
-      var maxed = lvl >= u.max;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'cheat-btn';
-      btn.disabled = maxed;
-      btn.innerHTML = '<span></span><span class="lvl"></span>';
-      btn.firstChild.textContent = u.name;
-      btn.lastChild.textContent = maxed ? 'MAX ' + lvl : 'LV ' + lvl + ' / ' + u.max;
-      btn.addEventListener('click', function () {
-        if ((upgradeLevels[u.id] || 0) >= u.max) return;
-        G.cheated = true;
-        u.apply();
-        recalc();
-        upgradeLevels[u.id] = (upgradeLevels[u.id] || 0) + 1;
-        Audio_.pickup();
-        buildCheatPanel();
-        updateHud();
-      });
-      upHost.appendChild(btn);
-    });
-  }
-
-  function openCheats() {
-    if (!cheatsOn) return;
-    buildCheatPanel();
-    show('cheats');
   }
 
   function setSound(on) {
@@ -4410,7 +4139,6 @@ function main(hotData) {
     if (e.key === 'Escape') {
       if (!$('menu-settings').hidden) openSettings(false);
       else if (G.screen === 'how') show('menu');
-      else if (G.screen === 'cheats') show('playing');
       else if (G.screen === 'playing' || G.screen === 'pause') togglePause();
     }
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) >= 0) {
@@ -4517,17 +4245,6 @@ function main(hotData) {
     return true;
   }
 
-  function nearestZombie(maxDist) {
-    var best = null, bestD = maxDist * maxDist;
-    for (var i = 0; i < zombies.length; i++) {
-      var z = zombies[i];
-      var dx = z.x - player.x, dz = z.z - player.z;
-      var d2 = dx * dx + dz * dz;
-      if (d2 < bestD) { bestD = d2; best = z; }
-    }
-    return best;
-  }
-
   function fire(dt) {
     player.cooldown -= dt;
     // recoil springs back; bloom bleeds off at the weapon's own rate
@@ -4546,14 +4263,6 @@ function main(hotData) {
       if (g) {
         aimA = Math.atan2(g.x - player.x, g.z - player.z);
         wantFire = mouse.down;          // hold to fire on desktop
-      }
-    }
-
-    if (autoAim) {
-      var target = nearestZombie(eff.range);
-      if (target) {
-        if (aimA === null) aimA = Math.atan2(target.x - player.x, target.z - player.z);
-        wantFire = true;
       }
     }
 
@@ -4744,18 +4453,14 @@ function main(hotData) {
     player.hp = 0;
     G.shake = 0.9;
     Audio_.dead();
-    if (!G.cheated) {
-      if (G.time > best.time) { best.time = G.time; store.set('bestTime', best.time); }
-      if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
-      refreshBest();
-    }
+    if (G.time > best.time) { best.time = G.time; store.set('bestTime', best.time); }
+    if (G.score > best.score) { best.score = G.score; store.set('bestScore', best.score); }
     $('o-hordes').textContent = G.hordes;
     $('o-score').textContent = G.score.toLocaleString();
     $('o-kills').textContent = G.kills;
     var mins = Math.floor(G.time / 60), secs = Math.floor(G.time % 60);
     $('o-time').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
-    $('o-eyebrow').textContent = G.cheated ? 'Cheated Run \u2014 Not Recorded'
-      : ((G.time >= best.time && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended');
+    $('o-eyebrow').textContent = (G.time >= best.time && G.score >= best.score) ? 'New Personal Best' : 'Shift Ended';
     setTimeout(function () { show('over'); }, 900);
   }
 
@@ -4769,7 +4474,7 @@ function main(hotData) {
                 held for at least 8 s
        RELAX    nothing spawns until intensity has stayed under 0.15 for 4 s.
                 Gated on the player, not a clock: hurt and cornered, it waits
-       RESPITE  still nothing; an upgrade, and supplies placed ahead of where
+       RESPITE  still nothing; supplies placed ahead of where
                 the player is heading. 12-20 s, or until they push on 50 m
 
      Intensity rises fast and falls slowly, so a scare lingers after the last
@@ -4866,17 +4571,17 @@ function main(hotData) {
       if (o1) D.origins.push(o1);
       if (L >= 6) { var o2 = directorSpot(24, 38, 'ahead'); if (o2) D.origins.push(o2); }
       Audio_.horde();
-      announce('Horde', 'Incoming');
+      hordeWarning();
     } else if (s === 'respite') {
       G.hordes++;
       D.respiteLen = rand(12, 20);
       D.respiteFrom = { x: player.x, z: player.z };
       Audio_.fanfare();
-      showUpgrades();                // pauses; supplies land once a card is chosen
+      placeSupplies();
     }
   }
 
-  // Once the upgrade is chosen: what is the player short of? Put it ahead.
+  // A horde survived: what is the player short of? Put it ahead.
   function placeSupplies() {
     spawnWeaponCrate();
     if (G.level >= 8 && Math.random() < 0.5) spawnWeaponCrate();
@@ -4997,30 +4702,9 @@ function main(hotData) {
     return m + ':' + (r < 10 ? '0' : '') + r;
   }
 
-  // The Director is invisible by design, which makes it impossible to tune by
-  // feel alone. With cheats on, a readout shows what it is thinking.
-  var dirDbgEl = null, dirDbgT = 0;
-  function syncDirectorDebug(dt) {
-    if (!dirDbgEl) dirDbgEl = $('dir-dbg');
-    var on = cheatsOn && (G.screen === 'playing' || G.screen === 'cheats' || G.screen === 'pause');
-    dirDbgEl.hidden = !on;
-    if (!on) return;
-    dirDbgT -= dt;
-    if (dirDbgT > 0) return;
-    dirDbgT = 0.15;
-    var extra = D.state === 'peak' ? ' · horde ' + D.spawned + '/' + D.budget
-              : D.state === 'relax' ? ' · calm ' + D.calm.toFixed(1) + '/4s'
-              : D.state === 'respite' ? ' · ' + (D.respiteLen - D.t).toFixed(0) + 's left' : '';
-    dirDbgEl.textContent = D.state.toUpperCase() + ' ' + D.t.toFixed(1) + 's' + extra +
-      ' · intensity ' + D.intensity.toFixed(2) + ' (→' + D.target.toFixed(2) + ')' +
-      ' · alive ' + zombies.length + aiCounts() + ' · level ' + G.level.toFixed(1) +
-      ' · special ' + Math.max(0, D.specCd).toFixed(0) + 's';
-  }
-
   function resetRun() {
     zombies.length = 0; bullets.length = 0; eBullets.length = 0;
     parts.length = 0; pickups.length = 0; decals.length = 0;
-    upgradeLevels = {};
     player.x = SPAWN.x; player.z = SPAWN.z; player.vx = 0; player.vz = 0; player.angle = PI;
     resolveProps(player);
     updateNav(true);
@@ -5031,54 +4715,14 @@ function main(hotData) {
     player.recoil = 0; player.bloom = 0; player.hipYaw = 0; player.back = 0; player.lean = 0;
     player.kx = 0; player.kz = 0;
     G.kick = 0;
-    player.mul.damage = player.mul.fireRate = 1;
-    player.mul.bulletSpeed = player.mul.range = 1;
-    player.add.pierce = player.add.shots = player.add.crit = player.add.spread = 0;
     equip('rifle', false);
     player.torch = false;
     G.hordes = 0; G.level = 1; G.score = 0; G.kills = 0; G.time = 0;
-    G.shake = 0; G.cheated = false;
+    G.shake = 0;
     input.mx = input.mz = 0; input.aiming = false;
     resetDirector();
     // the night is black: the first flashlight lies a few steps away
     spawnDrop('torch', 4, 8);
-    updateHud();
-  }
-
-  function showUpgrades() {
-    var offers = offerUpgrades();
-    $('up-title').textContent = 'Horde ' + G.hordes + ' Survived';
-    var host = $('up-cards');
-    host.innerHTML = '';
-    if (!offers.length) { endUpgrade(); return; }
-    offers.forEach(function (u) {
-      var lvl = upgradeLevels[u.id] || 0;
-      var btn = document.createElement('button');
-      btn.className = 'card';
-      btn.type = 'button';
-      btn.innerHTML =
-        '<span class="glyph"><svg viewBox="0 0 20 20" aria-hidden="true">' +
-        (GLYPHS[u.glyph] || GLYPHS.burst) + '</svg></span>' +
-        '<span class="body"><span class="nm"></span><span class="ds"></span></span>' +
-        '<span class="lv"></span>';
-      btn.querySelector('.nm').textContent = u.name;
-      btn.querySelector('.ds').textContent = u.desc();
-      btn.querySelector('.lv').textContent = lvl ? 'LV ' + (lvl + 1) : 'NEW';
-      btn.addEventListener('click', function () {
-        u.apply();
-        recalc();
-        upgradeLevels[u.id] = lvl + 1;
-        Audio_.pickup();
-        endUpgrade();
-      });
-      host.appendChild(btn);
-    });
-    show('upgrade');
-  }
-
-  function endUpgrade() {
-    show('playing');
-    placeSupplies();
     updateHud();
   }
 
@@ -6127,7 +5771,7 @@ function main(hotData) {
       d.className = 'threat';
       d.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true">' +
         '<path d="M10 1.5l7 15.5-7-3.6-7 3.6z" fill="currentColor" ' +
-        'stroke="rgba(5,7,9,.75)" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+        'stroke="rgba(5,5,5,.75)" stroke-width="1.4" stroke-linejoin="round"/></svg>';
       threatHost.appendChild(d);
       threatPool.push(d);
     }
@@ -6137,7 +5781,7 @@ function main(hotData) {
   var MINI_RANGE = 34;   // world units from the player, edge to centre
 
   function syncMinimap() {
-    var live = G.screen === 'playing' || G.screen === 'cheats';
+    var live = G.screen === 'playing';
     miniCv.classList.toggle('on', live);
     if (!live) return;
 
@@ -6152,12 +5796,12 @@ function main(hotData) {
       (player.x - MINI_RANGE - BX0) * sr, (player.z - MINI_RANGE - BZ0) * sr,
       MINI_RANGE * 2 * sr, MINI_RANGE * 2 * sr, 0, 0, w, w);
     miniCtx.restore();
-    miniCtx.strokeStyle = 'rgba(46,57,65,.9)';
+    miniCtx.strokeStyle = 'rgba(44,35,35,.9)';
     miniCtx.lineWidth = 2;
     miniCtx.strokeRect(c + (BX0 - player.x) * k, c + (BZ0 - player.z) * k,
                        (BX1 - BX0) * k, (BZ1 - BZ0) * k);
     // lamps as landmarks, since light is how you orient at night
-    miniCtx.fillStyle = 'rgba(255,164,36,.55)';
+    miniCtx.fillStyle = 'rgba(226,40,47,.55)';
     for (var li2 = 0; li2 < LAMPS.length; li2++) {
       var lp = LAMPS[li2];
       var lx = c + (lp.x - player.x) * k, lz = c + (lp.z - player.z) * k;
@@ -6186,7 +5830,7 @@ function main(hotData) {
 
     for (var i = 0; i < pickups.length; i++) {
       var p = pickups[i];
-      if (p.kind === 'weapon') dot(p.x, p.z, 2.6, '#EDE7D9');
+      if (p.kind === 'weapon') dot(p.x, p.z, 2.6, '#A89E96');
       else if (p.kind === 'torch') dot(p.x, p.z, 2.6, '#BFE6FF');
       else if (p.kind === 'health') dot(p.x, p.z, 2, '#E23B3B');
     }
@@ -6200,7 +5844,7 @@ function main(hotData) {
     miniCtx.save();
     miniCtx.translate(c, c);
     miniCtx.rotate(player.angle + PI);
-    miniCtx.fillStyle = '#FFA424';
+    miniCtx.fillStyle = '#EDE7E3';
     miniCtx.beginPath();
     miniCtx.moveTo(0, -5); miniCtx.lineTo(3.6, 4); miniCtx.lineTo(-3.6, 4);
     miniCtx.closePath(); miniCtx.fill();
@@ -6256,7 +5900,7 @@ function main(hotData) {
         el.style.transform =
           'translate(' + (cx + ax * t) + 'px,' + (cy + ay * t) + 'px) ' +
           'rotate(' + (a * 180 / PI + 90) + 'deg)';
-        el.style.color = dist < 13 ? '#E23B3B' : '#FFA424';
+        el.style.color = dist < 13 ? '#FF3036' : '#A3141A';
         el.classList.add('on');
       }
     }
@@ -6573,7 +6217,7 @@ function main(hotData) {
     } else if (G.screen === 'menu' || G.screen === 'how') {
       menuAmbience(dt);
     } else {
-      // paused / upgrade / game over — hold the world still but keep drawing
+      // paused / game over — hold the world still but keep drawing
       if (G.screen !== 'menu' && G.screen !== 'how') {
         updateCamera(dt);
         syncPlayer(now / 1000);
@@ -6582,7 +6226,6 @@ function main(hotData) {
 
     syncThreats();
     syncMinimap();
-    syncDirectorDebug(dt);
     syncZombies();
     syncBullets();
     syncParticles();
@@ -6642,7 +6285,7 @@ function main(hotData) {
   function openSettings(on) {
     $('menu-settings').hidden = !on;
     $('btn-settings').setAttribute('aria-expanded', on);
-    if (on) $('tog-aim').focus();
+    if (on) $('tog-quality').focus();
   }
   $('btn-settings').addEventListener('click', function () { openSettings($('menu-settings').hidden); });
   $('btn-settings-close').addEventListener('click', function () { openSettings(false); $('btn-settings').focus(); });
@@ -6675,21 +6318,15 @@ function main(hotData) {
   }
   $('tog-quality').addEventListener('click', cycleQuality);
   $('tog-quality2').addEventListener('click', cycleQuality);
-  $('btn-cheats').addEventListener('click', openCheats);
-  $('btn-cheat-close').addEventListener('click', function () { show('playing'); });
   $('tog-fx').addEventListener('click', function () { setEffects(!fxOn); });
   $('tog-fx2').addEventListener('click', function () { setEffects(!fxOn); });
-  $('tog-cheat').addEventListener('click', function () { setCheats(!cheatsOn); });
-  $('tog-cheat2').addEventListener('click', function () { setCheats(!cheatsOn); });
-  $('tog-aim').addEventListener('click', function () { setAutoAim(!autoAim); });
-  $('tog-aim2').addEventListener('click', function () { setAutoAim(!autoAim); });
   $('tog-sound').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
   $('tog-sound2').addEventListener('click', function () { Audio_.unlock(); setSound(!Audio_.on); });
 
   setQuality(quality);
   setSound(Audio_.on);
-  setAutoAim(autoAim);
-  setCheats(cheatsOn);
+  $('hint-l').textContent = IS_TOUCH ? 'move' : 'w a s d';
+  $('hint-r').textContent = IS_TOUCH ? 'aim + fire' : 'mouse \u00b7 hold to fire';
   setEffects(fxOn);
   checkOrientation();
   equip('rifle', false);   // derive eff[] before the first frame
@@ -6703,7 +6340,6 @@ function main(hotData) {
   if (hotData && hotData.bestTime > best.time) {
     best.time = hotData.bestTime;
     best.score = Math.max(best.score, hotData.bestScore || 0);
-    refreshBest();
   }
 
   // Installable build only: on the artifact host there is no sw.js to fetch and
