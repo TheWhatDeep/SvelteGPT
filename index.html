@@ -59,9 +59,35 @@ body{
   background:var(--pit);
   overflow:hidden;
   touch-action:none;
+  /* portrait: a square view on top, the control deck below it */
+  display:flex;flex-direction:column;align-items:center;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);
 }
+/* the game's window on the world: always 1:1, sized in resize() */
+#stage{position:relative;flex:none;width:100%;overflow:hidden;background:var(--pit);}
 
 #scene{display:block;width:100%;height:100%;}
+
+/* The control deck: everything under the view is thumb space. Left half moves,
+   right half aims and fires; the minimap sits between them. */
+#pad{
+  position:relative;flex:1;align-self:center;width:100%;min-height:0;
+  display:flex;align-items:stretch;
+  border-top:1px solid var(--red-deep);
+  background:
+    radial-gradient(ellipse 60% 70% at 25% 55%, rgba(237,231,217,.035), rgba(237,231,217,0) 70%),
+    radial-gradient(ellipse 60% 70% at 75% 55%, rgba(226,40,47,.05), rgba(226,40,47,0) 70%),
+    var(--pit);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.padzone{
+  flex:1;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:16px;pointer-events:none;
+  font-size:var(--fs-label);letter-spacing:.28em;text-transform:uppercase;
+  color:rgba(237,231,217,.22);transition:opacity .3s ease;
+}
+.padzone.gone{opacity:0;}
+#pad-mid{flex:none;display:flex;align-items:flex-start;justify-content:center;padding-top:112px;}
 
 /* Atmospheric vignette over the render — sells the lamp-lit night */
 #vignette{
@@ -72,15 +98,14 @@ body{
 }
 
 /* ---------------- HUD ---------------- */
+/* the HUD lives on the deck, so the square view is all game */
 #hud{
-  position:absolute;inset:0;z-index:3;pointer-events:none;
+  position:absolute;left:0;right:0;top:0;z-index:3;pointer-events:none;
   display:flex;flex-direction:column;
 }
 #hud-top{
   display:flex;flex-direction:column;gap:7px;
-  padding:12px 16px 26px;
-  /* the lot can be bright under a lamp — keep the readout legible over it */
-  background:linear-gradient(180deg,rgba(5,5,5,.82) 0%,rgba(5,5,5,.52) 58%,rgba(5,5,5,0) 100%);
+  padding:12px 16px 0;
 }
 .vit{display:flex;align-items:center;gap:10px;}
 
@@ -138,7 +163,7 @@ body{
 
 /* Horde warning: a red sign at the top that flashes, then goes */
 #horde-warn{
-  position:absolute;left:50%;top:calc(58px + env(safe-area-inset-top,0px));
+  position:absolute;left:50%;top:14px;
   width:clamp(44px,6.4vw,58px);height:auto;margin-left:calc(clamp(44px,6.4vw,58px) / -2);
   pointer-events:none;z-index:4;opacity:0;color:var(--red);
   filter:drop-shadow(0 0 14px rgba(226,40,47,.7));
@@ -205,20 +230,8 @@ body{
 #stick-aim .knob{
   background:rgba(226,40,47,.2);border-color:rgba(226,40,47,.62);
 }
-.hintzone{
-  position:absolute;bottom:0;height:42%;width:50%;
-  display:flex;align-items:flex-end;justify-content:center;
-  padding-bottom:20px;
-  font-size:var(--fs-label);letter-spacing:.28em;text-transform:uppercase;
-  color:rgba(237,231,217,.2);
-  transition:opacity .3s ease;
-}
-#hint-l{left:0;}
-#hint-r{right:0;}
-.hintzone.gone{opacity:0;}
-
 #minimap{
-  position:absolute;right:16px;top:112px;width:104px;height:104px;z-index:3;
+  position:relative;width:96px;height:96px;z-index:3;
   pointer-events:none;opacity:0;transition:opacity .2s ease;
   background:rgba(5,5,5,.62);
   border:1px solid var(--fog);
@@ -473,44 +486,10 @@ body{
 </style>
 
 <div id="app">
+ <div id="stage">
   <canvas id="scene"></canvas>
   <div id="vignette"></div>
-
-  <div id="sticks">
-    <div class="stick" id="stick-move"><div class="knob"></div></div>
-    <div class="stick" id="stick-aim"><div class="knob"></div></div>
-    <div class="hintzone" id="hint-l">move</div>
-    <div class="hintzone" id="hint-r">aim + fire</div>
-  </div>
-
   <div id="threats"></div>
-  <canvas id="minimap" width="150" height="150" aria-hidden="true"></canvas>
-
-  <div id="hud" hidden>
-    <div id="hud-top">
-      <div class="vit">
-        <div class="hpwrap">
-          <div class="hpghost" id="hp-ghost"></div>
-          <div class="hpfill" id="hp-fill"></div>
-          <div class="hptext" id="hp-text">100 / 100</div>
-        </div>
-        <div class="hudbtns">
-          <button class="pausebtn" id="btn-pause" aria-label="Pause">
-            <svg viewBox="0 0 12 14" aria-hidden="true">
-              <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
-              <rect x="8" y="0" width="4" height="14" fill="currentColor"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="readout">
-        <span class="wep" id="ro-wep">Rifle</span>
-        <span class="tm"><b id="ro-time">0:00</b></span>
-        <span>Score <b id="ro-score">0</b></span>
-        <span>Kills <b id="ro-kills">0</b></span>
-      </div>
-    </div>
-  </div>
 
   <div id="horde-warn" role="img" aria-label="Horde incoming">
     <svg viewBox="0 0 64 56" aria-hidden="true">
@@ -521,6 +500,42 @@ body{
   </div>
   <div id="hurt"></div>
   <div id="toast"><div class="t-name" id="toast-name"></div><div class="t-sub" id="toast-sub"></div></div>
+ </div>
+
+  <div id="pad">
+  <div id="hud" hidden>
+      <div id="hud-top">
+        <div class="vit">
+          <div class="hpwrap">
+            <div class="hpghost" id="hp-ghost"></div>
+            <div class="hpfill" id="hp-fill"></div>
+            <div class="hptext" id="hp-text">100 / 100</div>
+          </div>
+          <div class="hudbtns">
+            <button class="pausebtn" id="btn-pause" aria-label="Pause">
+              <svg viewBox="0 0 12 14" aria-hidden="true">
+                <rect x="0" y="0" width="4" height="14" fill="currentColor"/>
+                <rect x="8" y="0" width="4" height="14" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="readout">
+          <span class="wep" id="ro-wep">Rifle</span>
+          <span class="tm"><b id="ro-time">0:00</b></span>
+          <span>Score <b id="ro-score">0</b></span>
+          <span>Kills <b id="ro-kills">0</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="padzone" id="hint-l">move</div>
+    <div id="pad-mid"><canvas id="minimap" width="150" height="150" aria-hidden="true"></canvas></div>
+    <div class="padzone" id="hint-r">aim + fire</div>
+  </div>
+  <div id="sticks">
+    <div class="stick" id="stick-move"><div class="knob"></div></div>
+    <div class="stick" id="stick-aim"><div class="knob"></div></div>
+  </div>
 
   <!-- MENU -->
   <section class="screen" id="sc-menu">
@@ -559,11 +574,11 @@ body{
         <div class="up-sub">Survive the night.</div>
       </div>
       <div class="howto">
-        <p><b>Move</b> — drag anywhere on the <span class="k">left half</span> of the
-          screen. The stick appears under your thumb.</p>
-        <p><b>Shoot</b> — drag on the <span class="k">right half</span>. You fire in
-          the direction you point, and only while you are pointing. Two thumbs,
-          both busy.</p>
+        <p><b>Move</b> — drag on the <span class="k">left half</span> of the deck
+          under the view. The stick appears under your thumb.</p>
+        <p><b>Shoot</b> — drag on the <span class="k">right half</span> of the deck.
+          You fire in the direction you point, and only while you are pointing. Two
+          thumbs, both busy.</p>
         <p><b>Grab the flashlight</b> — the night is black. One lies a few steps from
           where you start; a <span class="k">blue arrow</span> points to it if it is
           off-screen. Without it you can barely see past your own feet.</p>
@@ -650,9 +665,9 @@ body{
         <path d="M46 30l4 3 3-5" stroke="currentColor" stroke-width="3" fill="none"
               stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <div class="rot-title">Turn your phone</div>
-      <div class="rot-sub">Graveyard Shift is played sideways. You need the width
-        to see what is coming.</div>
+      <div class="rot-title">Hold it upright</div>
+      <div class="rot-sub">This build of Graveyard Shift plays in portrait: the
+        view on top, your thumbs on the deck below.</div>
     </div>
   </div>
 
@@ -1066,6 +1081,7 @@ function main(hotData) {
   /* -------------------------------------------------------------- renderer */
   var canvas = $('scene');
   var app = $('app');
+  var stage = $('stage'), pad = $('pad');   // the square view, the control deck
   var fxOn = store.get('fx', true);
   var quality = store.get('quality', 'balanced');
   if (QORDER.indexOf(quality) === -1) quality = 'balanced';
@@ -1098,6 +1114,7 @@ function main(hotData) {
   var camera = new T.PerspectiveCamera(58, 1, 0.5, 120);
   var CAM_TILT = 64 * PI / 180;
   var camDist = 34;
+  var VIEW_SPAN = 16;      // metres across the square view
 
   /* ============================================================ OAKHAVEN
      The map is transcribed from a blueprint rather than generated. Every
@@ -4105,9 +4122,13 @@ function main(hotData) {
   app.addEventListener('touchstart', function (e) {
     Audio_.unlock();
     if (!inPlay()) return;
+    if (e.target.closest && e.target.closest('button')) return;   // the pause button
+    // sticks start only on the deck under the view; its halves split the job
+    var pr = pad.getBoundingClientRect();
     for (var i = 0; i < e.changedTouches.length; i++) {
       var t = e.changedTouches[i];
-      if (t.clientX < window.innerWidth * 0.5) {
+      if (t.clientY < pr.top) continue;
+      if (t.clientX < pr.left + pr.width * 0.5) {
         if (!touches.move) stickStart('move', t.identifier, t.clientX, t.clientY);
       } else {
         if (!touches.aim) stickStart('aim', t.identifier, t.clientX, t.clientY);
@@ -4190,7 +4211,7 @@ function main(hotData) {
   var _hit = new T.Vector3();
 
   function screenToGround(px, py) {
-    var rect = app.getBoundingClientRect();
+    var rect = canvas.getBoundingClientRect();
     _ndc.x = ((px - rect.left) / rect.width) * 2 - 1;
     _ndc.y = -((py - rect.top) / rect.height) * 2 + 1;
     _ray.setFromCamera(_ndc, camera);
@@ -5729,15 +5750,11 @@ function main(hotData) {
   }
 
   function updateCamera(dt) {
-    var aspect = app.clientWidth / Math.max(1, app.clientHeight);
-    // Landscape is the design target. Framing by WIDTH there keeps the play
-    // area the same shape on a desktop window and a sideways phone: ~36 units
-    // across either way, which is what sightlines and chokepoints need.
-    // Portrait still frames by height so the player isn't a speck, but it is a
-    // fallback now, not the target.
+    // Portrait build: the view is a square, zoomed in to VIEW_SPAN metres
+    // across (the landscape build shows ~36), so the player and the dead are
+    // big on a phone's narrow width. The threat markers cover the sides.
     var tanV = Math.tan((camera.fov * PI / 180) / 2);
-    var d = aspect < 1 ? 30 / (2 * tanV) : 36 / (2 * tanV * aspect);
-    camDist = clamp(d, 13, 32);
+    camDist = clamp(VIEW_SPAN / (2 * tanV), 13, 32);
 
     // recoil shoves the view back against the shot, then springs home
     G.kick = (G.kick || 0) * Math.exp(-dt * 10);
@@ -5857,7 +5874,7 @@ function main(hotData) {
   function syncThreats() {
     var used = 0;
     if (G.screen === 'playing') {
-      var w = app.clientWidth, h = app.clientHeight;
+      var w = stage.clientWidth, h = stage.clientHeight;
       var aspect = w / Math.max(1, h);
       var tanV = Math.tan((camera.fov * PI / 180) / 2);
       var spanV = 2 * camDist * tanV;                   // world units top-to-bottom
@@ -6127,22 +6144,29 @@ function main(hotData) {
   Post.init();
 
   /* ------------------------------------------------------------------ resize */
-  // Only nag a phone. A narrow desktop window is a legitimate way to play and
-  // shouldn't be blocked; a phone held upright genuinely cannot see enough.
+  // Only nag a phone. A wide desktop window just gets the square view with the
+  // deck under it; a phone held sideways has no room left for the deck.
   var rotateEl = $('rotate');
   function checkOrientation() {
     var w = app.clientWidth || window.innerWidth;
     var h = app.clientHeight || window.innerHeight;
-    var nag = IS_TOUCH && h > w * 1.08;
+    var nag = IS_TOUCH && w > h * 1.08;
     rotateEl.classList.toggle('on', nag);
     if (nag && G.screen === 'playing') togglePause();
   }
 
   function resize() {
-    var w = app.clientWidth || window.innerWidth;
-    var h = app.clientHeight || window.innerHeight;
+    var W = app.clientWidth || window.innerWidth;
+    var H = (app.clientHeight || window.innerHeight) -
+            (parseFloat(getComputedStyle(app).paddingTop) || 0);
+    // the square takes the width, but always leaves the deck at least ~30% of
+    // the height (and 170 px) for thumbs
+    var side = Math.max(120, Math.floor(Math.min(W, H - Math.max(170, H * 0.3))));
+    stage.style.width = stage.style.height = side + 'px';
+    pad.style.maxWidth = side + 'px';      // the deck is as wide as the view
+    var w = side, h = side;
     renderer.setSize(w, h, false);
-    camera.aspect = w / Math.max(1, h);
+    camera.aspect = 1;
     camera.updateProjectionMatrix();
     syncPostSize(true);
     checkOrientation();

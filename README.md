@@ -1,5 +1,14 @@
 # Graveyard Shift
 
+> **Branch `xf-portrait` — experiment.** A portrait build: the game plays in a
+> **1:1 square view** at the top of a phone held upright, zoomed in to 16 m
+> across (the landscape build shows ~36), with a **control deck** filling the
+> screen below it — health, weapon and score along its top, the minimap in the
+> middle, the move stick on its left half and the aim-and-fire stick on its
+> right. Touches on the view itself do nothing, so a thumb never covers the
+> action. A phone held sideways is asked to turn upright; a desktop window gets
+> the square with the deck under it. Everything else is `main`.
+
 A top-down 3D zombie survival shooter, played **in landscape** on desktop or a
 sideways phone. The game itself is one HTML file with no build step and no
 dependencies to install.
